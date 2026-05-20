@@ -9,12 +9,10 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function main(): void {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scanAndRender);
+    document.addEventListener('DOMContentLoaded', refreshRenderedBlocks);
   } else {
-    scanAndRender();
+    refreshRenderedBlocks();
   }
-
-  startObserver();
 }
 
 function scanAndRender(): void {
@@ -38,7 +36,7 @@ function startObserver(): void {
   if (observer) observer.disconnect();
 
   observer = new MutationObserver((mutations) => {
-    if (mutations.some((mutation) => mutation.addedNodes.length > 0)) {
+    if (mutations.length > 0) {
       debouncedScan();
     }
   });
@@ -46,14 +44,27 @@ function startObserver(): void {
   observer.observe(document.body, {
     childList: true,
     subtree: true,
+    characterData: true,
   });
 }
 
 function debouncedScan(): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    scanAndRender();
+    refreshRenderedBlocks();
   }, DEBOUNCE_MS);
+}
+
+function refreshRenderedBlocks(): void {
+  if (observer) observer.disconnect();
+
+  rendererInstances.forEach((instance) => {
+    instance.destroy();
+  });
+  rendererInstances.clear();
+
+  scanAndRender();
+  startObserver();
 }
 
 window.addEventListener('beforeunload', () => {
