@@ -10,6 +10,7 @@ export function shouldRenderCodeBlock(language: string | undefined, text: string
   const normalizedLanguage = language?.trim().toLowerCase();
   if (normalizedLanguage === 'eventstorming') return true;
   if (normalizedLanguage === 'json') return isEventStormingJSON(text);
+  if (!normalizedLanguage) return isEventStormingJSON(text);
 
   return false;
 }
@@ -17,4 +18,18 @@ export function shouldRenderCodeBlock(language: string | undefined, text: string
 export function getLanguageFromCodeClassName(className: string): string | undefined {
   const match = className.match(/(?:^|\s)language-([a-z0-9_-]+)(?:\s|$)/i);
   return match ? match[1].toLowerCase() : undefined;
+}
+
+export function getLanguageFromElement(element: Element | null): string | undefined {
+  if (!element) return undefined;
+
+  const classLanguage = getLanguageFromCodeClassName((element as HTMLElement).className || '');
+  if (classLanguage) return classLanguage;
+
+  const dataLanguage =
+    element.getAttribute('data-lang') ||
+    element.getAttribute('lang') ||
+    element.getAttribute('data-language');
+
+  return dataLanguage?.trim().toLowerCase() || undefined;
 }

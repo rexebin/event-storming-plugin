@@ -1,4 +1,4 @@
-import { getLanguageFromCodeClassName, normalizeBlockText, shouldRenderCodeBlock } from './block-detection.js';
+import { getLanguageFromElement, normalizeBlockText, shouldRenderCodeBlock } from './block-detection.js';
 import { mountRenderedBlock, RenderedBlockInstance } from './block-render.js';
 
 const DEBOUNCE_MS = 200;
@@ -18,14 +18,14 @@ function main(): void {
 }
 
 function scanAndRender(): void {
-  const codeBlocks = document.querySelectorAll<HTMLElement>('pre > code');
+  const preBlocks = document.querySelectorAll<HTMLElement>('pre');
 
-  for (const code of codeBlocks) {
-    const pre = code.parentElement;
-    if (!pre || pre.getAttribute('data-es-rendered') === 'true') continue;
+  for (const pre of preBlocks) {
+    if (pre.getAttribute('data-es-rendered') === 'true') continue;
 
-    const language = getLanguageFromCodeClassName(code.className);
-    const dslText = normalizeBlockText(code.textContent || '');
+    const code = pre.querySelector<HTMLElement>('code');
+    const language = getLanguageFromElement(code) || getLanguageFromElement(pre);
+    const dslText = normalizeBlockText((code?.textContent || pre.textContent || ''));
 
     if (!shouldRenderCodeBlock(language, dslText)) continue;
 
