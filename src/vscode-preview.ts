@@ -1,17 +1,19 @@
 import { getLanguageFromElement, normalizeBlockText, shouldRenderCodeBlock } from './block-detection.js';
 import { mountRenderedBlock, RenderedBlockInstance } from './block-render.js';
+import { createPreviewSourceSnapshot } from './preview-source.js';
 
 const DEBOUNCE_MS = 200;
 
 let observer: MutationObserver | null = null;
 const rendererInstances = new Map<HTMLElement, RenderedBlockInstance>();
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let lastSourceSnapshot = '';
 
 function main(): void {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', refreshRenderedBlocks);
+    document.addEventListener('DOMContentLoaded', () => refreshRenderedBlocks(true));
   } else {
-    refreshRenderedBlocks();
+    refreshRenderedBlocks(true);
   }
 }
 
@@ -55,7 +57,12 @@ function debouncedScan(): void {
   }, DEBOUNCE_MS);
 }
 
-function refreshRenderedBlocks(): void {
+function refreshRenderedBlocks(force: boolean = false): void {
+  const nextSourceSnapshot = createPreviewSourceSnapshot(document);
+  if (!force && nextSourceSnapshot === lastSourceSnapshot) {
+    return;
+  }
+
   if (observer) observer.disconnect();
 
   rendererInstances.forEach((instance) => {
@@ -64,6 +71,7 @@ function refreshRenderedBlocks(): void {
   rendererInstances.clear();
 
   scanAndRender();
+  lastSourceSnapshot = createPreviewSourceSnapshot(document);
   startObserver();
 }
 
