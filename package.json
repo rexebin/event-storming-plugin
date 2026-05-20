@@ -4,6 +4,7 @@
   "publisher": "rexebin",
   "version": "1.0.0",
   "description": "Render event storming diagrams on GitHub and in VS Code Markdown preview.",
+  "icon": "icon.png",
   "license": "MIT",
   "type": "module",
   "repository": {
