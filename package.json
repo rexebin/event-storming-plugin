@@ -1,13 +1,43 @@
 {
   "name": "event-storming-plugin",
+  "displayName": "Event Storming Diagram Renderer",
+  "publisher": "rexebin",
   "version": "1.0.0",
-  "description": "Render event storming diagrams on GitHub from fenced code blocks.",
+  "description": "Render event storming diagrams on GitHub and in VS Code Markdown preview.",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rexebin/event-storming-plugin.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "event storming",
+    "markdown",
+    "diagram",
+    "json",
+    "vscode"
+  ],
   "scripts": {
     "build": "tsc --noEmit && node build.mjs",
     "dev": "node build.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "package:vscode": "npm run build && npx @vscode/vsce package"
+  },
+  "contributes": {
+    "markdown.previewScripts": [
+      "./dist/vscode-preview.js"
+    ],
+    "markdown.previewStyles": [
+      "./style.css"
+    ]
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

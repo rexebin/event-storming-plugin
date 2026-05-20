@@ -11,19 +11,23 @@ try {
 } catch {}
 mkdirSync(dist, { recursive: true });
 
-// Bundle content.ts (entry point) into a single file
-// This bundles content.ts + dsl.ts + renderer.ts together
-await esbuild.build({
-  entryPoints: [join(process.cwd(), 'src/content.ts')],
-  bundle: true,
-  outfile: join(dist, 'content.js'),
-  format: 'iife', // Immediately Invoked Function Expression (no import/export)
-  target: 'es2022',
-  minify: false,
-  sourcemap: false,
-  // Tell esbuild this is a browser environment
-  platform: 'browser',
-});
+const browserEntries = [
+  ['src/content.ts', 'content.js'],
+  ['src/vscode-preview.ts', 'vscode-preview.js'],
+];
+
+for (const [entryPoint, outputFile] of browserEntries) {
+  await esbuild.build({
+    entryPoints: [join(process.cwd(), entryPoint)],
+    bundle: true,
+    outfile: join(dist, outputFile),
+    format: 'iife',
+    target: 'es2022',
+    minify: false,
+    sourcemap: false,
+    platform: 'browser',
+  });
+}
 
 // Copy static assets
 const assets = ['manifest.json', 'style.css', 'icon.svg'];

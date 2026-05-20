@@ -6,9 +6,8 @@
  * with rendered D3 diagrams.
  */
 
-import { isEventStormingJSON } from './dsl.js';
-import { renderEventStorming } from './renderer.js';
-import * as d3 from 'd3';
+import { normalizeBlockText, shouldRenderCodeBlock } from './block-detection.js';
+import { mountRenderedBlock } from './block-render.js';
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -51,14 +50,9 @@ function scanAndRender(): void {
 
    const langSpan = pre.querySelector('span.pl-en');
    const language = langSpan?.textContent?.trim().toLowerCase();
-   let dslText = pre.textContent || '';
-   dslText = dslText.replace(/^\`\`\`.*\n?/, '').replace(/\n?\`\`\`.*$/, '').trim();
+   const dslText = normalizeBlockText(pre.textContent || '');
 
-   const shouldRender =
-     language === 'eventstorming' ||
-     (language === 'json' && isEventStormingJSON(dslText));
-
-   if (shouldRender && dslText.length > 0) {
+   if (shouldRenderCodeBlock(language, dslText)) {
      renderBlock(parent!, dslText);
    }
   }
@@ -68,81 +62,8 @@ function scanAndRender(): void {
  * Wrap a code block container in a diagram and render the diagram inside.
  */
 function renderBlock(highlightDiv: HTMLElement, dslText: string): void {
-  // Create the wrapper container
-  const container = document.createElement('div');
-  container.className = 'event-storming-container';
-
-  // Build header
-  const header = document.createElement('div');
-  header.className = 'es-header';
-
-  const badge = document.createElement('span');
-  badge.className = 'es-badge';
-  badge.textContent = 'Event Storming';
-
-  const titleSpan = document.createElement('span');
-  titleSpan.className = 'es-title';
-
-  // Extract title from DSL
-  const titleMatch = dslText.match(/^# Title:\s*(.+)$/m);
-  titleSpan.textContent = titleMatch ? titleMatch[1].trim() : 'Event Storming';
-
-  header.appendChild(badge);
-  header.appendChild(titleSpan);
-  container.appendChild(header);
-
-  // Toggle button
-  const toggle = document.createElement('button');
-  toggle.className = 'es-toggle';
-  toggle.setAttribute('aria-label', 'Toggle diagram');
-  toggle.addEventListener('click', () => {
-    container.classList.toggle('collapsed');
-  });
-  container.appendChild(toggle);
-
-  // Canvas wrapper
-  const canvasWrapper = document.createElement('div');
-  canvasWrapper.className = 'es-canvas-wrapper';
-  container.appendChild(canvasWrapper);
-
-  // Legend
-  const legend = document.createElement('div');
-  legend.className = 'es-legend';
-  legend.innerHTML = `
-    <div class="es-legend-item">
-      <span class="es-legend-swatch" style="background:#FFA500"></span> Domain Event
-    </div>
-    <div class="es-legend-item">
-      <span class="es-legend-swatch" style="background:#91D49C"></span> Command
-    </div>
-    <div class="es-legend-item">
-      <span class="es-legend-swatch" style="background:#FEE254"></span> Aggregate
-    </div>
-    <div class="es-legend-item">
-      <span class="es-legend-swatch" style="background:#D4D3D3"></span> Actor
-    </div>
-    <div class="es-legend-item">
-      <span class="es-legend-swatch" style="background:#859EBF"></span> Policy
-    </div>
-    <div class="es-legend-item">
-      <span class="es-legend-swatch" style="background:#FEE254; border-style:dashed"></span> Read Model
-    </div>
-    <div class="es-legend-item">
-      <span class="es-legend-swatch" style="background:#FB8597"></span> External System
-    </div>
-  `;
-  container.appendChild(legend);
-
-  // Insert container before the highlight div
-    // Mark the highlight div as processed
-  highlightDiv.setAttribute('data-es-rendered', 'true');
-  highlightDiv.parentElement?.insertBefore(container, highlightDiv);
-  highlightDiv.style.display = 'none'; // Hide the raw code block
-
-  // Render D3 diagram
-  const d3Container = d3.select(canvasWrapper);
-  const instance = renderEventStorming(d3Container as any, dslText);
-  rendererInstances.set(container, instance);
+  const instance = mountRenderedBlock(highlightDiv, dslText);
+  rendererInstances.set(instance.container, instance);
 }
 
 // ─── Mutation Observer (for SPA navigation) ─────────────────

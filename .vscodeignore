@@ -1,0 +1,15 @@
+.gitignore
+.copilot/**
+.git/**
+.github/**
+node_modules/**
+src/**
+build.mjs
+manifest.json
+icon.svg
+vitest.config.ts
+tsconfig.json
+dist/content.js
+dist/icon.svg
+dist/manifest.json
+dist/style.css

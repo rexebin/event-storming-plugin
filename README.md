@@ -1,6 +1,6 @@
-# Event Storming Diagram Renderer for GitHub
+# Event Storming Diagram Renderer for GitHub and VS Code
 
-A **browser extension** (Manifest V3) that renders **event storming** diagrams directly on GitHub pages from fenced code blocks.
+A **browser extension** (Manifest V3) and **VS Code Markdown preview extension** that render **event storming** diagrams from fenced code blocks.
 
 ## Features
 
@@ -52,6 +52,14 @@ npm test
 2. Enable **Developer mode** (toggle in top-right)
 3. Click **Load unpacked**
 4. Select the `dist/` folder
+
+### 5. Package for VS Code
+
+```bash
+npm run package:vscode
+```
+
+This creates a `.vsix` file that can be shared or installed using **Extensions: Install from VSIX...**
 
 ## Usage on GitHub
 
@@ -143,6 +151,14 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
 The diagram will render inline, replacing the code block automatically.
 
 For the JSON DSL shown above, supported container types are `Aggregate`, `ExternalSystem`, `ReadModel`, and `Process`.
+
+## Usage in VS Code
+
+Open a Markdown file containing an `eventstorming` fenced block or a matching `json` fenced block, then run **Markdown: Open Preview to the Side**.
+
+The built-in Markdown preview keeps normal Markdown rendering and replaces matching blocks with the diagram UI.
+
+> **Note:** The current VS Code integration targets the desktop Markdown preview.
 
 ## DSL Reference
 
