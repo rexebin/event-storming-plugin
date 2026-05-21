@@ -329,4 +329,60 @@ describe('renderEventStorming layout', () => {
     expect(gelPos.x - runningPos.x).toBe(176);
     expect(switchPos.y).toBeGreaterThan(runningPos.y);
   });
+
+  it('curves the negative rejoin link back into the main flow', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    const haveShowerGel = host.querySelector('[data-id="Shower_Have_shower_gel_"]');
+    const switchOnShower = host.querySelector('[data-id="Shower_Switch_on_shower"]');
+
+    expect(haveShowerGel).toBeTruthy();
+    expect(switchOnShower).toBeTruthy();
+
+    const curvedRejoin = host.querySelector<SVGPathElement>(
+      `path.es-link-negative[data-source="${switchOnShower!.getAttribute('data-id')}"][data-target="${haveShowerGel!.getAttribute('data-id')}"]`
+    );
+
+    expect(curvedRejoin).toBeTruthy();
+    expect(curvedRejoin!.getAttribute('d')).toContain(' C ');
+    expect(curvedRejoin!.getAttribute('marker-end')).toBe('url(#arrowhead)');
+  });
+
+  it('curves fan-in links when source nodes are on different rows', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), readmeSample);
+
+    const customer = host.querySelector('[data-id="Cancel_Order_Customer"]');
+    const staff = host.querySelector('[data-id="Cancel_Order_Staff"]');
+    const paymentFailed = host.querySelector('[data-id="Cancel_Order_PaymentFailed"]');
+    const cancelOrder = host.querySelector('[data-id="Cancel_Order_CancelOrder"]');
+
+    expect(customer).toBeTruthy();
+    expect(staff).toBeTruthy();
+    expect(paymentFailed).toBeTruthy();
+    expect(cancelOrder).toBeTruthy();
+
+    const cancelOrderPos = getTranslate(cancelOrder!);
+
+    for (const source of [customer!, staff!, paymentFailed!]) {
+      const path = host.querySelector<SVGPathElement>(
+        `path.es-link-default[data-source="${source.getAttribute('data-id')}"][data-target="${cancelOrder!.getAttribute('data-id')}"]`
+      );
+      const sourcePos = getTranslate(source);
+
+      expect(path).toBeTruthy();
+      expect(path!.getAttribute('marker-end')).toBe('url(#arrowhead)');
+
+      if (sourcePos.y === cancelOrderPos.y) {
+        expect(path!.getAttribute('d')).not.toContain(' C ');
+      } else {
+        expect(path!.getAttribute('d')).toContain(' C ');
+      }
+    }
+  });
 });

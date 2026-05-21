@@ -72,8 +72,34 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
 [
   {
     "type": "Aggregate",
-    "name": "Order",
+    "name": "User",
     "children": [
+      {
+        "name": "User Registration",
+        "nodes": [
+          { "type": "Actor", "name": "Customer", "next": "Register" },
+          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
+          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
+          { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
+          { "type": "Event", "name": "UserRegistered" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "Aggregate",
+    "name": "Morning Routine",
+    "children": [
+      {
+        "name": "Wake Up",
+        "nodes": [
+          { "type": "Actor", "name": "Me", "next": "Wake Up" },
+          { "type": "Command", "name": "Wake Up", "next": "Is Alarm Ringing?" },
+          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Get Out of Bed", "negativeNext": "Sleep In" },
+          { "type": "Error", "name": "Sleep In" },
+          { "type": "Event", "name": "Get Out of Bed" }
+        ]
+      },
       {
         "name": "Shower",
         "nodes": [
@@ -84,7 +110,13 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "Error", "name": "Go Buy Shower Gel" },
           { "type": "Event", "name": "Get Dressed" }
         ]
-      },
+      }
+    ]
+  },
+  {
+    "type": "Aggregate",
+    "name": "Order",
+    "children": [    
       {
         "name": "Place Order",
         "nodes": [

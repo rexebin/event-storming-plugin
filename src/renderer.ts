@@ -80,7 +80,7 @@ export function renderEventStorming(
   defs.append('marker')
     .attr('id', 'arrowhead')
     .attr('viewBox', '0 0 10 6')
-    .attr('refX', 10)
+    .attr('refX', 11)
     .attr('refY', 3)
     .attr('markerWidth', 8)
     .attr('markerHeight', 6)
@@ -222,8 +222,12 @@ export function renderEventStorming(
   linksGroup
     .append('path')
     .attr('class', `es-link es-link-${link.type}`)
+    .attr('data-source', link.source)
+    .attr('data-target', link.target)
     .attr('d', pathD)
+    .attr('fill', 'none')
     .attr('stroke', LINK_COLOR)
+    .attr('stroke-width', 1.5)
     .attr('marker-end', 'url(#arrowhead)');
 
   // Link label
@@ -803,6 +807,24 @@ function computeLinkPath(source: LayoutNode, target: LayoutNode, type: string, i
   const targetX = sourceIsLeft ? target.x : target.x + NODE_W;
   const sourceY = source.y + NODE_H / 2;
   const targetY = target.y + NODE_H / 2;
+
+  if (sourceY !== targetY) {
+    const horizontalDistance = Math.abs(targetX - sourceX);
+
+    if (horizontalDistance < 1) {
+      const curveDirection = type === 'negative' ? 1 : -1;
+      const controlOffset = Math.max(28, NODE_GAP_X);
+      const controlX = sourceX + curveDirection * controlOffset;
+
+      return `M ${sourceX} ${sourceY} C ${controlX} ${sourceY}, ${controlX} ${targetY}, ${targetX} ${targetY}`;
+    }
+
+    const controlOffset = Math.max(32, horizontalDistance * 0.45);
+    const controlX1 = sourceX + (sourceIsLeft ? controlOffset : -controlOffset);
+    const controlX2 = targetX - (sourceIsLeft ? controlOffset : -controlOffset);
+
+    return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetY}, ${targetX} ${targetY}`;
+  }
 
   return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
 }
