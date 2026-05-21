@@ -23,6 +23,7 @@ interface LayoutContainer {
   width: number;
   height: number;
   nodeIds: string[];
+  notes?: string[];
 }
 
 interface LayoutGroup {
@@ -33,6 +34,7 @@ interface LayoutGroup {
   y: number;
   width: number;
   height: number;
+  notes?: string[];
 }
 
 interface LayoutResult {
@@ -106,6 +108,7 @@ export function renderEventStorming(
   // ─── Draw containers (aggregate / readModel boxes) ───
 
   const containersGroup = svg.append('g').attr('class', 'containers');
+  const tooltip = d3.select('body').append('div').attr('class', 'es-tooltip').style('display', 'none');
 
   layout.containers.forEach((c) => {
     const g = containersGroup.append('g')
@@ -143,6 +146,10 @@ export function renderEventStorming(
       .attr('font-weight', '700')
       .attr('fill', isLight(c.color) ? '#333' : '#fff')
       .text(`${c.type === 'aggregate' ? '📦' : c.type === 'readModel' ? '📊' : c.type === 'externalSystem' ? '🔌' : '🔄'} ${c.label}`);
+
+    if (c.notes && c.notes.length > 0) {
+      appendNotesBadge(g, c.width - 14, 12, c.notes, tooltip, 'es-container-note-badge');
+    }
   });
 
   const groupsGroup = svg.append('g').attr('class', 'groups');
@@ -173,6 +180,10 @@ export function renderEventStorming(
       .attr('font-weight', '600')
       .attr('fill', '#57606a')
       .text(group.label);
+
+    if (group.notes && group.notes.length > 0) {
+      appendNotesBadge(g, group.width - 14, 12, group.notes, tooltip, 'es-group-note-badge');
+    }
   });
 
   // ─── Draw nodes ───
@@ -306,8 +317,6 @@ export function renderEventStorming(
 
   // ─── Tooltip ───
 
-  const tooltip = d3.select('body').append('div').attr('class', 'es-tooltip').style('display', 'none');
-
   nodesGroup
     .selectAll('.es-node')
     .on('mouseenter', function (this: Element, event: MouseEvent) {
@@ -328,7 +337,9 @@ export function renderEventStorming(
 
       tooltip
         .style('display', 'block')
-        .html(notesHtml);
+        .html(notesHtml)
+        .style('left', (event.pageX + 12) + 'px')
+        .style('top', (event.pageY - 10) + 'px');
     })
     .on('mousemove', function (event: MouseEvent) {
       tooltip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY - 10) + 'px');
@@ -368,6 +379,7 @@ function computeLayout(model: DSLModel): LayoutResult {
       y: cy,
       width: containerW,
       height: containerH,
+      notes: container.notes,
     });
 
     // Position nodes inside the container
@@ -461,6 +473,7 @@ function computeLayout(model: DSLModel): LayoutResult {
         y: groupY,
         width: groupWidth,
         height: groupHeight,
+        notes: process.notes,
       });
 
       processY = groupY + groupHeight + GROUP_GAP_Y;
@@ -951,6 +964,7 @@ function wrapText(
       current = test;
     }
   }
+
   if (current) lines.push(current);
 
   const displayLines = lines.slice(0, 2);
@@ -974,6 +988,60 @@ function wrapText(
       .attr('dy', `${lineHeight}`)
       .text('…');
   }
+}
+
+function appendNotesBadge(
+  parent: any,
+  x: number,
+  y: number,
+  notes: string[],
+  tooltip: any,
+  className: string
+): void {
+  const badge = parent
+    .append('g')
+    .attr('class', className)
+    .attr('transform', `translate(${x}, ${y})`);
+
+  badge
+    .append('circle')
+    .attr('r', 6)
+    .attr('fill', '#FFF1AA')
+    .attr('stroke', '#333')
+    .attr('stroke-width', 1);
+
+  badge
+    .append('text')
+    .attr('x', 0)
+    .attr('y', 0.5)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'middle')
+    .attr('font-size', '7px')
+    .attr('font-weight', '700')
+    .attr('fill', '#333')
+    .attr('pointer-events', 'none')
+    .text('i');
+
+  badge
+    .on('mouseenter', function (event: MouseEvent) {
+      tooltip
+        .style('display', 'block')
+        .html(buildNotesHtml(notes))
+        .style('left', (event.pageX + 12) + 'px')
+        .style('top', (event.pageY - 10) + 'px');
+    })
+    .on('mousemove', function (event: MouseEvent) {
+      tooltip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY - 10) + 'px');
+    })
+    .on('mouseleave', function () {
+      tooltip.style('display', 'none');
+    });
+}
+
+function buildNotesHtml(notes: string[]): string {
+  return `<div class="es-tooltip-notes"><div class="es-tooltip-notes-label">Notes</div><ul>${
+    notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')
+  }</ul></div>`;
 }
 
 // ─── Color Helpers ─────────────────────────────────────────

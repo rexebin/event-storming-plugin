@@ -207,6 +207,7 @@ const groupedSample = `[
     "children": [
       {
         "name": "Place Order",
+        "notes": ["Handles the happy path for order placement."],
         "nodes": [
           { "type": "Actor", "name": "Customer", "next": "PlaceOrder" },
           { "type": "Command", "name": "PlaceOrder", "next": "OrderPlaced" },
@@ -348,6 +349,22 @@ describe('renderEventStorming layout', () => {
     const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
     expect(tooltip).toBeTruthy();
     expect(tooltip!.style.display).toBe('none');
+  });
+
+  it('shows a note icon and tooltip for process groups with notes', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), groupedSample);
+
+    const badge = host.querySelector<SVGGElement>('g.es-group-note-badge');
+    expect(badge).toBeTruthy();
+
+    badge!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, clientX: 20, clientY: 20 }));
+
+    const tooltip = document.body.querySelector('.es-tooltip');
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.innerHTML).toContain('Handles the happy path for order placement.');
   });
 
   it('keeps the main policy chain moving right when a negative branch rejoins it', () => {

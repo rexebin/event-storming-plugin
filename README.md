@@ -74,6 +74,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
   {
     "type": "Aggregate",
     "name": "User",
+    "notes": ["This aggregate represents a user in the system, including their registration and profile management processes."],
     "children": [
       {
         "name": "User Registration",
