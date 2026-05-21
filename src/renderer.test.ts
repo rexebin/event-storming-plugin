@@ -242,6 +242,69 @@ const groupedSample = `[
   }
 ]`;
 
+const wrapSample = `[
+  {
+    "type": "Aggregate",
+    "name": "User",
+    "children": [
+      {
+        "name": "User Registration",
+        "nodes": [
+          { "type": "Actor", "name": "Customer", "next": "Register" },
+          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
+          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
+          { "type": "Event", "name": "UserRegistered" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "Aggregate",
+    "name": "Morning Routine",
+    "children": [
+      {
+        "name": "Wake Up",
+        "nodes": [
+          { "type": "Actor", "name": "Me", "next": "WakeUp" },
+          { "type": "Command", "name": "WakeUp", "next": "Is Alarm Ringing?" },
+          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "negativeNext": "Sleep In" },
+          { "type": "Event", "name": "Got Out of Bed" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "Aggregate",
+    "name": "Order",
+    "children": [
+      {
+        "name": "Place Order",
+        "nodes": [
+          { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
+          { "type": "ExternalSystem", "name": "InventoryService", "next": "Do We Have Stock?" },
+          { "type": "Policy", "name": "Do We Have Stock?", "next": "PaymentGateway", "negativeNext": "Out Of Stock" },
+          { "type": "ExternalSystem", "name": "PaymentGateway", "next": "OrderPlaced" },
+          { "type": "Event", "name": "OrderPlaced" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "Process",
+    "name": "Customer Order View",
+    "children": [
+      {
+        "name": "View Order Details",
+        "nodes": [
+          { "type": "Actor", "name": "Customer", "next": "GetOrderDetails" },
+          { "type": "Query", "name": "GetOrderDetails", "next": "Order Detail Projection" },
+          { "type": "View", "name": "Order Detail Projection" }
+        ]
+      }
+    ]
+  }
+]`;
+
 function getTranslate(element: Element): { x: number; y: number } {
   const transform = element.getAttribute('transform') || '';
   const match = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
@@ -416,6 +479,43 @@ describe('renderEventStorming layout', () => {
 
     const notes = host.querySelectorAll('[data-id="User_Registration_Some_Note"]');
     expect(notes).toHaveLength(1);
+  });
+
+  it('sizes branched containers to the horizontal flow instead of total node count', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    const container = host.querySelector('g.containers g[data-name="Order"]');
+    expect(container).toBeTruthy();
+
+    const containerRect = container!.querySelector('rect');
+    expect(containerRect).toBeTruthy();
+    expect(Number(containerRect!.getAttribute('width'))).toBe(748);
+  });
+
+  it('wraps later containers onto the next row without overlapping the first row', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), wrapSample);
+
+    const user = host.querySelector('g.containers g[data-name="User"]');
+    const order = host.querySelector('g.containers g[data-name="Order"]');
+    const customerOrderView = host.querySelector('g.containers g[data-name="Customer Order View"]');
+    expect(user).toBeTruthy();
+    expect(order).toBeTruthy();
+    expect(customerOrderView).toBeTruthy();
+
+    const userPos = getTranslate(user!);
+    const orderPos = getTranslate(order!);
+    const customerOrderViewPos = getTranslate(customerOrderView!);
+    const userHeight = Number(user!.querySelector('rect')!.getAttribute('height'));
+    const orderHeight = Number(order!.querySelector('rect')!.getAttribute('height'));
+    const firstRowBottom = Math.max(userPos.y + userHeight, orderPos.y + orderHeight);
+
+    expect(customerOrderViewPos.y).toBeGreaterThan(firstRowBottom);
   });
 
   it('keeps the main policy chain moving right when a negative branch rejoins it', () => {

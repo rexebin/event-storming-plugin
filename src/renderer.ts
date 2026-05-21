@@ -112,7 +112,9 @@ export function renderEventStorming(
 
   layout.containers.forEach((c) => {
     const g = containersGroup.append('g')
-      .attr('transform', `translate(${c.x}, ${c.y})`);
+      .attr('transform', `translate(${c.x}, ${c.y})`)
+      .attr('data-id', c.id)
+      .attr('data-name', c.label);
 
     // Container background
     g.append('rect')
@@ -364,11 +366,17 @@ function computeLayout(model: DSLModel): LayoutResult {
   const allLinks: LayoutLink[] = [];
   let x = PADDING_X;
   let y = PADDING_Y;
+  let rowBottom = PADDING_Y;
 
   // 1. Render containers (aggregates + readModels + processes)
   for (const container of model.containers) {
     const containerW = computeContainerWidth(container, model);
     const containerH = computeContainerHeight(container, model);
+
+    if (x > PADDING_X && x + containerW > (PADDING_X * 2 + 1200)) {
+      x = PADDING_X;
+      y = rowBottom + CONTAINER_GAP_Y;
+    }
 
     const cx = x;
     const cy = y;
@@ -533,15 +541,9 @@ function computeLayout(model: DSLModel): LayoutResult {
       containerH,
        maxNodeBottom - cy + CONTAINER_PADDING + 20
     );
+    rowBottom = Math.max(rowBottom, cy + allContainers[allContainers.length - 1].height);
 
     x += containerW + CONTAINER_GAP_X;
-    y = PADDING_Y; // reset Y for next container in row
-
-    // Wrap to next row if too wide
-    if (x + containerW > (PADDING_X * 2 + 1200)) {
-       x = PADDING_X;
-       y = Math.max(PADDING_Y, maxNodeBottom + CONTAINER_GAP_Y);
-    }
   }
 
   // 2. Render standalone nodes (not in any container)
@@ -840,16 +842,30 @@ function layoutFanInProcess(
 }
 
 function computeContainerWidth(container: DSLContainer, model: DSLModel): number {
-  // Width = max of all process row widths
   let maxW = 0;
+
   for (const proc of container.processes) {
-    const w = proc.stepIds.length * (NODE_W + NODE_GAP_X) - NODE_GAP_X;
+    const processNodes = getProcessNodes(proc, model);
+    const processNodeMap = new Map(processNodes.map((node) => [node.id, node]));
+    const roots = getProcessRoots(proc, processNodeMap);
+    const fanInTarget = detectSharedTargetFanIn(roots, processNodeMap);
+    const startNodes = roots.length > 0 ? roots : processNodes;
+    const columns = fanInTarget
+      ? computeFanInProcessColumns(roots, fanInTarget, processNodeMap, container)
+      : computeProcessColumns(startNodes, processNodeMap);
+    const w = columns > 0 ? columns * (NODE_W + NODE_GAP_X) - NODE_GAP_X : 0;
+
     maxW = Math.max(maxW, w);
   }
-  // Also consider non-process nodes
-  const nonProcess = model.nodes.filter((n) => n.containerId === container.id);
-  const gridW = Math.min(nonProcess.length, 4) * (NODE_W + NODE_GAP_X);
-  return Math.max(maxW, gridW) + CONTAINER_PADDING * 2;
+
+  const nonProcess = model.nodes.filter(
+    (n) => n.containerId === container.id && !container.processes.some((process) => process.stepIds.includes(n.id))
+  );
+  const gridCols = Math.min(nonProcess.length, 4);
+  const gridW = gridCols > 0 ? gridCols * (NODE_W + NODE_GAP_X) - NODE_GAP_X : 0;
+  const processPadding = container.processes.length > 0 ? GROUP_PADDING * 2 : 0;
+
+  return Math.max(maxW + processPadding, gridW) + CONTAINER_PADDING * 2;
 }
 
 function computeContainerHeight(container: DSLContainer, model: DSLModel): number {
@@ -874,6 +890,41 @@ function layoutStandaloneNodes(nodes: DSLNode[], allNodes: LayoutNode[], startX:
     }
     allNodes.push({ ...nodes[i], x: cx, y: cy });
   }
+}
+
+function computeProcessColumns(processNodes: DSLNode[], processNodeMap: Map<string, DSLNode>): number {
+  if (processNodes.length === 0) return 0;
+
+  const memo = new Map<string, number>();
+
+  const visit = (node: DSLNode, path: Set<string>): number => {
+    const cached = memo.get(node.id);
+    if (cached !== undefined) return cached;
+    if (path.has(node.id)) return 0;
+
+    const nextPath = new Set(path);
+    nextPath.add(node.id);
+
+    const nextNode = node.next ? processNodeMap.get(node.next) : undefined;
+    const length = nextNode ? 1 + visit(nextNode, nextPath) : 1;
+
+    memo.set(node.id, length);
+    return length;
+  };
+
+  return processNodes.reduce((max, node) => Math.max(max, visit(node, new Set<string>())), 1);
+}
+
+function computeFanInProcessColumns(
+  roots: DSLNode[],
+  target: DSLNode,
+  processNodeMap: Map<string, DSLNode>,
+  container: DSLContainer
+): number {
+  const chainColumns = computeProcessColumns([target], processNodeMap);
+  const useTwoSidedLayout = container.type === 'readModel' || target.type === 'view';
+
+  return useTwoSidedLayout ? Math.max(3, chainColumns + 1) : chainColumns + 1;
 }
 
 // ─── Link Path ─────────────────────────────────────────────
