@@ -200,6 +200,31 @@ const showerSample = `[
   }
 ]`;
 
+const groupedSample = `[
+  {
+    "type": "Aggregate",
+    "name": "Order",
+    "children": [
+      {
+        "name": "Place Order",
+        "nodes": [
+          { "type": "Actor", "name": "Customer", "next": "PlaceOrder" },
+          { "type": "Command", "name": "PlaceOrder", "next": "OrderPlaced" },
+          { "type": "Event", "name": "OrderPlaced" }
+        ]
+      },
+      {
+        "name": "Cancel Order",
+        "nodes": [
+          { "type": "Actor", "name": "Support", "next": "CancelOrder" },
+          { "type": "Command", "name": "CancelOrder", "next": "OrderCancelled" },
+          { "type": "Event", "name": "OrderCancelled" }
+        ]
+      }
+    ]
+  }
+]`;
+
 function getTranslate(element: Element): { x: number; y: number } {
   const transform = element.getAttribute('transform') || '';
   const match = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
@@ -304,6 +329,25 @@ describe('renderEventStorming layout', () => {
     expect(tooltip).toBeTruthy();
     expect(tooltip!.innerHTML).toContain('Requires manager approval');
     expect(tooltip!.innerHTML).toContain('Audit this action');
+    expect(tooltip!.innerHTML).not.toContain('PlaceOrder');
+    expect(tooltip!.innerHTML).not.toContain('command');
+    expect(tooltip!.innerHTML).not.toContain('in: Order');
+  });
+
+  it('does not show a tooltip for nodes without notes', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), readmeSample);
+
+    const node = host.querySelector('[data-id="Cancel_Order_CancelOrder"]');
+    expect(node).toBeTruthy();
+
+    node!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.style.display).toBe('none');
   });
 
   it('keeps the main policy chain moving right when a negative branch rejoins it', () => {
@@ -390,5 +434,34 @@ describe('renderEventStorming layout', () => {
         expect(pathD.endsWith(`${cancelOrderPos.x} ${expectedAnchorY}`)).toBe(true);
       }
     }
+  });
+
+  it('draws a group container for each process and places its name in the top-left corner', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), groupedSample);
+
+    const groups = Array.from(host.querySelectorAll<SVGGElement>('g.es-process-group'));
+    expect(groups).toHaveLength(2);
+
+    const placeOrderGroup = groups.find((group) => group.getAttribute('data-name') === 'Place Order');
+    expect(placeOrderGroup).toBeTruthy();
+
+    const title = placeOrderGroup!.querySelector('text');
+    expect(title?.textContent).toBe('Place Order');
+
+    const titleX = Number(title?.getAttribute('x'));
+    const titleY = Number(title?.getAttribute('y'));
+    expect(titleX).toBeLessThan(20);
+    expect(titleY).toBeLessThan(20);
+
+    const customer = host.querySelector('[data-id="Place_Order_Customer"]');
+    expect(customer).toBeTruthy();
+
+    const groupPos = getTranslate(placeOrderGroup!);
+    const customerPos = getTranslate(customer!);
+    expect(customerPos.x).toBeGreaterThan(groupPos.x);
+    expect(customerPos.y).toBeGreaterThan(groupPos.y);
   });
 });

@@ -25,10 +25,21 @@ interface LayoutContainer {
   nodeIds: string[];
 }
 
+interface LayoutGroup {
+  id: string;
+  label: string;
+  containerId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface LayoutResult {
   width: number;
   height: number;
   containers: LayoutContainer[];
+  groups: LayoutGroup[];
   nodes: LayoutNode[];
   links: LayoutLink[];
 }
@@ -53,6 +64,9 @@ const CONTAINER_GAP_Y = 80;
 const PADDING_X = 40;
 const PADDING_Y = 30;
 const LINK_COLOR = '#6a737d';
+const GROUP_PADDING = 16;
+const GROUP_HEADER_H = 22;
+const GROUP_GAP_Y = 18;
 
 // ─── Main render function ───────────────────────────────────
 
@@ -129,6 +143,36 @@ export function renderEventStorming(
       .attr('font-weight', '700')
       .attr('fill', isLight(c.color) ? '#333' : '#fff')
       .text(`${c.type === 'aggregate' ? '📦' : c.type === 'readModel' ? '📊' : c.type === 'externalSystem' ? '🔌' : '🔄'} ${c.label}`);
+  });
+
+  const groupsGroup = svg.append('g').attr('class', 'groups');
+
+  layout.groups.forEach((group) => {
+    const g = groupsGroup
+      .append('g')
+      .attr('class', 'es-process-group')
+      .attr('transform', `translate(${group.x}, ${group.y})`)
+      .attr('data-id', group.id)
+      .attr('data-container-id', group.containerId)
+      .attr('data-name', group.label);
+
+    g.append('rect')
+      .attr('width', group.width)
+      .attr('height', group.height)
+      .attr('rx', 6)
+      .attr('fill', '#ffffff')
+      .attr('fill-opacity', 0.55)
+      .attr('stroke', '#d0d7de')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '6 4');
+
+    g.append('text')
+      .attr('x', 12)
+      .attr('y', 16)
+      .attr('font-size', '12px')
+      .attr('font-weight', '600')
+      .attr('fill', '#57606a')
+      .text(group.label);
   });
 
   // ─── Draw nodes ───
@@ -255,6 +299,7 @@ export function renderEventStorming(
       nodesGroup.attr('transform', t);
       linksGroup.attr('transform', t);
       containersGroup.attr('transform', t);
+      groupsGroup.attr('transform', t);
     });
 
   (svg as any).call(zoom);
@@ -271,6 +316,10 @@ export function renderEventStorming(
       const node = layout.nodes.find((n) => n.id === id);
       if (!node) return;
       const nodeNotes = getNodeNotes(node, model);
+      if (nodeNotes.length === 0) {
+        tooltip.style('display', 'none');
+        return;
+      }
       const notesHtml = nodeNotes.length > 0
         ? `<div class="es-tooltip-notes"><div class="es-tooltip-notes-label">Notes</div><ul>${
             nodeNotes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')
@@ -279,12 +328,7 @@ export function renderEventStorming(
 
       tooltip
         .style('display', 'block')
-        .html(
-          `<div class="es-tooltip-type">${node.type}</div>` +
-          `<div class="es-tooltip-title">${escapeHtml(node.label)}</div>` +
-          (node.containerId ? `<div class="es-tooltip-container">in: ${node.containerId}</div>` : '') +
-          notesHtml
-        );
+        .html(notesHtml);
     })
     .on('mousemove', function (event: MouseEvent) {
       tooltip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY - 10) + 'px');
@@ -305,6 +349,7 @@ export function renderEventStorming(
 function computeLayout(model: DSLModel): LayoutResult {
   const allNodes: LayoutNode[] = [];
   const allContainers: LayoutContainer[] = [];
+  const allGroups: LayoutGroup[] = [];
   const allLinks: LayoutLink[] = [];
   let x = PADDING_X;
   let y = PADDING_Y;
@@ -334,22 +379,27 @@ function computeLayout(model: DSLModel): LayoutResult {
 
     // Layout each process group — each process is INDEPENDENT with its own positioned scope
     let processY = innerY;
-    for (const process of container.processes) {
+    container.processes.forEach((process, processIndex) => {
+       const groupX = innerX;
+       const groupY = processY;
+       const groupWidth = containerW - CONTAINER_PADDING * 2;
+       const groupInnerX = groupX + GROUP_PADDING;
+       const groupInnerY = groupY + GROUP_HEADER_H + GROUP_PADDING;
        const processNodes = getProcessNodes(process, model);
        const processNodeMap = new Map(processNodes.map((node) => [node.id, node]));
        const processPositioned = new Set<string>();
        const roots = getProcessRoots(process, processNodeMap);
        const fanInTarget = detectSharedTargetFanIn(roots, processNodeMap);
-       let processBottom = processY + NODE_H;
+       let processBottom = groupInnerY + NODE_H;
 
        if (fanInTarget) {
        processBottom = layoutFanInProcess(
          roots,
          fanInTarget,
-         innerX,
-         processY,
+         groupInnerX,
+         groupInnerY,
          container,
-         containerW,
+         groupWidth - GROUP_PADDING * 2,
          model,
          processNodeMap,
          allNodes,
@@ -358,14 +408,14 @@ function computeLayout(model: DSLModel): LayoutResult {
          positioned
        );
        } else {
-       let laneY = processY;
+       let laneY = groupInnerY;
        const startNodes = roots.length > 0 ? roots : processNodes;
 
        for (const startNode of startNodes) {
          if (processPositioned.has(startNode.id)) continue;
          const laneBottom = layoutChainFrom(
            startNode,
-           innerX,
+           groupInnerX,
            laneY,
            container,
            model,
@@ -383,7 +433,7 @@ function computeLayout(model: DSLModel): LayoutResult {
          if (processPositioned.has(node.id)) continue;
          const laneBottom = layoutChainFrom(
            node,
-           innerX,
+           groupInnerX,
            laneY,
            container,
            model,
@@ -398,8 +448,23 @@ function computeLayout(model: DSLModel): LayoutResult {
        }
        }
 
-       processY = processBottom + NODE_GAP_Y;
-    }
+      const groupHeight = Math.max(
+        GROUP_HEADER_H + GROUP_PADDING * 2 + NODE_H,
+        processBottom - groupY + GROUP_PADDING
+      );
+
+      allGroups.push({
+        id: `${container.id}_group_${processIndex}`,
+        label: process.name,
+        containerId: container.id,
+        x: groupX,
+        y: groupY,
+        width: groupWidth,
+        height: groupHeight,
+      });
+
+      processY = groupY + groupHeight + GROUP_GAP_Y;
+    });
 
     // Layout non-process nodes below processes
     const nonProcessNodes = model.nodes.filter(
@@ -443,9 +508,14 @@ function computeLayout(model: DSLModel): LayoutResult {
        maxNodeBottom = Math.max(maxNodeBottom, n.y + NODE_H);
        }
     }
+    for (const group of allGroups) {
+      if (group.containerId === container.id) {
+       maxNodeBottom = Math.max(maxNodeBottom, group.y + group.height);
+      }
+    }
     // Update container height
     allContainers[allContainers.length - 1].height = Math.max(
-       containerH,
+      containerH,
        maxNodeBottom - cy + CONTAINER_PADDING + 20
     );
 
@@ -482,6 +552,7 @@ function computeLayout(model: DSLModel): LayoutResult {
     width: totalWidth,
     height: totalHeight,
     containers: allContainers,
+    groups: allGroups,
     nodes: allNodes,
     links: allLinks,
   };
@@ -663,7 +734,7 @@ function layoutFanInProcess(
   innerX: number,
   processY: number,
   container: DSLContainer,
-  containerWidth: number,
+  processWidth: number,
   model: DSLModel,
   processNodeMap: Map<string, DSLNode>,
   allNodes: LayoutNode[],
@@ -679,7 +750,7 @@ function layoutFanInProcess(
     const leftRoots = roots.slice(0, splitIndex);
     const rightRoots = roots.slice(splitIndex);
     const stackRows = Math.max(leftRoots.length, rightRoots.length);
-    const targetX = innerX + (containerWidth - CONTAINER_PADDING * 2 - NODE_W) / 2;
+    const targetX = innerX + (processWidth - NODE_W) / 2;
     const targetY = processY + ((stackRows - 1) * rowHeight) / 2;
     const leftX = targetX - NODE_W - NODE_GAP_X;
     const rightX = targetX + NODE_W + NODE_GAP_X;

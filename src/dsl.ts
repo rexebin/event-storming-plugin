@@ -2,47 +2,6 @@
  * Event Storming DSL Parser
  *
  * ─── DSL Syntax ───────────────────────────────────────────
- *
- * # Title: My Event Storming Session
- * # Description: Brief description of the domain
- *
- * // --- Actors ---
- * actor: Customer [purple]
- * actor: Admin [purple]
- *
- * // --- Aggregate containers (contain processes) ---
- * aggregate: Order [green] {
- *   process: Customer -> PlaceOrder -> OrderPlaced
- *   process: CancelOrder -> OrderCancelled
- *   process: OrderPlaced ->|triggers| ValidateOrder
- * }
- *
- * // --- Read model containers (contain events, read models, notes) ---
- * readModel: OrderSummary [cyan] {
- *   event: OrderPlaced
- *   event: PaymentReceived
- *   note: "Shows total amount and status"
- * }
- *
- * // --- Standalone nodes (outside containers) ---
- * command: PlaceOrder [blue]
- * command: CancelOrder [blue]
- * event: OrderPlaced [orange]
- * event: OrderCancelled [orange]
- * event: PaymentReceived [orange]
- * aggregate: Payment [green]
- * policy: ValidateOrder [yellow]
- * policy: NotifyCustomer [yellow]
- * externalSystem: PaymentGateway [pink]
- * externalSystem: EmailService [pink]
- * tempObject: OrderDto [lightgray]
- *
- * // --- Relationships ---
- * Customer ->|initiates| PlaceOrder : command
- * PlaceOrder -> OrderPlaced : event
- *
- * // --- Comments ---
- * // Single-line comments
  */
 
 export interface DSLNode {

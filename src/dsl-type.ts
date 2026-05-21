@@ -1,13 +1,13 @@
 export enum NodeType {
-    Aggregate = "Aggregate",
-    Actor = "Actor",
-    Command = "Command",
-    Event = "Event",
-    Query = "Query",
-    Policy = "Policy",
-    Error = "Error",
-    ExternalSystem = "ExternalSystem",
-    View = "View",
+  Aggregate = "Aggregate",
+  Actor = "Actor",
+  Command = "Command",
+  Event = "Event",
+  Query = "Query",
+  Policy = "Policy",
+  Error = "Error",
+  ExternalSystem = "ExternalSystem",
+  View = "View",
 }
 
 export enum ContainerType {

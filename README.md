@@ -6,6 +6,7 @@ A **browser extension** (Manifest V3) and **VS Code Markdown preview extension**
 
 - 🎨 Full event storming visual language: events, commands, queries, aggregates, actors, policies, views, read models, external systems, errors, temp objects, notes
 - 📦 Container-based layout: JSON DSL containers render as visual boxes for aggregates, external systems, read models, and processes
+- 🗂️ Group subgraphs: each child group renders inside its own nested container with the group name in the top-left corner
 - ⬅️→ Left-to-right process flows: actor → command/query/policy → event inside containers
 - ↘️ Directional arrows with shared-target fan-in layouts for commands and views
 - 🔍 Interactive zoom & pan
@@ -82,7 +83,8 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
           { "type": "Event", "name": "UserRegistered" }
-        ]
+        ],
+        "notes": ["This process handles user registration, including validating the email address and creating a new user account if the email is valid."]
       }
     ]
   },
@@ -95,9 +97,9 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
         "nodes": [
           { "type": "Actor", "name": "Me", "next": "Wake Up" },
           { "type": "Command", "name": "Wake Up", "next": "Is Alarm Ringing?" },
-          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Get Out of Bed", "negativeNext": "Sleep In" },
+          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "negativeNext": "Sleep In" },
           { "type": "Error", "name": "Sleep In" },
-          { "type": "Event", "name": "Get Out of Bed" }
+          { "type": "Event", "name": "Got Out of Bed" }
         ]
       },
       {
@@ -106,9 +108,9 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
           { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "negativeNext": "Switch on shower" },
           { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
-          { "type": "Policy", "name": "Have shower gel?", "next": "Get Dressed", "negativeNext": "Go Buy Shower Gel" },
+          { "type": "Policy", "name": "Have shower gel?", "next": "Had Shower", "negativeNext": "Go Buy Shower Gel" },
           { "type": "Error", "name": "Go Buy Shower Gel" },
-          { "type": "Event", "name": "Get Dressed" }
+          { "type": "Event", "name": "Had Shower" }
         ]
       }
     ]
@@ -217,6 +219,7 @@ type NodeType =
   | "Policy"
   | "Error"
   | "ExternalSystem"
+  | "Note"
   | "View";
 
 interface Container {
