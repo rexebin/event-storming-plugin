@@ -68,13 +68,23 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
 - `eventstorming` for the text DSL
 - `json` for the JSON DSL, which gives editors JSON syntax help
 
-````markdown
 ```json
 [
   {
     "type": "Aggregate",
     "name": "Order",
     "children": [
+      {
+        "name": "Shower",
+        "nodes": [
+          { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
+          { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "negativeNext": "Switch on shower" },
+          { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
+          { "type": "Policy", "name": "Have shower gel?", "next": "Get Dressed", "negativeNext": "Go Buy Shower Gel" },
+          { "type": "Error", "name": "Go Buy Shower Gel" },
+          { "type": "Event", "name": "Get Dressed" }
+        ]
+      },
       {
         "name": "Place Order",
         "nodes": [
@@ -85,7 +95,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "Error", "name": "Invalid Order Detail", "notes": ["Order details are invalid, please review your order and try again."] },
           { "type": "ExternalSystem", "name": "PaymentGateway", "next": "Is Payment Successful?" },
           { "type": "Policy", "name": "Is Payment Successful?", "next": "OrderPlaced", "negativeNext": "PaymentFailed" },
-          { "type": "Error", "name": "PaymentFailed", "notes": ["Payment failed, please try again or use a different payment method.", "Client should handle this error"] },
+          { "type": "Error", "name": "PaymentFailed", "notes": ["Payment failed, please try again or use a different payment method.", "Client should handle this error."] },
           { "type": "Event", "name": "OrderPlaced" }       
         ]
       },      
@@ -97,7 +107,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "Event", "name": "PaymentFailed", "next": "CancelOrder" },
           { "type": "Command", "name": "CancelOrder", "next": "Is Cancellation Allowed?" },
           { "type": "Policy", "name": "Is Cancellation Allowed?", "next": "OrderCancelled", "negativeNext": "CancellationDenied" },
-          { "type": "Event", "name": "OrderCancelled" }
+          { "type": "Event", "name": "OrderCancelled", "notes": ["Order has been cancelled successfully.", "another note"] }         
         ]
       }
     ]
@@ -146,7 +156,6 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
   }
 ]
 ```
-````
 
 The diagram will render inline, replacing the code block automatically.
 

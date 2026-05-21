@@ -180,6 +180,26 @@ const noteSample = `[
   }
 ]`;
 
+const showerSample = `[
+  {
+    "type": "Aggregate",
+    "name": "Order",
+    "children": [
+      {
+        "name": "Shower",
+        "nodes": [
+          { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
+          { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "negativeNext": "Switch on shower" },
+          { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
+          { "type": "Policy", "name": "Have shower gel?", "next": "Get Dressed", "negativeNext": "Go Buy Shower Gel" },
+          { "type": "Error", "name": "Go Buy Shower Gel" },
+          { "type": "Event", "name": "Get Dressed" }
+        ]
+      }
+    ]
+  }
+]`;
+
 function getTranslate(element: Element): { x: number; y: number } {
   const transform = element.getAttribute('transform') || '';
   const match = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
@@ -284,5 +304,29 @@ describe('renderEventStorming layout', () => {
     expect(tooltip).toBeTruthy();
     expect(tooltip!.innerHTML).toContain('Requires manager approval');
     expect(tooltip!.innerHTML).toContain('Audit this action');
+  });
+
+  it('keeps the main policy chain moving right when a negative branch rejoins it', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    const isShowerRunning = host.querySelector('[data-id="Shower_Is_the_shower_running_"]');
+    const haveShowerGel = host.querySelector('[data-id="Shower_Have_shower_gel_"]');
+    const switchOnShower = host.querySelector('[data-id="Shower_Switch_on_shower"]');
+
+    expect(isShowerRunning).toBeTruthy();
+    expect(haveShowerGel).toBeTruthy();
+    expect(switchOnShower).toBeTruthy();
+
+    const runningPos = getTranslate(isShowerRunning!);
+    const gelPos = getTranslate(haveShowerGel!);
+    const switchPos = getTranslate(switchOnShower!);
+
+    expect(gelPos.x).toBeGreaterThan(runningPos.x);
+    expect(gelPos.y).toBe(runningPos.y);
+    expect(gelPos.x - runningPos.x).toBe(176);
+    expect(switchPos.y).toBeGreaterThan(runningPos.y);
   });
 });

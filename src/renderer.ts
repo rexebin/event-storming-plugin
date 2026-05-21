@@ -44,7 +44,8 @@ interface LayoutLink {
 
 const NODE_W = 140;
 const NODE_H = 36;
-const NODE_GAP = 22;
+const NODE_GAP_X = 36;
+const NODE_GAP_Y = 22;
 const CONTAINER_PADDING = 24;
 const CONTAINER_HEADER_H = 32;
 const CONTAINER_GAP_X = 60;
@@ -371,7 +372,7 @@ function computeLayout(model: DSLModel): LayoutResult {
            positioned
          );
          processBottom = Math.max(processBottom, laneBottom);
-         laneY = laneBottom + NODE_GAP;
+         laneY = laneBottom + NODE_GAP_Y;
        }
 
        for (const node of processNodes) {
@@ -389,11 +390,11 @@ function computeLayout(model: DSLModel): LayoutResult {
            positioned
          );
          processBottom = Math.max(processBottom, laneBottom);
-         laneY = laneBottom + NODE_GAP;
+         laneY = laneBottom + NODE_GAP_Y;
        }
        }
 
-       processY = processBottom + NODE_GAP;
+       processY = processBottom + NODE_GAP_Y;
     }
 
     // Layout non-process nodes below processes
@@ -404,10 +405,10 @@ function computeLayout(model: DSLModel): LayoutResult {
     let npY = processY + 10;
     for (const np of nonProcessNodes) {
        allNodes.push({ ...np, x: npX, y: npY });
-       npX += NODE_W + NODE_GAP;
+       npX += NODE_W + NODE_GAP_X;
        if (npX - innerX > containerW - CONTAINER_PADDING * 2 - NODE_W) {
        npX = innerX;
-       npY += NODE_H + NODE_GAP;
+       npY += NODE_H + NODE_GAP_Y;
        }
     }
 
@@ -602,7 +603,7 @@ function layoutChainFrom(
 
     if (current.type === 'policy') {
        const negativeNode = getOrCreateNegativeNode(current, container, model, processNodeMap);
-       const negativeY = currentY + NODE_H + NODE_GAP + 20;
+       const negativeY = currentY + NODE_H + NODE_GAP_Y + 20;
 
        placeProcessNode(negativeNode, currentX, negativeY, container.id, allNodes, processPositioned, positioned);
        allLinks.push({
@@ -615,16 +616,21 @@ function layoutChainFrom(
 
        if (negativeNode.next && processNodeMap.has(negativeNode.next)) {
        const negativeNextNode = processNodeMap.get(negativeNode.next)!;
-       const negativeNextY = negativeY + NODE_H + NODE_GAP + 20;
+       const rejoinsMainFlow = current.next === negativeNextNode.id;
 
-       placeProcessNode(negativeNextNode, currentX, negativeNextY, container.id, allNodes, processPositioned, positioned);
+       if (!rejoinsMainFlow && !processPositioned.has(negativeNextNode.id)) {
+         const negativeNextY = negativeY + NODE_H + NODE_GAP_Y + 20;
+
+         placeProcessNode(negativeNextNode, currentX, negativeNextY, container.id, allNodes, processPositioned, positioned);
+         maxBottom = Math.max(maxBottom, negativeNextY + NODE_H);
+       }
+
        allLinks.push({
          source: negativeNode.id,
          target: negativeNextNode.id,
          label: '',
          type: 'negative',
        });
-       maxBottom = Math.max(maxBottom, negativeNextY + NODE_H);
        }
     }
 
@@ -640,7 +646,7 @@ function layoutChainFrom(
        type: 'default',
     });
 
-    currentX += NODE_W + NODE_GAP;
+    currentX += NODE_W + NODE_GAP_X;
     current = nextNode;
   }
 
@@ -661,7 +667,7 @@ function layoutFanInProcess(
   processPositioned: Set<string>,
   positioned: Set<string>
 ): number {
-  const rowHeight = NODE_H + NODE_GAP;
+  const rowHeight = NODE_H + NODE_GAP_Y;
   const useTwoSidedLayout = container.type === 'readModel' || target.type === 'view';
 
   if (useTwoSidedLayout) {
@@ -671,8 +677,8 @@ function layoutFanInProcess(
     const stackRows = Math.max(leftRoots.length, rightRoots.length);
     const targetX = innerX + (containerWidth - CONTAINER_PADDING * 2 - NODE_W) / 2;
     const targetY = processY + ((stackRows - 1) * rowHeight) / 2;
-    const leftX = targetX - NODE_W - NODE_GAP;
-    const rightX = targetX + NODE_W + NODE_GAP;
+    const leftX = targetX - NODE_W - NODE_GAP_X;
+    const rightX = targetX + NODE_W + NODE_GAP_X;
 
     placeProcessNode(target, targetX, targetY, container.id, allNodes, processPositioned, positioned);
 
@@ -712,7 +718,7 @@ function layoutFanInProcess(
     return Math.max(chainBottom, processY + (stackRows - 1) * rowHeight + NODE_H);
   }
 
-  const targetX = innerX + NODE_W + NODE_GAP;
+  const targetX = innerX + NODE_W + NODE_GAP_X;
   const targetY = processY + ((roots.length - 1) * rowHeight) / 2;
 
   placeProcessNode(target, targetX, targetY, container.id, allNodes, processPositioned, positioned);
@@ -747,12 +753,12 @@ function computeContainerWidth(container: DSLContainer, model: DSLModel): number
   // Width = max of all process row widths
   let maxW = 0;
   for (const proc of container.processes) {
-    const w = proc.stepIds.length * (NODE_W + NODE_GAP) - NODE_GAP;
+    const w = proc.stepIds.length * (NODE_W + NODE_GAP_X) - NODE_GAP_X;
     maxW = Math.max(maxW, w);
   }
   // Also consider non-process nodes
   const nonProcess = model.nodes.filter((n) => n.containerId === container.id);
-  const gridW = Math.min(nonProcess.length, 4) * (NODE_W + NODE_GAP);
+  const gridW = Math.min(nonProcess.length, 4) * (NODE_W + NODE_GAP_X);
   return Math.max(maxW, gridW) + CONTAINER_PADDING * 2;
 }
 
@@ -761,7 +767,7 @@ function computeContainerHeight(container: DSLContainer, model: DSLModel): numbe
   const nonProcess = model.nodes.filter((n) => n.containerId === container.id && !container.processes.some(p => p.stepIds.includes(n.id)));
   const nonProcessRows = Math.ceil(nonProcess.length / 4);
   return CONTAINER_HEADER_H + CONTAINER_PADDING * 2 +
-    (processRows + nonProcessRows) * (NODE_H + NODE_GAP) + 10;
+    (processRows + nonProcessRows) * (NODE_H + NODE_GAP_Y) + 10;
 }
 
 function layoutStandaloneNodes(nodes: DSLNode[], allNodes: LayoutNode[], startX: number, startY: number) {
@@ -771,10 +777,10 @@ function layoutStandaloneNodes(nodes: DSLNode[], allNodes: LayoutNode[], startX:
 
   for (let i = 0; i < nodes.length; i++) {
     if (i % COLS !== 0) {
-      cx += NODE_W + NODE_GAP;
+      cx += NODE_W + NODE_GAP_X;
     } else {
       cx = startX;
-      cy += NODE_H + NODE_GAP;
+      cy += NODE_H + NODE_GAP_Y;
     }
     allNodes.push({ ...nodes[i], x: cx, y: cy });
   }
