@@ -811,6 +811,7 @@ function computeLinkPath(source: LayoutNode, target: LayoutNode, type: string, i
   if (sourceY !== targetY) {
     const sourceIsBelowTarget = sourceY > targetY;
     const targetAnchorY = target.y + (sourceIsBelowTarget ? NODE_H * 0.75 : NODE_H * 0.25);
+    const targetApproachY = targetAnchorY + (sourceY - targetAnchorY) * 0.45;
     const horizontalDistance = Math.abs(targetX - sourceX);
 
     if (horizontalDistance < 1) {
@@ -820,14 +821,14 @@ function computeLinkPath(source: LayoutNode, target: LayoutNode, type: string, i
       const controlOffset = Math.max(28, NODE_GAP_X);
       const controlX = sourceCenterX + curveDirection * controlOffset;
 
-      return `M ${sourceCenterX} ${sourceY} C ${controlX} ${sourceY}, ${controlX} ${targetAnchorY}, ${targetCenterX} ${targetAnchorY}`;
+      return `M ${sourceCenterX} ${sourceY} C ${controlX} ${sourceY}, ${controlX} ${targetApproachY}, ${targetCenterX} ${targetAnchorY}`;
     }
 
     const controlOffset = Math.max(32, horizontalDistance * 0.45);
     const controlX1 = sourceX + (sourceIsLeft ? controlOffset : -controlOffset);
     const controlX2 = targetX - (sourceIsLeft ? controlOffset : -controlOffset);
 
-    return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetAnchorY}, ${targetX} ${targetAnchorY}`;
+    return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetApproachY}, ${targetX} ${targetAnchorY}`;
   }
 
   return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
