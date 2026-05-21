@@ -341,14 +341,17 @@ describe('renderEventStorming layout', () => {
 
     expect(haveShowerGel).toBeTruthy();
     expect(switchOnShower).toBeTruthy();
+    const gelPos = getTranslate(haveShowerGel!);
 
     const curvedRejoin = host.querySelector<SVGPathElement>(
       `path.es-link-negative[data-source="${switchOnShower!.getAttribute('data-id')}"][data-target="${haveShowerGel!.getAttribute('data-id')}"]`
     );
+    const curvedRejoinPath = curvedRejoin?.getAttribute('d') || '';
 
     expect(curvedRejoin).toBeTruthy();
-    expect(curvedRejoin!.getAttribute('d')).toContain(' C ');
+    expect(curvedRejoinPath).toContain(' C ');
     expect(curvedRejoin!.getAttribute('marker-end')).toBe('url(#arrowhead)');
+    expect(curvedRejoinPath.endsWith(`${gelPos.x} ${gelPos.y + 27}`)).toBe(true);
   });
 
   it('curves fan-in links when source nodes are on different rows', () => {
@@ -374,14 +377,17 @@ describe('renderEventStorming layout', () => {
         `path.es-link-default[data-source="${source.getAttribute('data-id')}"][data-target="${cancelOrder!.getAttribute('data-id')}"]`
       );
       const sourcePos = getTranslate(source);
+      const pathD = path?.getAttribute('d') || '';
 
       expect(path).toBeTruthy();
       expect(path!.getAttribute('marker-end')).toBe('url(#arrowhead)');
 
       if (sourcePos.y === cancelOrderPos.y) {
-        expect(path!.getAttribute('d')).not.toContain(' C ');
+        expect(pathD).not.toContain(' C ');
       } else {
-        expect(path!.getAttribute('d')).toContain(' C ');
+        const expectedAnchorY = sourcePos.y > cancelOrderPos.y ? cancelOrderPos.y + 27 : cancelOrderPos.y + 9;
+        expect(pathD).toContain(' C ');
+        expect(pathD.endsWith(`${cancelOrderPos.x} ${expectedAnchorY}`)).toBe(true);
       }
     }
   });
