@@ -4,14 +4,14 @@ A **browser extension** (Manifest V3) and **VS Code Markdown preview extension**
 
 ## Features
 
-- 🎨 Full event storming visual language: events, commands, queries, aggregates, actors, policies, views, read models, external systems, errors, temp objects, notes
-- 📦 Container-based layout: JSON DSL containers render as visual boxes for aggregates, external systems, read models, and processes
-- 🗂️ Group subgraphs: each child group renders inside its own nested container with the group name in the top-left corner
-- ⬅️→ Left-to-right process flows: actor → command/query/policy → event inside containers
+- 🎨 Full event storming visual language: events, commands, queries, aggregates, actors, policies, views, read models, external systems, errors, and note nodes
+- 📦 Container-based layout: JSON DSL containers render as visual boxes for aggregates, external systems, read models, and process containers
+- 🗂️ Nested process groups: each child group renders inside a dashed sub-container with the group name in the top-left corner
+- ⬅️→ Left-to-right process flows: actor → command/query/policy → event inside containers, with policy failure branches rendered below
 - ↘️ Directional arrows with shared-target fan-in layouts for commands and views
 - 🔍 Interactive zoom & pan
-- 💡 Tooltips on hover, including attached notes
-- 📝 Note badge on nodes that have notes
+- 💡 Notes-only tooltips: tooltips appear only for containers, groups, or nodes that have notes
+- 📝 Note badges on containers, groups, and nodes that have notes
 - 🎯 Collapsible diagrams with toggle button
 - 🌈 Color-coded rectangles (black border) per event storming standard:
   - **Orange** (`#FFA500`) → Domain Events
@@ -79,7 +79,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
       {
         "name": "User Registration",
         "nodes": [
-          { "type": "Actor", "name": "Customer", "next": "Register" },
+          { "type": "Actor", "name": "Customer1", "next": "Register" },
           { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
           { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
@@ -269,7 +269,8 @@ interface Node {
 - `next` links to another node in the same group and renders to the **right**.
 - `negativeNext` is used for policy failure paths and renders **below** the policy.
 - If a policy omits a matching negative-path node, the renderer creates a default error node.
-- `notes` can be added to containers, groups, or nodes. Nodes with notes show a small badge, and hover tooltips include the note text.
+- `notes` can be added to containers, groups, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
+- `Note` is a supported JSON node type and renders as a light-yellow note node rather than a command.
 
 ## Project Structure
 

@@ -319,6 +319,23 @@ function getTranslate(element: Element): { x: number; y: number } {
   };
 }
 
+function getPointOnLine(d: string, t: number): { x: number; y: number } {
+  const lineMatch = d.match(/M ([\d.]+) ([\d.]+) L ([\d.]+) ([\d.]+)/);
+  if (!lineMatch) {
+    throw new Error(`Expected line path, got: ${d}`);
+  }
+
+  const x1 = parseFloat(lineMatch[1]);
+  const y1 = parseFloat(lineMatch[2]);
+  const x2 = parseFloat(lineMatch[3]);
+  const y2 = parseFloat(lineMatch[4]);
+
+  return {
+    x: x1 + (x2 - x1) * t,
+    y: y1 + (y2 - y1) * t,
+  };
+}
+
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -564,6 +581,23 @@ describe('renderEventStorming layout', () => {
     expect(curvedRejoinPath).toContain(' C ');
     expect(curvedRejoin!.getAttribute('marker-end')).toBe('url(#arrowhead)');
     expect(curvedRejoinPath.endsWith(`${gelPos.x} ${gelPos.y + 27}`)).toBe(true);
+  });
+
+  it('offsets the "no" label away from the negative link line', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    const noLabel = Array.from(host.querySelectorAll<SVGTextElement>('g.links text'))
+      .find((label) => label.textContent === 'no');
+    const negativeLink = host.querySelector<SVGPathElement>('path.es-link-negative');
+    expect(noLabel).toBeTruthy();
+    expect(negativeLink).toBeTruthy();
+
+    const mid = getPointOnLine(negativeLink!.getAttribute('d') || '', 0.5);
+    expect(Number(noLabel!.getAttribute('x'))).toBe(mid.x + 14);
+    expect(Number(noLabel!.getAttribute('y'))).toBe(mid.y - 10);
   });
 
   it('curves fan-in links when source nodes are on different rows', () => {

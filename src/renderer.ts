@@ -289,11 +289,11 @@ export function renderEventStorming(
 
   // Link label
   if (link.label) {
-    const mid = getPointOnPath(pathD, 0.5);
+    const labelPosition = getLinkLabelPosition(pathD, link);
     linksGroup
       .append('text')
-      .attr('x', mid.x)
-      .attr('y', mid.y - 6)
+      .attr('x', labelPosition.x)
+      .attr('y', labelPosition.y)
       .attr('text-anchor', 'middle')
       .attr('font-size', '10px')
       .attr('fill', '#586069')
@@ -993,6 +993,22 @@ function getPointOnPath(d: string, t: number): { x: number; y: number } {
     return { x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t };
   }
   return { x: 0, y: 0 };
+}
+
+function getLinkLabelPosition(d: string, link: LayoutLink): { x: number; y: number } {
+  const mid = getPointOnPath(d, 0.5);
+
+  if (link.label === 'no') {
+    return {
+      x: mid.x + 14,
+      y: mid.y - 10,
+    };
+  }
+
+  return {
+    x: mid.x,
+    y: mid.y - 6,
+  };
 }
 
 // ─── Text Wrapping ─────────────────────────────────────────

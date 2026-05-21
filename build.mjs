@@ -30,7 +30,7 @@ for (const [entryPoint, outputFile] of browserEntries) {
 }
 
 // Copy static assets
-const assets = ['manifest.json', 'style.css', 'icon.svg'];
+const assets = ['manifest.json', 'style.css', 'icon.svg', 'icon.png'];
 for (const asset of assets) {
   copyFileSync(join(process.cwd(), asset), join(dist, asset));
   console.log(`    ✓ ${asset}`);
