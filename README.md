@@ -83,7 +83,8 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
           { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
-          { "type": "Event", "name": "UserRegistered" }
+          { "type": "Event", "name": "UserRegistered", "next":"Some Note" },
+          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
         ],
         "notes": ["This process handles user registration, including validating the email address and creating a new user account if the email is valid."]
       }
@@ -113,6 +114,23 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "Error", "name": "Go Buy Shower Gel" },
           { "type": "Event", "name": "Had Shower" }
         ]
+      }
+    ]
+  },
+  {
+    "type": "Aggregate",
+    "name": "User Profile",
+    "children": [
+      {
+        "name": "Update Profile",
+        "nodes": [
+          { "type": "Actor", "name": "Customer", "next": "UpdateProfile" },
+          { "type": "Command", "name": "UpdateProfile", "next": "Is User Authenticated?" },
+          { "type": "Policy", "name": "Is User Authenticated?", "next": "ProfileUpdated", "negativeNext": "Authentication Required" },
+          { "type": "Error", "name": "Authentication Required", "notes": ["You must be logged in to update your profile. Please log in and try again."] },
+          { "type": "Event", "name": "ProfileUpdated" }
+        ],
+        "notes": ["This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned."]
       }
     ]
   },

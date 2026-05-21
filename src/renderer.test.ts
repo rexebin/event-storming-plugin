@@ -180,6 +180,22 @@ const noteSample = `[
   }
 ]`;
 
+const jsonNoteSample = `[
+  {
+    "type": "Aggregate",
+    "name": "User",
+    "children": [
+      {
+        "name": "User Registration",
+        "nodes": [
+          { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
+          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
+        ]
+      }
+    ]
+  }
+]`;
+
 const showerSample = `[
   {
     "type": "Aggregate",
@@ -365,6 +381,41 @@ describe('renderEventStorming layout', () => {
     const tooltip = document.body.querySelector('.es-tooltip');
     expect(tooltip).toBeTruthy();
     expect(tooltip!.innerHTML).toContain('Handles the happy path for order placement.');
+  });
+
+  it('renders JSON Note nodes with the note color instead of the command color', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), jsonNoteSample);
+
+    const note = host.querySelector('[data-id="User_Registration_Some_Note"]');
+    expect(note).toBeTruthy();
+
+    const noteRect = note!.querySelector('rect');
+    expect(noteRect).toBeTruthy();
+    expect(noteRect!.getAttribute('fill')).toBe('#FFF1AA');
+  });
+
+  it('shows the has-notes icon on JSON Note nodes that have notes', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), jsonNoteSample);
+
+    const note = host.querySelector('[data-id="User_Registration_Some_Note"]');
+    expect(note).toBeTruthy();
+    expect(note!.querySelector('.es-note-badge')).toBeTruthy();
+  });
+
+  it('does not render JSON Note nodes twice', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), jsonNoteSample);
+
+    const notes = host.querySelectorAll('[data-id="User_Registration_Some_Note"]');
+    expect(notes).toHaveLength(1);
   });
 
   it('keeps the main policy chain moving right when a negative branch rejoins it', () => {

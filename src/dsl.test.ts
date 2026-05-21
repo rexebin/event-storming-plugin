@@ -603,6 +603,30 @@ describe('parseDSL', () => {
      expect(result.containers[0].color).toBe('#FB8597');
    });
 
+   it('should parse JSON Note nodes as note type with note color', () => {
+     const dsl = `[
+       {
+         "type": "Aggregate",
+         "name": "User",
+         "children": [
+           {
+             "name": "User Registration",
+             "nodes": [
+               { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
+               { "type": "Note", "name": "Some Note", "notes": ["Attached to the event"] }
+             ]
+           }
+         ]
+       }
+     ]`;
+     const result = parseDSL(dsl);
+     const note = result.nodes.find((node) => node.label === 'Some Note');
+
+     expect(note).toBeDefined();
+     expect(note?.type).toBe('note');
+     expect(note?.color).toBe('#FFF1AA');
+   });
+
    it('should keep the README eventstorming example parseable', async () => {
      const readme = (await import('../README.md?raw')).default;
      const match = readme.match(/```(?:eventstorming|json)\n([\s\S]*?)\n```/);

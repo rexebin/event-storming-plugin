@@ -210,7 +210,7 @@ export function renderEventStorming(
       .attr('stroke', '#000000')
       .attr('stroke-width', 1.5);
 
-    if (node.type !== 'note' && nodeNotes.length > 0) {
+    if (nodeNotes.length > 0) {
       const badge = g
         .append('g')
         .attr('class', 'es-note-badge')
@@ -495,7 +495,9 @@ function computeLayout(model: DSLModel): LayoutResult {
     }
 
     // Layout notes near their targets
-    const notes = model.nodes.filter((n) => n.containerId === container.id && n.type === 'note');
+    const notes = model.nodes.filter(
+      (n) => n.containerId === container.id && n.type === 'note' && !positioned.has(n.id)
+    );
     for (const note of notes) {
        const target = allNodes.find((n) => n.id === note.noteTarget);
        if (target) {

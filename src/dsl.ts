@@ -508,6 +508,7 @@ function mapNodeType(type: string): NodeType {
     Policy: 'policy',
     Error: 'error',
     ExternalSystem: 'externalSystem',
+    Note: 'note',
     View: 'view',
   };
   return m[type] || 'command';
