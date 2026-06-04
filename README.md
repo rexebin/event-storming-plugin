@@ -75,28 +75,28 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
     "type": "Aggregate",
     "name": "User",
     "notes": ["This aggregate represents a user in the system, including their registration and profile management processes."],
-    "children": [
+    "containers": [
       {
         "name": "User Registration",
-        "nodes": [
+        "notes": ["This process handles user registration, including validating the email address and creating a new user account if the email is valid."],
+        "children": [
           { "type": "Actor", "name": "Customer1", "next": "Register" },
           { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
           { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
           { "type": "Event", "name": "UserRegistered", "next":"Some Note" },
           { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
-        ],
-        "notes": ["This process handles user registration, including validating the email address and creating a new user account if the email is valid."]
+        ]
       }
     ]
   },
   {
     "type": "Aggregate",
     "name": "Morning Routine",
-    "children": [
+    "containers": [
       {
         "name": "Wake Up",
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Me", "next": "Wake Up" },
           { "type": "Command", "name": "Wake Up", "next": "Is Alarm Ringing?" },
           { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "negativeNext": "Sleep In" },
@@ -106,7 +106,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
       },
       {
         "name": "Shower",
-        "nodes": [
+        "children": [
           { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
           { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "negativeNext": "Switch on shower" },
           { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
@@ -120,28 +120,35 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
   {
     "type": "Aggregate",
     "name": "User Profile",
-    "children": [
+    "containers": [
       {
         "name": "Update Profile",
-        "nodes": [
+        "notes": ["This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned."],
+        "children": [
           { "type": "Actor", "name": "Customer", "next": "UpdateProfile" },
           { "type": "Command", "name": "UpdateProfile", "next": "Is User Authenticated?" },
           { "type": "Policy", "name": "Is User Authenticated?", "next": "ProfileUpdated", "negativeNext": "Authentication Required" },
           { "type": "Error", "name": "Authentication Required", "notes": ["You must be logged in to update your profile. Please log in and try again."] },
           { "type": "Event", "name": "ProfileUpdated" }
-        ],
-        "notes": ["This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned."]
+        ]
       }
     ]
   },
   {
     "type": "Aggregate",
     "name": "Order",
-    "children": [    
+    "containers": [
       {
         "name": "Place Order",
-        "nodes": [
-          { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
+        "children": [
+          { "type": "Command", "name": "PlaceOrder", "next": "IsAddressValid" },
+          { 
+            "name": "PlaceOrder", 
+            "children": [
+               { "type": "Policy", "name": "IsAddressValid", "next": "IsEmailValid", "negativeNext": "AddressIsInValid" },
+               { "type": "Policy", "name": "IsEmailValid", "next": "InventoryService", "negativeNext": "EmailIsInValid" }
+            ]
+          },
           { "type": "ExternalSystem", "name": "InventoryService", "next": "Do We Have Stock?" },
           { "type": "Policy", "name": "Do We Have Stock?", "next": "Is Order Detail Valid?", "negativeNext": "Out Of Stock" },
           { "type": "Policy", "name": "Is Order Detail Valid?", "next": "PaymentGateway", "negativeNext": "Invalid Order Detail" },
@@ -149,46 +156,38 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           { "type": "ExternalSystem", "name": "PaymentGateway", "next": "Is Payment Successful?" },
           { "type": "Policy", "name": "Is Payment Successful?", "next": "OrderPlaced", "negativeNext": "PaymentFailed" },
           { "type": "Error", "name": "PaymentFailed", "notes": ["Payment failed, please try again or use a different payment method.", "Client should handle this error."] },
-          { "type": "Event", "name": "OrderPlaced" }       
+          { "type": "Event", "name": "OrderPlaced" }
         ]
-      },      
-      {
-        "name": "Cancel Order",
-        "nodes": [
-          { "type": "Actor", "name": "Customer", "next": "CancelOrder" },
-          { "type": "Actor", "name": "Staff", "next": "CancelOrder" },
-          { "type": "Event", "name": "PaymentFailed", "next": "CancelOrder" },
-          { "type": "Command", "name": "CancelOrder", "next": "Is Cancellation Allowed?" },
-          { "type": "Policy", "name": "Is Cancellation Allowed?", "next": "OrderCancelled", "negativeNext": "CancellationDenied" },
-          { "type": "Event", "name": "OrderCancelled", "notes": ["Order has been cancelled successfully.", "another note"] }         
-        ]
-      }
+      }    
     ]
   },
   {
     "type": "ExternalSystem",
     "name": "Inventory Service",
-    "children": [
-      { "name": "Inventory Check", "nodes": [
-        {"type": "Command", "name": "Check Inventory", "next": "Get Inventory"},
-        {"type": "Query", "name": "Get Inventory", "next": "Has Stock?"},
-        {"type": "Policy", "name": "Has Stock?", "next": "InventoryCheckPassed", "negativeNext": "Out of Stock"},
-        {"type": "Event", "name": "Inventory Check Passed"}
-      ]}
+    "containers": [
+      {
+        "name": "Inventory Check",
+        "children": [
+          { "type": "Command", "name": "Check Inventory", "next": "Get Inventory" },
+          { "type": "Query", "name": "Get Inventory", "next": "Has Stock?" },
+          { "type": "Policy", "name": "Has Stock?", "next": "InventoryCheckPassed", "negativeNext": "Out of Stock" },
+          { "type": "Event", "name": "Inventory Check Passed" }
+        ]
+      }
     ]
   },
   {
-    "type": "ReadModel",
+    "type": "Projector",
     "name": "OrderDetail",
-    "children": [
+    "containers": [
       {
         "name": "Order Detail Projection",
-        "nodes": [
+        "children": [
           { "type": "Event", "name": "OrderPlaced", "next": "Order Detail View" },
           { "type": "Event", "name": "OrderCancelled", "next": "Order Detail View" },
           { "type": "Event", "name": "OrderUpdated", "next": "Order Detail View" },
           { "type": "Event", "name": "OrderShipped", "next": "Order Detail View" },
-          { "type": "View", "name": "Order Detail View", "notes": ["This view is used to display the details of an order, including its status, items, and other relevant information."] }
+          { "type": "ReadModel", "name": "Order Detail View", "notes": ["This view is used to display the details of an order, including its status, items, and other relevant information."] }
         ]
       }
     ]
@@ -196,13 +195,13 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
   {
     "type": "Process",
     "name": "Customer Order View",
-    "children": [
+    "containers": [
       {
         "name": "View Order Details",
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Customer", "next": "GetOrderDetails" },
           { "type": "Query", "name": "GetOrderDetails", "next": "Order Detail Projection" },
-          { "type": "View", "name": "Order Detail Projection" }
+          { "type": "ReadModel", "name": "Order Detail Projection" }
         ]
       }
     ]
@@ -212,7 +211,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
 
 The diagram will render inline, replacing the code block automatically.
 
-For the JSON DSL shown above, supported container types are `Aggregate`, `ExternalSystem`, `ReadModel`, and `Process`.
+For the JSON DSL shown above, supported diagram types are `Aggregate`, `ExternalSystem`, `Projector`, and `Process`.
 
 ## Usage in VS Code
 
@@ -227,31 +226,37 @@ The built-in Markdown preview keeps normal Markdown rendering and replaces match
 The current DSL is JSON. Its shape matches the implementation in `src/dsl-type.ts`:
 
 ```ts
-type ContainerType = "Aggregate" | "ExternalSystem" | "ReadModel" | "Process";
-
-type NodeType =
-  | "Aggregate"
-  | "Actor"
-  | "Command"
-  | "Event"
-  | "Query"
-  | "Policy"
-  | "Error"
-  | "ExternalSystem"
-  | "Note"
-  | "View";
-
-interface Container {
-  type: ContainerType;
-  name: string;
-  notes?: string[];
-  children: Group[];
+enum DiagramType {
+  Aggregate = "Aggregate",
+  ExternalSystem = "ExternalSystem",
+  Projector = "Projector",
+  Process = "Process",
 }
 
-interface Group {
+enum NodeType {
+  Aggregate = "Aggregate",
+  Actor = "Actor",
+  Command = "Command",
+  Event = "Event",
+  Query = "Query",
+  Policy = "Policy",
+  Error = "Error",
+  ExternalSystem = "ExternalSystem",
+  Note = "Note",
+  ReadModel = "ReadModel",
+}
+
+interface Diagram {
+  type: DiagramType;
   name: string;
-  nodes: Node[];
   notes?: string[];
+  containers: Container[];
+}
+
+interface Container {
+  name: string;
+  notes?: string[];
+  children: (Node | Container)[];
 }
 
 interface Node {
@@ -265,12 +270,53 @@ interface Node {
 
 ### Schema Notes
 
-- `children` defines independent process groups inside a container.
-- `next` links to another node in the same group and renders to the **right**.
+- The top-level array contains `Diagram` objects, each rendered as a labelled outer box.
+- `containers` defines named process groups inside a diagram, rendered as dashed sub-boxes.
+- `children` inside a container holds `Node` elements or nested `Container` elements (recursive nesting supported).
+- `next` links to another node in the same container and renders to the **right**.
 - `negativeNext` is used for policy failure paths and renders **below** the policy.
 - If a policy omits a matching negative-path node, the renderer creates a default error node.
-- `notes` can be added to containers, groups, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
-- `Note` is a supported JSON node type and renders as a light-yellow note node rather than a command.
+- `notes` can be added to diagrams, containers, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
+- `Note` is a supported node type and renders as a light-yellow note node rather than a command.
+
+### Recursive Containers
+
+A container's `children` array may mix `Node` elements with nested `Container` elements. Each nested container becomes its own labelled sub-group rendered inside the parent container.
+
+```json
+[
+  {
+    "type": "Aggregate",
+    "name": "Order",
+    "containers": [
+      {
+        "name": "Order Lifecycle",
+        "notes": ["Top-level group grouping placement and cancellation sub-flows."],
+        "children": [
+          {
+            "name": "Place Order",
+            "children": [
+              { "type": "Actor", "name": "Customer", "next": "PlaceOrder" },
+              { "type": "Command", "name": "PlaceOrder", "next": "Is Payment Valid?" },
+              { "type": "Policy", "name": "Is Payment Valid?", "next": "OrderPlaced", "negativeNext": "PaymentFailed" },
+              { "type": "Error", "name": "PaymentFailed" },
+              { "type": "Event", "name": "OrderPlaced" }
+            ]
+          },
+          {
+            "name": "Cancel Order",
+            "children": [
+              { "type": "Actor", "name": "Customer", "next": "CancelOrder" },
+              { "type": "Command", "name": "CancelOrder", "next": "OrderCancelled" },
+              { "type": "Event", "name": "OrderCancelled" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
+```
 
 ## Project Structure
 

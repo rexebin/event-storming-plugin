@@ -60,10 +60,10 @@ describe('parseDSL', () => {
         {
           "type": "Aggregate",
           "name": "Order",
-          "children": [
+          "containers": [
             {
               "name": "Place Order",
-              "nodes": [
+              "children": [
                 { "type": "Command", "name": "PlaceOrder" }
               ]
             }
@@ -559,10 +559,10 @@ describe('parseDSL', () => {
        {
          "type": "Aggregate",
          "name": "Order",
-         "children": [
+         "containers": [
            {
              "name": "Place Order",
-             "nodes": [
+             "children": [
                { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
                { "type": "ExternalSystem", "name": "InventoryService", "next": "DoWeHaveStock" },
                { "type": "Policy", "name": "Do We Have Stock?", "negativeNext": "Out Of Stock" }
@@ -586,10 +586,10 @@ describe('parseDSL', () => {
        {
          "type": "ExternalSystem",
          "name": "Inventory Service",
-         "children": [
+         "containers": [
            {
              "name": "Inventory Check",
-             "nodes": [
+             "children": [
                { "type": "Command", "name": "Check Inventory" }
              ]
            }
@@ -608,10 +608,10 @@ describe('parseDSL', () => {
        {
          "type": "Aggregate",
          "name": "User",
-         "children": [
+         "containers": [
            {
              "name": "User Registration",
-             "nodes": [
+             "children": [
                { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
                { "type": "Note", "name": "Some Note", "notes": ["Attached to the event"] }
              ]

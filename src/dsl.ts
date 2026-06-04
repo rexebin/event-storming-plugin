@@ -35,10 +35,17 @@ export interface DSLContainer {
   notes?: string[];           // container-level notes
 }
 
+export interface DSLSubGroup {
+  name: string;
+  nodeIds: string[];
+  notes?: string[];
+}
+
 export interface DSLProcess {
   name: string;              // process group name
   stepIds: string[];        // ordered list of node ids in the flow
   notes?: string[];          // process-level notes
+  subGroups?: DSLSubGroup[];  // nested sub-containers rendered as inline boxes
 }
 
 export interface DSLModel {
@@ -427,17 +434,17 @@ interface JSONNode {
   notes?: string[];
 }
 
-interface JSONGroup {
+interface JSONContainerNode {
   name: string;
-  nodes: JSONNode[];
   notes?: string[];
+  children: (JSONNode | JSONContainerNode)[];
 }
 
-interface JSONContainer {
+interface JSONDiagram {
   type: string;
   name: string;
   notes?: string[];
-  children: JSONGroup[];
+  containers: JSONContainerNode[];
 }
 
 export function isEventStormingJSON(text: string): boolean {
@@ -451,29 +458,34 @@ export function isEventStormingJSON(text: string): boolean {
   }
 }
 
-function isEventStormingJSONValue(value: unknown): value is JSONContainer[] {
-  return Array.isArray(value) && value.every(isJSONContainer);
+function isEventStormingJSONValue(value: unknown): value is JSONDiagram[] {
+  return Array.isArray(value) && value.every(isJSONDiagram);
 }
 
-function isJSONContainer(value: unknown): value is JSONContainer {
+function isJSONDiagram(value: unknown): value is JSONDiagram {
   if (!isRecord(value)) return false;
   return (
     typeof value.type === 'string' &&
     typeof value.name === 'string' &&
-    Array.isArray(value.children) &&
-    value.children.every(isJSONGroup) &&
+    Array.isArray(value.containers) &&
+    value.containers.every(isJSONContainerNode) &&
     isStringArrayOrUndefined(value.notes)
   );
 }
 
-function isJSONGroup(value: unknown): value is JSONGroup {
+function isJSONContainerNode(value: unknown): value is JSONContainerNode {
   if (!isRecord(value)) return false;
   return (
     typeof value.name === 'string' &&
-    Array.isArray(value.nodes) &&
-    value.nodes.every(isJSONNode) &&
+    !('type' in value) &&
+    Array.isArray(value.children) &&
+    value.children.every(isJSONNodeOrContainer) &&
     isStringArrayOrUndefined(value.notes)
   );
+}
+
+function isJSONNodeOrContainer(value: unknown): value is JSONNode | JSONContainerNode {
+  return isJSONNode(value) || isJSONContainerNode(value);
 }
 
 function isJSONNode(value: unknown): value is JSONNode {
@@ -509,7 +521,7 @@ function mapNodeType(type: string): NodeType {
     Error: 'error',
     ExternalSystem: 'externalSystem',
     Note: 'note',
-    View: 'view',
+    ReadModel: 'view',
   };
   return m[type] || 'command';
 }
@@ -519,13 +531,13 @@ function mapNodeType(type: string): NodeType {
  */
 function mapContainerType(type: string): 'aggregate' | 'readModel' | 'process' | 'externalSystem' {
   const l = type.toLowerCase();
-  if (l === 'readmodel') return 'readModel';
+  if (l === 'projector') return 'readModel';
   if (l === 'externalsystem') return 'externalSystem';
   if (l === 'process') return 'process';
   return 'aggregate';
 }
 
-function parseJSONDSL(data: JSONContainer[]): DSLModel {
+function parseJSONDSL(data: JSONDiagram[]): DSLModel {
   const model: DSLModel = {
     title: 'Event Storming',
     description: '',
@@ -534,13 +546,13 @@ function parseJSONDSL(data: JSONContainer[]): DSLModel {
     links: [],
   };
 
-  for (const container of data) {
-    const containerId = normalizeId(container.name);
-    const cType = mapContainerType(container.type);
+  for (const diagram of data) {
+    const containerId = normalizeId(diagram.name);
+    const cType = mapContainerType(diagram.type);
 
     const dslContainer: DSLContainer = {
       id: containerId,
-      label: container.name,
+      label: diagram.name,
       type: cType,
       color:
         cType === 'aggregate' ? '#FEE254' :
@@ -549,58 +561,87 @@ function parseJSONDSL(data: JSONContainer[]): DSLModel {
         '#859EBF',
       nodeIds: [],
       processes: [],
-      notes: container.notes || [],
+      notes: diagram.notes || [],
     };
 
-    for (const group of container.children) {
-      // Create nodes for this group — each process gets UNIQUE node IDs to prevent cross-process linking
-      const stepIds: string[] = [];
-      const prefix = normalizeId(group.name) + '_'; // scope node IDs to this process
-      const groupNodes: DSLNode[] = [];
-      const rawReferences = new Map<string, { next?: string; negativeNext?: string }>();
-      const aliases = new Map<string, string>();
-
-      for (const node of group.nodes) {
-        const id = prefix + normalizeId(node.name);
-        const type = mapNodeType(node.type);
-        const n: DSLNode = {
-          id,
-          label: node.name,
-          type,
-          color: DEFAULT_COLORS[type] || '#6a737d',
-          containerId,
-          processIndex: -1,
-          noteTarget: null,
-          next: undefined,
-          negativeNext: undefined,
-          negativeNextText: node.negativeNext || undefined,
-          notes: node.notes || [],
-        };
-        model.nodes.push(n);
-        groupNodes.push(n);
-        rawReferences.set(id, { next: node.next, negativeNext: node.negativeNext });
-        aliases.set(canonicalizeReference(node.name), id);
-        dslContainer.nodeIds.push(id);
-        stepIds.push(id);
-      }
-
-      for (const node of groupNodes) {
-        const refs = rawReferences.get(node.id);
-        node.next = resolveJSONReference(refs?.next, prefix, aliases);
-        node.negativeNext = resolveJSONReference(refs?.negativeNext, prefix, aliases);
-      }
-
-      dslContainer.processes.push({
-        name: group.name,
-        stepIds,
-        notes: group.notes || [],
-      });
+    for (const container of diagram.containers) {
+      expandJSONContainer(container, dslContainer, model, normalizeId(container.name) + '_');
     }
 
     model.containers.push(dslContainer);
   }
 
   return model;
+}
+
+function expandJSONContainer(
+  container: JSONContainerNode,
+  dslContainer: DSLContainer,
+  model: DSLModel,
+  prefix: string,
+  parentAliases?: Map<string, string>
+): void {
+  const stepIds: string[] = [];
+  const subGroups: DSLSubGroup[] = [];
+  const aliases = new Map<string, string>();
+  const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
+
+  collectChildren(container, dslContainer, model, prefix, aliases, stepIds, subGroups, pending);
+
+  for (const { node, rawNext, rawNegativeNext, nodePrefix } of pending) {
+    node.next = resolveJSONReference(rawNext, nodePrefix, aliases, parentAliases);
+    node.negativeNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
+  }
+
+  dslContainer.processes.push({
+    name: container.name,
+    stepIds,
+    notes: container.notes || [],
+    subGroups: subGroups.length > 0 ? subGroups : undefined,
+  });
+}
+
+function collectChildren(
+  container: JSONContainerNode,
+  dslContainer: DSLContainer,
+  model: DSLModel,
+  prefix: string,
+  aliases: Map<string, string>,
+  stepIds: string[],
+  subGroups: DSLSubGroup[],
+  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }>
+): void {
+  for (const child of container.children) {
+    if (isJSONNode(child)) {
+      const id = prefix + normalizeId(child.name);
+      const type = mapNodeType(child.type);
+      const n: DSLNode = {
+        id,
+        label: child.name,
+        type,
+        color: DEFAULT_COLORS[type] || '#6a737d',
+        containerId: dslContainer.id,
+        processIndex: -1,
+        noteTarget: null,
+        next: undefined,
+        negativeNext: undefined,
+        negativeNextText: child.negativeNext || undefined,
+        notes: child.notes || [],
+      };
+      model.nodes.push(n);
+      pending.push({ node: n, rawNext: child.next, rawNegativeNext: child.negativeNext, nodePrefix: prefix });
+      aliases.set(canonicalizeReference(child.name), id);
+      dslContainer.nodeIds.push(id);
+      stepIds.push(id);
+    } else {
+      // Sub-container: inline-expand into the parent process flow
+      const subPrefix = prefix + normalizeId(child.name) + '_';
+      const subStepIds: string[] = [];
+      collectChildren(child, dslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending);
+      for (const id of subStepIds) stepIds.push(id);
+      subGroups.push({ name: child.name, nodeIds: subStepIds, notes: child.notes || [] });
+    }
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -613,12 +654,22 @@ function canonicalizeReference(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function resolveJSONReference(reference: string | undefined, prefix: string, aliases: Map<string, string>): string | undefined {
+function resolveJSONReference(
+  reference: string | undefined,
+  prefix: string,
+  aliases: Map<string, string>,
+  parentAliases?: Map<string, string>
+): string | undefined {
   if (!reference) return undefined;
 
-  const aliasMatch = aliases.get(canonicalizeReference(reference));
-  if (aliasMatch) {
-    return aliasMatch;
+  const key = canonicalizeReference(reference);
+
+  const localMatch = aliases.get(key);
+  if (localMatch) return localMatch;
+
+  if (parentAliases) {
+    const parentMatch = parentAliases.get(key);
+    if (parentMatch) return parentMatch;
   }
 
   return prefix + normalizeId(reference);

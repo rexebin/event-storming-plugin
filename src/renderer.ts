@@ -37,11 +37,23 @@ interface LayoutGroup {
   notes?: string[];
 }
 
+interface LayoutSubGroup {
+  id: string;
+  label: string;
+  containerId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  notes?: string[];
+}
+
 interface LayoutResult {
   width: number;
   height: number;
   containers: LayoutContainer[];
   groups: LayoutGroup[];
+  subGroups: LayoutSubGroup[];
   nodes: LayoutNode[];
   links: LayoutLink[];
 }
@@ -188,6 +200,40 @@ export function renderEventStorming(
     }
   });
 
+  // ─── Draw sub-groups (inline nested containers) ───
+
+  const subGroupsGroup = svg.append('g').attr('class', 'sub-groups');
+
+  layout.subGroups.forEach((sg) => {
+    const g = subGroupsGroup
+      .append('g')
+      .attr('class', 'es-sub-group')
+      .attr('transform', `translate(${sg.x}, ${sg.y})`)
+      .attr('data-name', sg.label);
+
+    g.append('rect')
+      .attr('width', sg.width)
+      .attr('height', sg.height)
+      .attr('rx', 4)
+      .attr('fill', '#f0f4ff')
+      .attr('fill-opacity', 0.7)
+      .attr('stroke', '#a8b8d8')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '4 3');
+
+    g.append('text')
+      .attr('x', 10)
+      .attr('y', GROUP_HEADER_H - 6)
+      .attr('font-size', '11px')
+      .attr('font-weight', '600')
+      .attr('fill', '#7a8aaa')
+      .text(sg.label);
+
+    if (sg.notes && sg.notes.length > 0) {
+      appendNotesBadge(g, sg.width - 14, 10, sg.notes, tooltip, 'es-group-note-badge');
+    }
+  });
+
   // ─── Draw nodes ───
 
   const nodesGroup = svg.append('g').attr('class', 'nodes');
@@ -313,6 +359,7 @@ export function renderEventStorming(
       linksGroup.attr('transform', t);
       containersGroup.attr('transform', t);
       groupsGroup.attr('transform', t);
+      subGroupsGroup.attr('transform', t);
     });
 
   (svg as any).call(zoom);
@@ -363,6 +410,7 @@ function computeLayout(model: DSLModel): LayoutResult {
   const allNodes: LayoutNode[] = [];
   const allContainers: LayoutContainer[] = [];
   const allGroups: LayoutGroup[] = [];
+  const allSubGroups: LayoutSubGroup[] = [];
   const allLinks: LayoutLink[] = [];
   let x = PADDING_X;
   let y = PADDING_Y;
@@ -484,6 +532,39 @@ function computeLayout(model: DSLModel): LayoutResult {
         notes: process.notes,
       });
 
+      // Compute bounding boxes for inline sub-groups
+      if (process.subGroups) {
+        const SUB_PAD = 10;
+        for (const subGroup of process.subGroups) {
+          const subNodeIdSet = new Set(subGroup.nodeIds);
+          const subNodes = allNodes.filter((n) => subNodeIdSet.has(n.id));
+          if (subNodes.length === 0) continue;
+          // Also include negative/error nodes: either explicitly defined (negativeNext id)
+          // or auto-generated (error_default_<policyId>)
+          const negIds = new Set<string>();
+          for (const n of subNodes) {
+            if (n.negativeNext) negIds.add(n.negativeNext);
+            negIds.add(`error_default_${n.id}`);
+          }
+          const negNodes = allNodes.filter((n) => negIds.has(n.id));
+          const allSub = [...subNodes, ...negNodes];
+          const minX = Math.min(...allSub.map((n) => n.x)) - SUB_PAD;
+          const minY = Math.min(...allSub.map((n) => n.y)) - SUB_PAD - GROUP_HEADER_H;
+          const maxX = Math.max(...allSub.map((n) => n.x + NODE_W)) + SUB_PAD;
+          const maxY = Math.max(...allSub.map((n) => n.y + NODE_H)) + SUB_PAD;
+          allSubGroups.push({
+            id: `${container.id}_subgroup_${processIndex}_${normalizeId(subGroup.name)}`,
+            label: subGroup.name,
+            containerId: container.id,
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY,
+            notes: subGroup.notes,
+          });
+        }
+      }
+
       processY = groupY + groupHeight + GROUP_GAP_Y;
     });
 
@@ -570,6 +651,7 @@ function computeLayout(model: DSLModel): LayoutResult {
     height: totalHeight,
     containers: allContainers,
     groups: allGroups,
+    subGroups: allSubGroups,
     nodes: allNodes,
     links: allLinks,
   };

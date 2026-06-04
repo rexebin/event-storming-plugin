@@ -133,10 +133,10 @@ const readmeSample = `[
   {
     "type": "Aggregate",
     "name": "Order",
-    "children": [
+    "containers": [
       {
         "name": "Cancel Order",
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Customer", "next": "CancelOrder" },
           { "type": "Actor", "name": "Staff", "next": "CancelOrder" },
           { "type": "Event", "name": "PaymentFailed", "next": "CancelOrder" },
@@ -148,17 +148,17 @@ const readmeSample = `[
     ]
   },
   {
-    "type": "ReadModel",
+    "type": "Projector",
     "name": "OrderDetail",
-    "children": [
+    "containers": [
       {
         "name": "Order Detail Projection",
-        "nodes": [
+        "children": [
           { "type": "Event", "name": "OrderPlaced", "next": "Order Detail View" },
           { "type": "Event", "name": "OrderCancelled", "next": "Order Detail View" },
           { "type": "Event", "name": "OrderUpdated", "next": "Order Detail View" },
           { "type": "Event", "name": "OrderShipped", "next": "Order Detail View" },
-          { "type": "View", "name": "Order Detail View" }
+          { "type": "ReadModel", "name": "Order Detail View" }
         ]
       }
     ]
@@ -169,10 +169,10 @@ const noteSample = `[
   {
     "type": "Aggregate",
     "name": "Order",
-    "children": [
+    "containers": [
       {
         "name": "Place Order",
-        "nodes": [
+        "children": [
           { "type": "Command", "name": "PlaceOrder", "notes": ["Requires manager approval", "Audit this action"] }
         ]
       }
@@ -184,10 +184,10 @@ const jsonNoteSample = `[
   {
     "type": "Aggregate",
     "name": "User",
-    "children": [
+    "containers": [
       {
         "name": "User Registration",
-        "nodes": [
+        "children": [
           { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
           { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
         ]
@@ -200,10 +200,10 @@ const showerSample = `[
   {
     "type": "Aggregate",
     "name": "Order",
-    "children": [
+    "containers": [
       {
         "name": "Shower",
-        "nodes": [
+        "children": [
           { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
           { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "negativeNext": "Switch on shower" },
           { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
@@ -220,11 +220,11 @@ const groupedSample = `[
   {
     "type": "Aggregate",
     "name": "Order",
-    "children": [
+    "containers": [
       {
         "name": "Place Order",
         "notes": ["Handles the happy path for order placement."],
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Customer", "next": "PlaceOrder" },
           { "type": "Command", "name": "PlaceOrder", "next": "OrderPlaced" },
           { "type": "Event", "name": "OrderPlaced" }
@@ -232,7 +232,7 @@ const groupedSample = `[
       },
       {
         "name": "Cancel Order",
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Support", "next": "CancelOrder" },
           { "type": "Command", "name": "CancelOrder", "next": "OrderCancelled" },
           { "type": "Event", "name": "OrderCancelled" }
@@ -246,10 +246,10 @@ const wrapSample = `[
   {
     "type": "Aggregate",
     "name": "User",
-    "children": [
+    "containers": [
       {
         "name": "User Registration",
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Customer", "next": "Register" },
           { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
           { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
@@ -261,10 +261,10 @@ const wrapSample = `[
   {
     "type": "Aggregate",
     "name": "Morning Routine",
-    "children": [
+    "containers": [
       {
         "name": "Wake Up",
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Me", "next": "WakeUp" },
           { "type": "Command", "name": "WakeUp", "next": "Is Alarm Ringing?" },
           { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "negativeNext": "Sleep In" },
@@ -276,10 +276,10 @@ const wrapSample = `[
   {
     "type": "Aggregate",
     "name": "Order",
-    "children": [
+    "containers": [
       {
         "name": "Place Order",
-        "nodes": [
+        "children": [
           { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
           { "type": "ExternalSystem", "name": "InventoryService", "next": "Do We Have Stock?" },
           { "type": "Policy", "name": "Do We Have Stock?", "next": "PaymentGateway", "negativeNext": "Out Of Stock" },
@@ -292,13 +292,13 @@ const wrapSample = `[
   {
     "type": "Process",
     "name": "Customer Order View",
-    "children": [
+    "containers": [
       {
         "name": "View Order Details",
-        "nodes": [
+        "children": [
           { "type": "Actor", "name": "Customer", "next": "GetOrderDetails" },
           { "type": "Query", "name": "GetOrderDetails", "next": "Order Detail Projection" },
-          { "type": "View", "name": "Order Detail Projection" }
+          { "type": "ReadModel", "name": "Order Detail Projection" }
         ]
       }
     ]

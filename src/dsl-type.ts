@@ -8,27 +8,27 @@ export enum NodeType {
   Policy = "Policy",
   Error = "Error",
   ExternalSystem = "ExternalSystem",
-  View = "View",
+  ReadModel = "ReadModel",
 }
 
-export enum ContainerType {
+export enum DiagramType {
   Aggregate = "Aggregate",
   ExternalSystem = "ExternalSystem",
-  ReadModel = "ReadModel",
+  Projector = "Projector",
   Process = "Process",
 }
 
-export interface Container {
-  type: ContainerType;
+export interface Diagram {
+  type: DiagramType;
   name: string;
   notes?: string[]; // Optional notes or comments about the container, which can provide additional context or information.
-  children: Group[];
+  containers: Container[];
 }
 
-export interface Group {
-  name: string; // The name of the process, e.g., the name of the command, event, policy, etc.
-  nodes: Node[]; // The nodes that belong to this process, which can include commands, events, policies, etc.
-  notes?: string[]; // Optional notes or comments about the process, which can provide additional context or information.
+export interface Container {
+  name: string; 
+  children: (Node | Container)[]; 
+  notes?: string[]; 
 }
 
 export interface Node {

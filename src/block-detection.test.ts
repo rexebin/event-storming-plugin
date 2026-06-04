@@ -32,10 +32,10 @@ describe('block detection helpers', () => {
       {
         "type": "Aggregate",
         "name": "Order",
-        "children": [
+        "containers": [
           {
             "name": "Place Order",
-            "nodes": [
+            "children": [
               { "type": "Command", "name": "PlaceOrder" }
             ]
           }
@@ -52,10 +52,10 @@ describe('block detection helpers', () => {
       {
         "type": "Aggregate",
         "name": "Order",
-        "children": [
+        "containers": [
           {
             "name": "Place Order",
-            "nodes": [
+            "children": [
               { "type": "Command", "name": "PlaceOrder" }
             ]
           }
