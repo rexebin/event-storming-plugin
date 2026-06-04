@@ -50,5 +50,6 @@
   },
   "dependencies": {
     "d3": "^7.9.0"
-  }
+  },
+  "packageManager": "npm@11.16.0"
 }

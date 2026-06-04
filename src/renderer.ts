@@ -81,6 +81,7 @@ const LINK_COLOR = '#6a737d';
 const GROUP_PADDING = 16;
 const GROUP_HEADER_H = 22;
 const GROUP_GAP_Y = 18;
+const SUB_GROUP_GAP_X = 24;
 
 // ─── Main render function ───────────────────────────────────
 
@@ -457,6 +458,12 @@ function computeLayout(model: DSLModel): LayoutResult {
        const processNodeMap = new Map(processNodes.map((node) => [node.id, node]));
        const processPositioned = new Set<string>();
        const roots = getProcessRoots(process, processNodeMap);
+       const subGroupOf = new Map<string, string>();
+       if (process.subGroups) {
+         for (const sg of process.subGroups) {
+           for (const nid of sg.nodeIds) subGroupOf.set(nid, sg.name);
+         }
+       }
        const fanInTarget = detectSharedTargetFanIn(roots, processNodeMap);
        let processBottom = groupInnerY + NODE_H;
 
@@ -491,7 +498,8 @@ function computeLayout(model: DSLModel): LayoutResult {
            allNodes,
            allLinks,
            processPositioned,
-           positioned
+           positioned,
+           subGroupOf
          );
          processBottom = Math.max(processBottom, laneBottom);
          laneY = laneBottom + NODE_GAP_Y;
@@ -509,7 +517,8 @@ function computeLayout(model: DSLModel): LayoutResult {
            allNodes,
            allLinks,
            processPositioned,
-           positioned
+           positioned,
+           subGroupOf
          );
          processBottom = Math.max(processBottom, laneBottom);
          laneY = laneBottom + NODE_GAP_Y;
@@ -534,7 +543,7 @@ function computeLayout(model: DSLModel): LayoutResult {
 
       // Compute bounding boxes for inline sub-groups
       if (process.subGroups) {
-        const SUB_PAD = 10;
+        const SUB_PAD = 8;
         for (const subGroup of process.subGroups) {
           const subNodeIdSet = new Set(subGroup.nodeIds);
           const subNodes = allNodes.filter((n) => subNodeIdSet.has(n.id));
@@ -762,7 +771,8 @@ function layoutChainFrom(
   allNodes: LayoutNode[],
   allLinks: LayoutLink[],
   processPositioned: Set<string>,
-  positioned: Set<string>
+  positioned: Set<string>,
+  subGroupOf?: Map<string, string>
 ): number {
   let current: DSLNode | undefined = startNode;
   let currentX = startX;
@@ -820,7 +830,10 @@ function layoutChainFrom(
        type: 'default',
     });
 
-    currentX += NODE_W + NODE_GAP_X;
+    const crossesSubGroup =
+      !!subGroupOf &&
+      (subGroupOf.get(current.id) ?? '') !== (subGroupOf.get(nextNode.id) ?? '');
+    currentX += NODE_W + NODE_GAP_X + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
     current = nextNode;
   }
 
@@ -935,7 +948,36 @@ function computeContainerWidth(container: DSLContainer, model: DSLModel): number
     const columns = fanInTarget
       ? computeFanInProcessColumns(roots, fanInTarget, processNodeMap, container)
       : computeProcessColumns(startNodes, processNodeMap);
-    const w = columns > 0 ? columns * (NODE_W + NODE_GAP_X) - NODE_GAP_X : 0;
+    let w = columns > 0 ? columns * (NODE_W + NODE_GAP_X) - NODE_GAP_X : 0;
+
+    if (!fanInTarget && proc.subGroups && proc.subGroups.length > 0) {
+      const subGroupOf = new Map<string, string>();
+      for (const sg of proc.subGroups) {
+        for (const nid of sg.nodeIds) subGroupOf.set(nid, sg.name);
+      }
+      let transitions = 0;
+      let lastInSubGroup = false;
+      let firstInSubGroup = false;
+      for (const start of startNodes) {
+        let curr: DSLNode | undefined = start;
+        const seen = new Set<string>();
+        let isFirst = true;
+        while (curr && !seen.has(curr.id)) {
+          seen.add(curr.id);
+          if (isFirst && subGroupOf.has(curr.id)) firstInSubGroup = true;
+          const nxt: DSLNode | undefined = curr.next ? processNodeMap.get(curr.next) : undefined;
+          if (nxt && (subGroupOf.get(curr.id) ?? '') !== (subGroupOf.get(nxt.id) ?? '')) {
+            transitions++;
+          }
+          if (!nxt && subGroupOf.has(curr.id)) lastInSubGroup = true;
+          curr = nxt;
+          isFirst = false;
+        }
+      }
+      w += transitions * SUB_GROUP_GAP_X;
+      if (firstInSubGroup) w += SUB_GROUP_GAP_X;
+      if (lastInSubGroup) w += SUB_GROUP_GAP_X;
+    }
 
     maxW = Math.max(maxW, w);
   }

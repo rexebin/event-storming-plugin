@@ -146,7 +146,15 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
             "name": "PlaceOrder", 
             "children": [
                { "type": "Policy", "name": "IsAddressValid", "next": "IsEmailValid", "negativeNext": "AddressIsInValid" },
-               { "type": "Policy", "name": "IsEmailValid", "next": "InventoryService", "negativeNext": "EmailIsInValid" }
+               { "type": "Policy", "name": "IsEmailValid", "next": "Do Something", "negativeNext": "Email is invalid" },
+               { 
+                "name": "Another Sub Process", 
+                "children": [
+                  { "type": "Command", "name": "Do Something", "next": "Is Something Valid?" },
+                  { "type": "Policy", "name": "Is Something Valid?", "next": "InventoryService", "negativeNext": "Something Is Invalid" },
+                  { "type": "Error", "name": "Something Is Invalid", "notes": ["Something is invalid, please review and try again."] }
+                ]
+               }
             ]
           },
           { "type": "ExternalSystem", "name": "InventoryService", "next": "Do We Have Stock?" },

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Event Storming Test</title>
+  <link rel="stylesheet" href="dist/style.css">
+</head>
+<body style="background:#f0f4f8;padding:20px">
+  <pre><code class="language-json">[
+  {
+    "type": "Aggregate",
+    "name": "Place Order",
+    "children": [
+      {
+        "name": "PlaceOrder",
+        "nodes": [
+          { "type": "Policy", "name": "IsAddressValid", "negativeNext": "addr_err", "note": "Validates address" },
+          { "type": "Policy", "name": "IsEmailValid", "negativeNext": "email_err" }
+        ],
+        "nodes_after": [
+          { "id": "addr_err", "type": "ReadModel", "name": "AddressIsInValid" },
+          { "id": "email_err", "type": "ReadModel", "name": "Email is invalid" }
+        ]
+      },
+      {
+        "name": "Another Sub Process",
+        "nodes": [
+          { "type": "Command", "name": "Do Something" },
+          { "type": "Policy", "name": "Is Something Valid?", "negativeNext": "some_err" }
+        ],
+        "nodes_after": [
+          { "id": "some_err", "type": "ReadModel", "name": "Something Is Invalid" }
+        ]
+      }
+    ]
+  }
+]</code></pre>
+  <script src="dist/content.js"></script>
+</body>
+</html>
