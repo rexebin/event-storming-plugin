@@ -155,6 +155,17 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <readModel name="Order Detail Projection" />
       </container>
   </process>
+  <aggregate name="complex vertical example">
+      <container name="Complex Vertical Example">
+          <actor name="Customer" />
+          <command name="Do Something" />
+          <policy name="Is Something Valid?" altNext="Something Is Invalid" />
+          <error name="Something Is Invalid" altNext="Is something else valid?"><note>Something is invalid, please review and try again.</note></error>
+          <policy name="Is something else valid?" altNext="Is another thing valid?" />
+          <policy name="Is another thing valid?" altNext="Do Something" />
+          <command name="New command" altNext="Another Error" />          
+      </container>
+  </aggregate>
 </eventstorming>
 ```
 
@@ -162,12 +173,28 @@ Rendered:
 
 ```xml
 <eventstorming>
+<aggregate name="complex vertical example">
+      <container name="Complex Vertical Example">
+          <actor name="Customer" />
+          <command name="Do Something" />
+          <policy name="Call Succeeded?" altNext="Service didn't respond correctly" />
+          <command name="Mark Pending" noNext="true" />
+          <error name="Service didn't respond correctly" altNext="Server Error?" noNext="true"></error>
+          <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
+          <error name="Status code is not 422" altNext="Rejected Exception?" ></error>
+          <command name="reject" altNext="Rejected Exception?" />
+          <error name="Rejected Exception?" noNext="true"></error>
+          <policy name="Have reached max retries?" altNext="Failed Exception" />
+          <command name="Record Failed Attempt" altNext="Failed Exception" />
+          <error name="Failed Exception" noNext="true"></error>
+      </container>
+  </aggregate>
   <aggregate name="User">
      <container name="User Registration">
         <actor name="Customer1" />
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
-        <error name="Invalid Email"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
+        <error name="Invalid Email" noNext="true"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
         <event name="UserRegistered" />
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
      </container>
@@ -177,15 +204,15 @@ Rendered:
           <actor name="Me"/>
           <command name="Wake Up" />
           <policy name="Is Alarm Ringing?" altNext="Sleep In" />
-          <error name="Sleep In"><note>You chose to sleep in instead of waking up.</note></error>
+          <error name="Sleep In" noNext="true"><note>You chose to sleep in instead of waking up.</note></error>
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
           <command name="Have Shower" />
           <policy name="Is the shower running?" next="Have shower gel?" altNext="Switch on shower" />
-          <externalSystem name="Switch on shower" />
+          <externalSystem name="Switch on shower" noNext="true" />
           <policy name="Have shower gel?" altNext="Go Buy Shower Gel" />
-          <error name="Go Buy Shower Gel" />
+          <error name="Go Buy Shower Gel" noNext="true" />
           <event name="Had Shower" />
       </container>
   </aggregate>
@@ -195,7 +222,7 @@ Rendered:
           <actor name="Customer" />
           <command name="UpdateProfile" />
           <policy name="Is User Authenticated?" altNext="Authentication Required" />
-          <error name="Authentication Required"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
+          <error name="Authentication Required" noNext="true"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
           <event name="ProfileUpdated" />
       </container>
   </aggregate>
@@ -208,16 +235,16 @@ Rendered:
                <container name="Another Sub Process">
                   <command name="Do Something" />
                   <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
-                  <error name="Something Is Invalid"><note>Something is invalid, please review and try again.</note></error>
+                  <error name="Something Is Invalid" noNext="true"><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
           <externalSystem name="InventoryService" />
           <policy name="Do We Have Stock?" altNext="Out Of Stock" />
           <policy name="Is Order Detail Valid?" altNext="Invalid Order Detail" />
-          <error name="Invalid Order Detail"><note>Order details are invalid, please review your order and try again.</note></error>
+          <error name="Invalid Order Detail" noNext="true"><note>Order details are invalid, please review your order and try again.</note></error>
           <externalSystem name="PaymentGateway" />
           <policy name="Is Payment Successful?" altNext="PaymentFailed" />
-          <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
+          <error name="PaymentFailed" noNext="true"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>
   </aggregate>
@@ -245,6 +272,7 @@ Rendered:
           <readModel name="Order Detail Projection" />
       </container>
   </process>
+  
 </eventstorming>
 ```
 
@@ -288,7 +316,7 @@ Rendered:
           { "type": "Actor", "name": "Customer1" },
           { "type": "Command", "name": "Register" },
           { "type": "Policy", "name": "Is Email Valid?", "altNext": "Invalid Email" },
-          { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
+          { "type": "Error", "name": "Invalid Email", "noNext": true, "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
           { "type": "Event", "name": "UserRegistered" },
           { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
         ]
@@ -407,8 +435,7 @@ Rendered:
       <container name="Place Order">
         <actor name="Customer" />
         <command name="PlaceOrder" />
-        <policy name="Is Payment Valid?" altNext="PaymentFailed" />
-        <error name="PaymentFailed" />
+        <policy name="Is Payment Valid?" altNext="PaymentFailed" />        
         <event name="OrderPlaced" />
       </container>
       <container name="Cancel Order">

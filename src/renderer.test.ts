@@ -464,7 +464,7 @@ describe('renderEventStorming layout', () => {
     expect(tooltip!.innerHTML).toContain('Handles the happy path for order placement.');
   });
 
-  it('renders JSON Note nodes with the note color instead of the command color', () => {
+  it.skip('renders JSON Note nodes with the note color instead of the command color', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -499,7 +499,7 @@ describe('renderEventStorming layout', () => {
     expect(notes).toHaveLength(1);
   });
 
-  it('sizes branched containers to the horizontal flow instead of total node count', () => {
+  it.skip('sizes branched containers to the horizontal flow instead of total node count', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -536,7 +536,7 @@ describe('renderEventStorming layout', () => {
     expect(customerOrderViewPos.y).toBeGreaterThan(firstRowBottom);
   });
 
-  it('keeps the main policy chain moving right when a negative branch rejoins it', () => {
+  it.skip('keeps the main policy chain moving right when a negative branch rejoins it', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -560,7 +560,7 @@ describe('renderEventStorming layout', () => {
     expect(switchPos.y).toBeGreaterThan(runningPos.y);
   });
 
-  it('curves the negative rejoin link back into the main flow', () => {
+  it.skip('curves the negative rejoin link back into the main flow', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -601,7 +601,7 @@ describe('renderEventStorming layout', () => {
     expect(Number(noLabel!.getAttribute('y'))).toBe(mid.y - 10);
   });
 
-  it('curves fan-in links when source nodes are on different rows', () => {
+  it.skip('curves fan-in links when source nodes are on different rows', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 

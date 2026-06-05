@@ -849,6 +849,61 @@ function getOrCreateNegativeNode(
   return errorNode;
 }
 
+function layoutAltBranch(
+  node: DSLNode,
+  x: number,
+  y: number,
+  container: DSLContainer,
+  model: DSLModel,
+  processNodeMap: Map<string, DSLNode>,
+  allNodes: LayoutNode[],
+  allLinks: LayoutLink[],
+  processPositioned: Set<string>,
+  positioned: Set<string>,
+  mainChainNextId: string | undefined,
+  subGroupOf?: Map<string, string>
+): number {
+  if (!processPositioned.has(node.id)) {
+    placeProcessNode(node, x, y, container.id, allNodes, processPositioned, positioned);
+  }
+  let maxBottom = y + NODE_H;
+
+  // altNext goes below (recursive)
+  if (node.altNext && processNodeMap.has(node.altNext)) {
+    const altNextNode = processNodeMap.get(node.altNext)!;
+    const altNextY = y + NODE_H + NODE_GAP_Y + 20;
+    allLinks.push({ source: node.id, target: altNextNode.id, label: '', type: 'negative' });
+    if (!processPositioned.has(altNextNode.id)) {
+      const altBottom = layoutAltBranch(
+        altNextNode, x, altNextY, container, model, processNodeMap,
+        allNodes, allLinks, processPositioned, positioned, undefined, subGroupOf
+      );
+      maxBottom = Math.max(maxBottom, altBottom);
+    }
+  }
+
+  // next goes right (starts a lateral chain at the same vertical level)
+  // Skip if it rejoins the main chain (that node will be placed by the primary loop)
+  if (node.next && processNodeMap.has(node.next)) {
+    const nextNode = processNodeMap.get(node.next)!;
+    allLinks.push({ source: node.id, target: nextNode.id, label: '', type: 'negative' });
+    const rejoinsMainChain = node.next === mainChainNextId;
+    if (!rejoinsMainChain && !processPositioned.has(nextNode.id)) {
+      const crossesSubGroup =
+        !!subGroupOf &&
+        (subGroupOf.get(node.id) ?? '') !== (subGroupOf.get(nextNode.id) ?? '');
+      const nextX = x + NODE_W + NODE_GAP_X + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
+      const chainBottom = layoutChainFrom(
+        nextNode, nextX, y, container, model, processNodeMap,
+        allNodes, allLinks, processPositioned, positioned, subGroupOf
+      );
+      maxBottom = Math.max(maxBottom, chainBottom);
+    }
+  }
+
+  return maxBottom;
+}
+
 function layoutChainFrom(
   startNode: DSLNode,
   startX: number,
@@ -868,61 +923,48 @@ function layoutChainFrom(
   let maxBottom = currentY + NODE_H;
   const visited = new Set<string>();
 
+  // Pass 1: place all chain nodes left-to-right and add next-links
+  const chainNodes: Array<{ node: DSLNode; x: number }> = [];
   while (current && !visited.has(current.id)) {
     visited.add(current.id);
     placeProcessNode(current, currentX, currentY, container.id, allNodes, processPositioned, positioned);
     maxBottom = Math.max(maxBottom, currentY + NODE_H);
+    chainNodes.push({ node: current, x: currentX });
 
-    if (current.type === 'policy') {
-       const negativeNode = getOrCreateNegativeNode(current, container, model, processNodeMap);
-       const negativeY = currentY + NODE_H + NODE_GAP_Y + 20;
-
-       placeProcessNode(negativeNode, currentX, negativeY, container.id, allNodes, processPositioned, positioned);
-       allLinks.push({
-       source: current.id,
-       target: negativeNode.id,
-       label: 'no',
-       type: 'negative',
-       });
-       maxBottom = Math.max(maxBottom, negativeY + NODE_H);
-
-       if (negativeNode.next && processNodeMap.has(negativeNode.next)) {
-       const altNextNode = processNodeMap.get(negativeNode.next)!;
-       const rejoinsMainFlow = current.next === altNextNode.id;
-
-       if (!rejoinsMainFlow && !processPositioned.has(altNextNode.id)) {
-         const altNextY = negativeY + NODE_H + NODE_GAP_Y + 20;
-
-         placeProcessNode(altNextNode, currentX, altNextY, container.id, allNodes, processPositioned, positioned);
-         maxBottom = Math.max(maxBottom, altNextY + NODE_H);
-       }
-
-       allLinks.push({
-         source: negativeNode.id,
-         target: altNextNode.id,
-         label: '',
-         type: 'negative',
-       });
-       }
-    }
-
-    if (!current.next || !processNodeMap.has(current.next)) {
-       break;
-    }
+    if (!current.next || !processNodeMap.has(current.next)) break;
 
     const nextNode: DSLNode = processNodeMap.get(current.next)!;
-    allLinks.push({
-       source: current.id,
-       target: nextNode.id,
-       label: '',
-       type: 'default',
-    });
+    allLinks.push({ source: current.id, target: nextNode.id, label: '', type: 'default' });
 
     const crossesSubGroup =
       !!subGroupOf &&
       (subGroupOf.get(current.id) ?? '') !== (subGroupOf.get(nextNode.id) ?? '');
     currentX += NODE_W + NODE_GAP_X + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
     current = nextNode;
+  }
+
+  // Pass 2: lay out alt branches right-to-left so fan-in targets land below the
+  // rightmost node that references them, not below the first one encountered.
+  const negativeY = currentY + NODE_H + NODE_GAP_Y + 20;
+  for (let i = chainNodes.length - 1; i >= 0; i--) {
+    const { node, x } = chainNodes[i];
+    const hasAltBranch =
+      node.type === 'policy' || (!!node.altNext && processNodeMap.has(node.altNext));
+    if (!hasAltBranch) continue;
+
+    const negativeNode =
+      node.type === 'policy'
+        ? getOrCreateNegativeNode(node, container, model, processNodeMap)
+        : processNodeMap.get(node.altNext!)!;
+    const linkLabel = node.type === 'policy' ? 'no' : '';
+    const mainChainNextId = chainNodes[i + 1]?.node.id;
+
+    allLinks.push({ source: node.id, target: negativeNode.id, label: linkLabel, type: 'negative' });
+    const altBottom = layoutAltBranch(
+      negativeNode, x, negativeY, container, model, processNodeMap,
+      allNodes, allLinks, processPositioned, positioned, mainChainNextId, subGroupOf
+    );
+    maxBottom = Math.max(maxBottom, altBottom);
   }
 
   return maxBottom;
@@ -1198,6 +1240,12 @@ function computeLinkPath(source: LayoutNode, target: LayoutNode, type: string, i
     return `M ${sourceCenterX} ${sourceBottomY} L ${targetCenterX} ${targetTopY}`;
   }
 
+  // Same column, target below: draw straight vertical arrow (bottom-center → top-center)
+  if (source.x === target.x && source.y < target.y) {
+    const cx = source.x + NODE_W / 2;
+    return `M ${cx} ${source.y + NODE_H} L ${cx} ${target.y}`;
+  }
+
   const sourceIsLeft = source.x <= target.x;
   const sourceX = sourceIsLeft ? source.x + NODE_W : source.x;
   const targetX = sourceIsLeft ? target.x : target.x + NODE_W;
@@ -1211,9 +1259,13 @@ function computeLinkPath(source: LayoutNode, target: LayoutNode, type: string, i
     const horizontalDistance = Math.abs(targetX - sourceX);
 
     if (horizontalDistance < 1) {
-      const curveDirection = type === 'negative' ? 1 : -1;
       const sourceCenterX = source.x + NODE_W / 2;
       const targetCenterX = target.x + NODE_W / 2;
+      if (!sourceIsBelowTarget) {
+        // target is directly below — draw straight vertical arrow
+        return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
+      }
+      const curveDirection = type === 'negative' ? 1 : -1;
       const controlOffset = Math.max(28, NODE_GAP_X);
       const controlX = sourceCenterX + curveDirection * controlOffset;
 

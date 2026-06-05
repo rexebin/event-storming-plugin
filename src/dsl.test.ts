@@ -643,6 +643,35 @@ describe('parseDSL', () => {
      expect(noteNode?.notes).toEqual(['This is a note attached to the event.']);
    });
 
+   it('should not assign implicit next when noNext is set (XML)', () => {
+     const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+       <command name="Place Order" noNext="true"/>
+       <event name="Order Placed"/>
+     </container></aggregate></eventstorming>`;
+     const result = parseDSL(xml);
+     const placeOrder = result.nodes.find((n) => n.label === 'Place Order');
+     expect(placeOrder!.next).toBeUndefined();
+     expect(placeOrder!.noNext).toBe(true);
+   });
+
+   it('should not assign implicit next when noNext is set (JSON)', () => {
+     const json = JSON.stringify([{
+       type: 'Aggregate',
+       name: 'Order',
+       containers: [{
+         name: 'Process',
+         children: [
+           { type: 'Command', name: 'Place Order', noNext: true },
+           { type: 'Event', name: 'Order Placed' },
+         ],
+       }],
+     }]);
+     const result = parseDSL(json);
+     const placeOrder = result.nodes.find((n) => n.label === 'Place Order');
+     expect(placeOrder!.next).toBeUndefined();
+     expect(placeOrder!.noNext).toBe(true);
+   });
+
    it('should keep the README eventstorming example parseable', async () => {
      const readme = (await import('../README.md?raw')).default;
      const match = readme.match(/```(?:eventstorming|json)\n([\s\S]*?)\n```/);

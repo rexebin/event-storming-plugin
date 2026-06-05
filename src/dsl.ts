@@ -13,6 +13,7 @@ export interface DSLNode {
   processIndex: number; // index within a process chain (-1 if standalone)
   noteTarget: string | null; // if type='note', the node it's attached to
   next?: string; // next node id (for explicit flow, especially policy yes-path)
+  noNext?: boolean; // explicitly terminates flow — suppresses implicit next assignment
   altNext?: string; // negative next node id (for policy no-path, rendered below)
   altNextText?: string; // original text of altNext (for auto-generated error node label)
   notes?: string[]; // attached notes for this node
@@ -436,6 +437,7 @@ interface JSONNode {
   type: string;
   name: string;
   next?: string;
+  noNext?: boolean;
   altNext?: string;
   notes?: string[];
 }
@@ -602,6 +604,7 @@ function collectXMLChildren(
       const id = prefix + normalizeId(name);
       const rawNext = child.getAttribute('next') ?? undefined;
       const rawNegativeNext = child.getAttribute('altNext') ?? undefined;
+      const noNext = child.hasAttribute('noNext') || undefined;
 
       const n: DSLNode = {
         id,
@@ -612,6 +615,7 @@ function collectXMLChildren(
         processIndex: -1,
         noteTarget: null,
         next: undefined,
+        noNext,
         altNext: undefined,
         altNextText: rawNegativeNext,
         notes: xmlAttrNotes(child),
@@ -752,7 +756,6 @@ function parseJSONDSL(data: JSONDiagram[]): DSLModel {
 
 function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSubGroup[]): void {
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  // Last node of each sub-container must not implicitly connect to the next sub-container.
   const subGroupLastIds = new Set<string>();
   if (subGroups) {
     for (const sg of subGroups) {
@@ -760,19 +763,22 @@ function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSu
     }
   }
 
+  // Nodes already reachable via altNext belong to an alt branch, not the sibling chain.
+  const altNextTargets = new Set(nodes.map((n) => n.altNext).filter((id): id is string => !!id));
+
   for (let i = 0; i < stepIds.length - 1; i++) {
     const node = nodeById.get(stepIds[i]);
-    if (node && node.next === undefined && node.type !== 'error') {
+    if (node && node.next === undefined && !node.noNext) {
       if (subGroupLastIds.has(node.id)) continue;
       const candidateId = stepIds[i + 1];
       const candidate = nodeById.get(candidateId);
-      // Skip an inline error node that is this node's altNext — it belongs on the
-      // negative branch, not the positive flow, so point ahead to the node after it.
-      if (candidate?.type === 'error' && candidate.id === node.altNext) {
+      if (node.type === 'policy' && candidate?.type === 'error' && candidate.id === node.altNext) {
+        // Policy: skip over its own adjacent inline error to assign the positive branch
         node.next = stepIds[i + 2];
-      } else {
+      } else if (!altNextTargets.has(candidateId)) {
         node.next = candidateId;
       }
+      // else: candidate is already reachable via altNext — leave it to the alt branch
     }
   }
 }
@@ -829,6 +835,7 @@ function collectChildren(
         processIndex: -1,
         noteTarget: null,
         next: undefined,
+        noNext: child.noNext || undefined,
         altNext: undefined,
         altNextText: child.altNext || undefined,
         notes: child.notes || [],
