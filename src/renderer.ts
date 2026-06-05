@@ -461,7 +461,8 @@ function computeLayout(model: DSLModel): LayoutResult {
          ? computeMaxSubGroupDepth(process.subGroups)
          : 0;
        const maxSubPad = SUB_PAD_BASE_PRE + maxSubDepth * NESTED_GAP_PRE;
-       const topPad = Math.max(GROUP_PADDING, maxSubPad + 4);
+       // Match the bottom gap (GROUP_PADDING below sub-group bbox) on the top side too.
+       const topPad = Math.max(GROUP_PADDING, maxSubPad + GROUP_PADDING);
        const groupInnerX = groupX + GROUP_PADDING;
        const groupInnerY = groupY + GROUP_HEADER_H + topPad;
        const processNodes = getProcessNodes(process, model);
