@@ -84,10 +84,10 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
   </aggregate>
   <aggregate name="Morning Routine">
       <container name="Wake Up">
-          <actor name="Me" next="Wake Up" />
-          <command name="Wake Up" next="Is Alarm Ringing?" />
-          <policy name="Is Alarm Ringing?" next="Got Out of Bed" negativeNext="Sleep In" />
-          <error name="Sleep In" />
+          <actor name="Me"/>
+          <command name="Wake Up" />
+          <policy name="Is Alarm Ringing?" negativeNext="Sleep In" />
+          <error name="Sleep In"><note>You chose to sleep in instead of waking up.</note></error>
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
@@ -174,10 +174,10 @@ Rendered:
   </aggregate>
   <aggregate name="Morning Routine">
       <container name="Wake Up">
-          <actor name="Me" next="Wake Up" />
-          <command name="Wake Up" next="Is Alarm Ringing?" />
-          <policy name="Is Alarm Ringing?" next="Got Out of Bed" negativeNext="Sleep In" />
-          <error name="Sleep In" />
+          <actor name="Me"/>
+          <command name="Wake Up" />
+          <policy name="Is Alarm Ringing?" negativeNext="Sleep In" />
+          <error name="Sleep In"><note>You chose to sleep in instead of waking up.</note></error>
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
@@ -360,7 +360,8 @@ interface Node {
 - The top-level array contains `Diagram` objects, each rendered as a labelled outer box.
 - `containers` defines named process groups inside a diagram, rendered as dashed sub-boxes.
 - `children` inside a container holds `Node` elements or nested `Container` elements (recursive nesting supported).
-- `next` links to another node in the same container and renders to the **right**.
+- `next` links to another node in the same container and renders to the **right**. **`next` is optional** — if omitted, the node automatically connects to the immediately following sibling in the container, so you only need to set it when jumping non-sequentially.
+- When a node has a `negativeNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
 - `negativeNext` is used for policy failure paths and renders **below** the policy.
 - If a policy omits a matching negative-path node, the renderer creates a default error node.
 - Notes can be added to diagrams, containers, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip. In the XML DSL, add one or more `<note>` child elements (without a `name` attribute) to attach notes; in the JSON DSL, use the `notes` string array.

@@ -548,6 +548,8 @@ function expandXMLContainer(
     node.negativeNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
   }
 
+  fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
+
   dslContainer.processes.push({
     name: containerEl.getAttribute('name') || '',
     stepIds,
@@ -748,6 +750,33 @@ function parseJSONDSL(data: JSONDiagram[]): DSLModel {
   return model;
 }
 
+function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSubGroup[]): void {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  // Last node of each sub-container must not implicitly connect to the next sub-container.
+  const subGroupLastIds = new Set<string>();
+  if (subGroups) {
+    for (const sg of subGroups) {
+      if (sg.nodeIds.length > 0) subGroupLastIds.add(sg.nodeIds[sg.nodeIds.length - 1]);
+    }
+  }
+
+  for (let i = 0; i < stepIds.length - 1; i++) {
+    const node = nodeById.get(stepIds[i]);
+    if (node && node.next === undefined && node.type !== 'error') {
+      if (subGroupLastIds.has(node.id)) continue;
+      const candidateId = stepIds[i + 1];
+      const candidate = nodeById.get(candidateId);
+      // Skip an inline error node that is this node's negativeNext — it belongs on the
+      // negative branch, not the positive flow, so point ahead to the node after it.
+      if (candidate?.type === 'error' && candidate.id === node.negativeNext) {
+        node.next = stepIds[i + 2];
+      } else {
+        node.next = candidateId;
+      }
+    }
+  }
+}
+
 function expandJSONContainer(
   container: JSONContainerNode,
   dslContainer: DSLContainer,
@@ -766,6 +795,8 @@ function expandJSONContainer(
     node.next = resolveJSONReference(rawNext, nodePrefix, aliases, parentAliases);
     node.negativeNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
   }
+
+  fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
 
   dslContainer.processes.push({
     name: container.name,
