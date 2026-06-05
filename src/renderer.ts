@@ -67,8 +67,9 @@ interface LayoutLink {
 
 // ─── Constants ──────────────────────────────────────────────
 
-const NODE_W = 140;
-const NODE_H = 36;
+const NODE_W = 130;
+const NODE_H = 120;
+const NODE_FOLD = 16;
 const NODE_GAP_X = 36;
 const NODE_GAP_Y = 22;
 const CONTAINER_PADDING = 24;
@@ -104,6 +105,19 @@ export function renderEventStorming(
 
   // Defs for arrow markers
   const defs = svg.append('defs');
+
+  // Drop shadow for post-it nodes
+  const shadowFilter = defs.append('filter')
+    .attr('id', 'node-shadow')
+    .attr('x', '-20%')
+    .attr('y', '-20%')
+    .attr('width', '150%')
+    .attr('height', '150%');
+  shadowFilter.append('feDropShadow')
+    .attr('dx', 2)
+    .attr('dy', 3)
+    .attr('stdDeviation', 3)
+    .attr('flood-color', 'rgba(0,0,0,0.22)');
 
   // Shared arrow marker
   defs.append('marker')
@@ -250,14 +264,18 @@ export function renderEventStorming(
         d3.select(this).raise();
       });
 
-    // All shapes are color-filled rectangles with black border
-    g.append('rect')
-      .attr('width', NODE_W)
-      .attr('height', NODE_H)
-      .attr('rx', 4)
+    // Post-it note shape: pentagon with folded lower-right corner
+    const bodyPoints = `0,0 ${NODE_W},0 ${NODE_W},${NODE_H - NODE_FOLD} ${NODE_W - NODE_FOLD},${NODE_H} 0,${NODE_H}`;
+    g.append('polygon')
+      .attr('points', bodyPoints)
       .attr('fill', node.color)
-      .attr('stroke', '#000000')
-      .attr('stroke-width', 1.5);
+      .attr('filter', 'url(#node-shadow)');
+
+    // Fold shadow triangle at the cut corner
+    const foldPoints = `${NODE_W - NODE_FOLD},${NODE_H - NODE_FOLD} ${NODE_W},${NODE_H - NODE_FOLD} ${NODE_W - NODE_FOLD},${NODE_H}`;
+    g.append('polygon')
+      .attr('points', foldPoints)
+      .attr('fill', 'rgba(0,0,0,0.18)');
 
     if (nodeNotes.length > 0) {
       const badge = g
@@ -303,7 +321,7 @@ export function renderEventStorming(
       .attr('y', NODE_H / 2 + 1)
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
-      .attr('font-size', node.type === 'note' ? '9px' : '11px')
+      .attr('font-size', node.type === 'note' ? '11px' : '13px')
       .attr('font-style', node.type === 'note' ? 'italic' : 'normal')
       .attr('font-weight', node.type === 'note' ? '400' : '500')
       .attr('fill', isLight(node.color) ? '#333' : '#fff')
@@ -1277,8 +1295,8 @@ function wrapText(
 
   if (current) lines.push(current);
 
-  const displayLines = lines.slice(0, 2);
-  const lineHeight = 13;
+  const displayLines = lines.slice(0, 4);
+  const lineHeight = 15;
   // Center the text block vertically: first line starts so the whole block is centered
   const totalBlockHeight = (displayLines.length - 1) * lineHeight;
   const startY = -totalBlockHeight / 2;
