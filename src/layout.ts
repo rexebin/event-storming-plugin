@@ -290,24 +290,38 @@ export function layoutFanInProcess(
 export function computeProcessColumns(processNodes: LayoutNode[], processNodeMap: Map<string, DSLNode>): number {
   if (processNodes.length === 0) return 0;
 
+  // memo key includes starting column because the same node reached via altNext
+  // starts at a deeper column than when reached via a root traversal.
   const memo = new Map<string, number>();
 
-  const visit = (node: LayoutNode, path: Set<string>): number => {
-    const cached = memo.get(node.id);
+  // Returns the max right edge (1-based column count) for the subtree rooted at `node` placed at `col`.
+  const maxRightFrom = (node: LayoutNode, col: number, path: Set<string>): number => {
+    const key = `${node.id}@${col}`;
+    const cached = memo.get(key);
     if (cached !== undefined) return cached;
-    if (path.has(node.id)) return 0;
+    if (path.has(node.id)) return col + 1;
 
     const nextPath = new Set(path);
     nextPath.add(node.id);
 
+    let maxRight = col + 1;
+
+    // next goes right (+1 column)
     const nextNode = node.next ? (processNodeMap.get(node.next) as LayoutNode | undefined) : undefined;
-    const length = nextNode ? 1 + visit(nextNode, nextPath) : 1;
+    if (nextNode) maxRight = Math.max(maxRight, maxRightFrom(nextNode, col + 1, nextPath));
 
-    memo.set(node.id, length);
-    return length;
-     };
+    // altNext goes down (same column), then its own next chain extends further right
+    const altNextId = processNodeMap.get(node.id)?.altNext;
+    if (altNextId) {
+      const altNode = processNodeMap.get(altNextId) as LayoutNode | undefined;
+      if (altNode) maxRight = Math.max(maxRight, maxRightFrom(altNode, col, nextPath));
+    }
 
-  return processNodes.reduce((max, node) => Math.max(max, visit(node, new Set<string>())), 1);
+    memo.set(key, maxRight);
+    return maxRight;
+  };
+
+  return processNodes.reduce((max, node) => Math.max(max, maxRightFrom(node, 0, new Set<string>())), 1);
 }
 
 export function computeFanInProcessColumns(
