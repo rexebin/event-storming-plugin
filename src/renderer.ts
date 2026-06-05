@@ -612,11 +612,11 @@ function computeLayout(model: DSLModel): LayoutResult {
           const subNodeIdSet = sgSets[sgIdx];
           const subNodes = allNodes.filter((n) => subNodeIdSet.has(n.id));
           if (subNodes.length === 0) continue;
-          // Also include negative/error nodes: either explicitly defined (negativeNext id)
+          // Also include negative/error nodes: either explicitly defined (altNext id)
           // or auto-generated (error_default_<policyId>)
           const negIds = new Set<string>();
           for (const n of subNodes) {
-            if (n.negativeNext) negIds.add(n.negativeNext);
+            if (n.altNext) negIds.add(n.altNext);
             negIds.add(`error_default_${n.id}`);
           }
           const negNodes = allNodes.filter((n) => negIds.has(n.id));
@@ -771,8 +771,8 @@ function getProcessRoots(process: DSLProcess, processNodeMap: Map<string, DSLNod
     if (node.next && processNodeMap.has(node.next)) {
        incomingCounts.set(node.next, (incomingCounts.get(node.next) || 0) + 1);
     }
-    if (node.negativeNext && processNodeMap.has(node.negativeNext)) {
-       incomingCounts.set(node.negativeNext, (incomingCounts.get(node.negativeNext) || 0) + 1);
+    if (node.altNext && processNodeMap.has(node.altNext)) {
+       incomingCounts.set(node.altNext, (incomingCounts.get(node.altNext) || 0) + 1);
     }
   }
 
@@ -820,8 +820,8 @@ function getOrCreateNegativeNode(
   model: DSLModel,
   processNodeMap: Map<string, DSLNode>
 ): DSLNode {
-  if (node.negativeNext && processNodeMap.has(node.negativeNext)) {
-    return processNodeMap.get(node.negativeNext)!;
+  if (node.altNext && processNodeMap.has(node.altNext)) {
+    return processNodeMap.get(node.altNext)!;
   }
 
   const errorId = `error_default_${node.id}`;
@@ -833,14 +833,14 @@ function getOrCreateNegativeNode(
 
   const errorNode: DSLNode = {
     id: errorId,
-    label: node.negativeNextText || node.label,
+    label: node.altNextText || node.label,
     type: 'error' as NodeType,
     color: '#8DCFF9',
     containerId: container.id,
     processIndex: -1,
     noteTarget: null,
     next: undefined,
-    negativeNext: undefined,
+    altNext: undefined,
     notes: [],
   };
 
@@ -887,19 +887,19 @@ function layoutChainFrom(
        maxBottom = Math.max(maxBottom, negativeY + NODE_H);
 
        if (negativeNode.next && processNodeMap.has(negativeNode.next)) {
-       const negativeNextNode = processNodeMap.get(negativeNode.next)!;
-       const rejoinsMainFlow = current.next === negativeNextNode.id;
+       const altNextNode = processNodeMap.get(negativeNode.next)!;
+       const rejoinsMainFlow = current.next === altNextNode.id;
 
-       if (!rejoinsMainFlow && !processPositioned.has(negativeNextNode.id)) {
-         const negativeNextY = negativeY + NODE_H + NODE_GAP_Y + 20;
+       if (!rejoinsMainFlow && !processPositioned.has(altNextNode.id)) {
+         const altNextY = negativeY + NODE_H + NODE_GAP_Y + 20;
 
-         placeProcessNode(negativeNextNode, currentX, negativeNextY, container.id, allNodes, processPositioned, positioned);
-         maxBottom = Math.max(maxBottom, negativeNextY + NODE_H);
+         placeProcessNode(altNextNode, currentX, altNextY, container.id, allNodes, processPositioned, positioned);
+         maxBottom = Math.max(maxBottom, altNextY + NODE_H);
        }
 
        allLinks.push({
          source: negativeNode.id,
-         target: negativeNextNode.id,
+         target: altNextNode.id,
          label: '',
          type: 'negative',
        });

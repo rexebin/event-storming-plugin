@@ -13,8 +13,8 @@ export interface DSLNode {
   processIndex: number; // index within a process chain (-1 if standalone)
   noteTarget: string | null; // if type='note', the node it's attached to
   next?: string; // next node id (for explicit flow, especially policy yes-path)
-  negativeNext?: string; // negative next node id (for policy no-path, rendered below)
-  negativeNextText?: string; // original text of negativeNext (for auto-generated error node label)
+  altNext?: string; // negative next node id (for policy no-path, rendered below)
+  altNextText?: string; // original text of altNext (for auto-generated error node label)
   notes?: string[]; // attached notes for this node
 }
 
@@ -236,7 +236,7 @@ export function parseDSL(text: string): DSLModel {
       notes: [],
       };
      currentContainer.processes.push(proc);
-       // Also add links between consecutive steps, set next/negativeNext
+       // Also add links between consecutive steps, set next/altNext
      for (let j = 0; j < stepIds.length - 1; j++) {
       model.links.push({ source: stepIds[j], target: stepIds[j + 1], label: '', type: 'default' });
       // Set next on the source node
@@ -246,7 +246,7 @@ export function parseDSL(text: string): DSLModel {
      continue;
       }
 
-    // Element inside container (with or without [color], with optional next/negativeNext)
+    // Element inside container (with or without [color], with optional next/altNext)
    const nodeInContainer = parseNodeLine(line, currentContainer.id, -1, null);
    if (nodeInContainer) {
      model.nodes.push(nodeInContainer);
@@ -345,7 +345,7 @@ function parseNodeLine(
   processIndex,
   noteTarget: null,
   next: normalizeId(yesNode),
-  negativeNext: normalizeId(noNode),
+  altNext: normalizeId(noNode),
   notes: [],
     };
     }
@@ -436,7 +436,7 @@ interface JSONNode {
   type: string;
   name: string;
   next?: string;
-  negativeNext?: string;
+  altNext?: string;
   notes?: string[];
 }
 
@@ -545,7 +545,7 @@ function expandXMLContainer(
 
   for (const { node, rawNext, rawNegativeNext, nodePrefix } of pending) {
     node.next = resolveJSONReference(rawNext, nodePrefix, aliases, parentAliases);
-    node.negativeNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
+    node.altNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
   }
 
   fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
@@ -601,7 +601,7 @@ function collectXMLChildren(
       const name = child.getAttribute('name') || '';
       const id = prefix + normalizeId(name);
       const rawNext = child.getAttribute('next') ?? undefined;
-      const rawNegativeNext = child.getAttribute('negativeNext') ?? undefined;
+      const rawNegativeNext = child.getAttribute('altNext') ?? undefined;
 
       const n: DSLNode = {
         id,
@@ -612,8 +612,8 @@ function collectXMLChildren(
         processIndex: -1,
         noteTarget: null,
         next: undefined,
-        negativeNext: undefined,
-        negativeNextText: rawNegativeNext,
+        altNext: undefined,
+        altNextText: rawNegativeNext,
         notes: xmlAttrNotes(child),
       };
       model.nodes.push(n);
@@ -670,7 +670,7 @@ function isJSONNode(value: unknown): value is JSONNode {
     typeof value.type === 'string' &&
     typeof value.name === 'string' &&
     (value.next === undefined || typeof value.next === 'string') &&
-    (value.negativeNext === undefined || typeof value.negativeNext === 'string') &&
+    (value.altNext === undefined || typeof value.altNext === 'string') &&
     isStringArrayOrUndefined(value.notes)
   );
 }
@@ -766,9 +766,9 @@ function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSu
       if (subGroupLastIds.has(node.id)) continue;
       const candidateId = stepIds[i + 1];
       const candidate = nodeById.get(candidateId);
-      // Skip an inline error node that is this node's negativeNext — it belongs on the
+      // Skip an inline error node that is this node's altNext — it belongs on the
       // negative branch, not the positive flow, so point ahead to the node after it.
-      if (candidate?.type === 'error' && candidate.id === node.negativeNext) {
+      if (candidate?.type === 'error' && candidate.id === node.altNext) {
         node.next = stepIds[i + 2];
       } else {
         node.next = candidateId;
@@ -793,7 +793,7 @@ function expandJSONContainer(
 
   for (const { node, rawNext, rawNegativeNext, nodePrefix } of pending) {
     node.next = resolveJSONReference(rawNext, nodePrefix, aliases, parentAliases);
-    node.negativeNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
+    node.altNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
   }
 
   fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
@@ -829,12 +829,12 @@ function collectChildren(
         processIndex: -1,
         noteTarget: null,
         next: undefined,
-        negativeNext: undefined,
-        negativeNextText: child.negativeNext || undefined,
+        altNext: undefined,
+        altNextText: child.altNext || undefined,
         notes: child.notes || [],
       };
       model.nodes.push(n);
-      pending.push({ node: n, rawNext: child.next, rawNegativeNext: child.negativeNext, nodePrefix: prefix });
+      pending.push({ node: n, rawNext: child.next, rawNegativeNext: child.altNext, nodePrefix: prefix });
       aliases.set(canonicalizeReference(child.name), id);
       dslContainer.nodeIds.push(id);
       stepIds.push(id);

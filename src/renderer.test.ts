@@ -141,7 +141,7 @@ const readmeSample = `[
           { "type": "Actor", "name": "Staff", "next": "CancelOrder" },
           { "type": "Event", "name": "PaymentFailed", "next": "CancelOrder" },
           { "type": "Command", "name": "CancelOrder", "next": "Is Cancellation Allowed?" },
-          { "type": "Policy", "name": "Is Cancellation Allowed?", "next": "OrderCancelled", "negativeNext": "CancellationDenied" },
+          { "type": "Policy", "name": "Is Cancellation Allowed?", "next": "OrderCancelled", "altNext": "CancellationDenied" },
           { "type": "Event", "name": "OrderCancelled" }
         ]
       }
@@ -205,9 +205,9 @@ const showerSample = `[
         "name": "Shower",
         "children": [
           { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
-          { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "negativeNext": "Switch on shower" },
+          { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "altNext": "Switch on shower" },
           { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
-          { "type": "Policy", "name": "Have shower gel?", "next": "Get Dressed", "negativeNext": "Go Buy Shower Gel" },
+          { "type": "Policy", "name": "Have shower gel?", "next": "Get Dressed", "altNext": "Go Buy Shower Gel" },
           { "type": "Error", "name": "Go Buy Shower Gel" },
           { "type": "Event", "name": "Get Dressed" }
         ]
@@ -252,7 +252,7 @@ const wrapSample = `[
         "children": [
           { "type": "Actor", "name": "Customer", "next": "Register" },
           { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
-          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
+          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "altNext": "Invalid Email" },
           { "type": "Event", "name": "UserRegistered" }
         ]
       }
@@ -267,7 +267,7 @@ const wrapSample = `[
         "children": [
           { "type": "Actor", "name": "Me", "next": "WakeUp" },
           { "type": "Command", "name": "WakeUp", "next": "Is Alarm Ringing?" },
-          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "negativeNext": "Sleep In" },
+          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "altNext": "Sleep In" },
           { "type": "Event", "name": "Got Out of Bed" }
         ]
       }
@@ -282,7 +282,7 @@ const wrapSample = `[
         "children": [
           { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
           { "type": "ExternalSystem", "name": "InventoryService", "next": "Do We Have Stock?" },
-          { "type": "Policy", "name": "Do We Have Stock?", "next": "PaymentGateway", "negativeNext": "Out Of Stock" },
+          { "type": "Policy", "name": "Do We Have Stock?", "next": "PaymentGateway", "altNext": "Out Of Stock" },
           { "type": "ExternalSystem", "name": "PaymentGateway", "next": "OrderPlaced" },
           { "type": "Event", "name": "OrderPlaced" }
         ]

@@ -493,7 +493,7 @@ describe('parseDSL', () => {
      expect(policy).toBeDefined();
      expect(policy!.type).toBe('policy');
      expect(policy!.next).toBe('IsOrderDetailValid_');
-     expect(policy!.negativeNext).toBe('OutOfStock');
+     expect(policy!.altNext).toBe('OutOfStock');
       });
 
     it('should parse process as container type', () => {
@@ -565,7 +565,7 @@ describe('parseDSL', () => {
              "children": [
                { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
                { "type": "ExternalSystem", "name": "InventoryService", "next": "DoWeHaveStock" },
-               { "type": "Policy", "name": "Do We Have Stock?", "negativeNext": "Out Of Stock" }
+               { "type": "Policy", "name": "Do We Have Stock?", "altNext": "Out Of Stock" }
              ]
            }
          ]
@@ -578,7 +578,7 @@ describe('parseDSL', () => {
      expect(inventoryService).toBeDefined();
      expect(stockPolicy).toBeDefined();
      expect(inventoryService!.next).toBe(stockPolicy!.id);
-     expect(stockPolicy!.negativeNext).toBe('Place_Order_Out_Of_Stock');
+     expect(stockPolicy!.altNext).toBe('Place_Order_Out_Of_Stock');
    });
 
    it('should preserve external system containers with pink container color', () => {

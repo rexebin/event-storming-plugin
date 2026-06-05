@@ -11,7 +11,7 @@
     &lt;container name="User Registration"&gt;
       &lt;actor name="Customer" /&gt;
       &lt;command name="Register" /&gt;
-      &lt;policy name="Is Email Valid?" negativeNext="Invalid Email" /&gt;
+      &lt;policy name="Is Email Valid?" altNext="Invalid Email" /&gt;
       &lt;error name="Invalid Email"&gt;&lt;note&gt;The email address provided is not valid.&lt;/note&gt;&lt;/error&gt;
       &lt;event name="UserRegistered" /&gt;
     &lt;/container&gt;
@@ -20,12 +20,12 @@
     &lt;container name="Place Order"&gt;
       &lt;command name="PlaceOrder" /&gt;
       &lt;container name="Validate Order"&gt;
-        &lt;policy name="IsAddressValid" negativeNext="AddressIsInValid" /&gt;
-        &lt;policy name="IsEmailValid" negativeNext="Email is invalid" /&gt;
+        &lt;policy name="IsAddressValid" altNext="AddressIsInValid" /&gt;
+        &lt;policy name="IsEmailValid" altNext="Email is invalid" /&gt;
         &lt;error name="AddressIsInValid"&gt;&lt;note&gt;The address provided is not valid.&lt;/note&gt;&lt;/error&gt;
         &lt;error name="Email is invalid"&gt;&lt;note&gt;The email address is not valid.&lt;/note&gt;&lt;/error&gt;
       &lt;/container&gt;
-      &lt;policy name="Is Payment Successful?" negativeNext="PaymentFailed" /&gt;
+      &lt;policy name="Is Payment Successful?" altNext="PaymentFailed" /&gt;
       &lt;error name="PaymentFailed"&gt;&lt;note&gt;Payment failed, please try again.&lt;/note&gt;&lt;/error&gt;
       &lt;event name="OrderPlaced" /&gt;
     &lt;/container&gt;

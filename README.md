@@ -76,7 +76,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
      <container name="User Registration">
         <actor name="Customer1" />
         <command name="Register" />
-        <policy name="Is Email Valid?" negativeNext="Invalid Email" />
+        <policy name="Is Email Valid?" altNext="Invalid Email" />
         <error name="Invalid Email"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
         <event name="UserRegistered" />
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
@@ -86,15 +86,15 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
       <container name="Wake Up">
           <actor name="Me"/>
           <command name="Wake Up" />
-          <policy name="Is Alarm Ringing?" negativeNext="Sleep In" />
+          <policy name="Is Alarm Ringing?" altNext="Sleep In" />
           <error name="Sleep In"><note>You chose to sleep in instead of waking up.</note></error>
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
           <command name="Have Shower" />
-          <policy name="Is the shower running?" next="Have shower gel?" negativeNext="Switch on shower" />
+          <policy name="Is the shower running?" next="Have shower gel?" altNext="Switch on shower" />
           <externalSystem name="Switch on shower" />
-          <policy name="Have shower gel?" negativeNext="Go Buy Shower Gel" />
+          <policy name="Have shower gel?" altNext="Go Buy Shower Gel" />
           <error name="Go Buy Shower Gel" />
           <event name="Had Shower" />
       </container>
@@ -104,7 +104,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
           <actor name="Customer" />
           <command name="UpdateProfile" />
-          <policy name="Is User Authenticated?" negativeNext="Authentication Required" />
+          <policy name="Is User Authenticated?" altNext="Authentication Required" />
           <error name="Authentication Required"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
           <event name="ProfileUpdated" />
       </container>
@@ -113,20 +113,20 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
       <container name="Place Order">
           <command name="PlaceOrder" next="IsAddressValid" />
           <container name="PlaceOrder">
-               <policy name="IsAddressValid" negativeNext="AddressIsInValid" />
-               <policy name="IsEmailValid" next="Do Something" negativeNext="Email is invalid" />
+               <policy name="IsAddressValid" altNext="AddressIsInValid" />
+               <policy name="IsEmailValid" next="Do Something" altNext="Email is invalid" />
                <container name="Another Sub Process">
                   <command name="Do Something" />
-                  <policy name="Is Something Valid?" next="InventoryService" negativeNext="Something Is Invalid" />
+                  <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
                   <error name="Something Is Invalid"><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
           <externalSystem name="InventoryService" />
-          <policy name="Do We Have Stock?" negativeNext="Out Of Stock" />
-          <policy name="Is Order Detail Valid?" negativeNext="Invalid Order Detail" />
+          <policy name="Do We Have Stock?" altNext="Out Of Stock" />
+          <policy name="Is Order Detail Valid?" altNext="Invalid Order Detail" />
           <error name="Invalid Order Detail"><note>Order details are invalid, please review your order and try again.</note></error>
           <externalSystem name="PaymentGateway" />
-          <policy name="Is Payment Successful?" negativeNext="PaymentFailed" />
+          <policy name="Is Payment Successful?" altNext="PaymentFailed" />
           <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>
@@ -135,7 +135,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
       <container name="Inventory Check">
           <command name="Check Inventory" />
           <query name="Get Inventory" />
-          <policy name="Has Stock?" next="InventoryCheckPassed" negativeNext="Out of Stock" />
+          <policy name="Has Stock?" next="InventoryCheckPassed" altNext="Out of Stock" />
           <event name="Inventory Check Passed" />
       </container>
   </externalSystem>
@@ -166,7 +166,7 @@ Rendered:
      <container name="User Registration">
         <actor name="Customer1" />
         <command name="Register" />
-        <policy name="Is Email Valid?" negativeNext="Invalid Email" />
+        <policy name="Is Email Valid?" altNext="Invalid Email" />
         <error name="Invalid Email"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
         <event name="UserRegistered" />
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
@@ -176,15 +176,15 @@ Rendered:
       <container name="Wake Up">
           <actor name="Me"/>
           <command name="Wake Up" />
-          <policy name="Is Alarm Ringing?" negativeNext="Sleep In" />
+          <policy name="Is Alarm Ringing?" altNext="Sleep In" />
           <error name="Sleep In"><note>You chose to sleep in instead of waking up.</note></error>
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
           <command name="Have Shower" />
-          <policy name="Is the shower running?" next="Have shower gel?" negativeNext="Switch on shower" />
+          <policy name="Is the shower running?" next="Have shower gel?" altNext="Switch on shower" />
           <externalSystem name="Switch on shower" />
-          <policy name="Have shower gel?" negativeNext="Go Buy Shower Gel" />
+          <policy name="Have shower gel?" altNext="Go Buy Shower Gel" />
           <error name="Go Buy Shower Gel" />
           <event name="Had Shower" />
       </container>
@@ -194,7 +194,7 @@ Rendered:
           <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
           <actor name="Customer" />
           <command name="UpdateProfile" />
-          <policy name="Is User Authenticated?" negativeNext="Authentication Required" />
+          <policy name="Is User Authenticated?" altNext="Authentication Required" />
           <error name="Authentication Required"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
           <event name="ProfileUpdated" />
       </container>
@@ -203,20 +203,20 @@ Rendered:
       <container name="Place Order">
           <command name="PlaceOrder" next="IsAddressValid" />
           <container name="PlaceOrder">
-               <policy name="IsAddressValid" negativeNext="AddressIsInValid" />
-               <policy name="IsEmailValid" next="Do Something" negativeNext="Email is invalid" />
+               <policy name="IsAddressValid" altNext="AddressIsInValid" />
+               <policy name="IsEmailValid" next="Do Something" altNext="Email is invalid" />
                <container name="Another Sub Process">
                   <command name="Do Something" />
-                  <policy name="Is Something Valid?" next="InventoryService" negativeNext="Something Is Invalid" />
+                  <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
                   <error name="Something Is Invalid"><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
           <externalSystem name="InventoryService" />
-          <policy name="Do We Have Stock?" negativeNext="Out Of Stock" />
-          <policy name="Is Order Detail Valid?" negativeNext="Invalid Order Detail" />
+          <policy name="Do We Have Stock?" altNext="Out Of Stock" />
+          <policy name="Is Order Detail Valid?" altNext="Invalid Order Detail" />
           <error name="Invalid Order Detail"><note>Order details are invalid, please review your order and try again.</note></error>
           <externalSystem name="PaymentGateway" />
-          <policy name="Is Payment Successful?" negativeNext="PaymentFailed" />
+          <policy name="Is Payment Successful?" altNext="PaymentFailed" />
           <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>
@@ -225,7 +225,7 @@ Rendered:
       <container name="Inventory Check">
           <command name="Check Inventory" />
           <query name="Get Inventory" />
-          <policy name="Has Stock?" next="InventoryCheckPassed" negativeNext="Out of Stock" />
+          <policy name="Has Stock?" next="InventoryCheckPassed" altNext="Out of Stock" />
           <event name="Inventory Check Passed" />
       </container>
   </externalSystem>
@@ -263,7 +263,7 @@ Use a ` ```json ` block. JSON gives editors full schema validation and autocompl
         "children": [
           { "type": "Actor", "name": "Customer1" },
           { "type": "Command", "name": "Register" },
-          { "type": "Policy", "name": "Is Email Valid?", "negativeNext": "Invalid Email" },
+          { "type": "Policy", "name": "Is Email Valid?", "altNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
           { "type": "Event", "name": "UserRegistered" },
           { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
@@ -287,7 +287,7 @@ Rendered:
         "children": [
           { "type": "Actor", "name": "Customer1" },
           { "type": "Command", "name": "Register" },
-          { "type": "Policy", "name": "Is Email Valid?", "negativeNext": "Invalid Email" },
+          { "type": "Policy", "name": "Is Email Valid?", "altNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
           { "type": "Event", "name": "UserRegistered" },
           { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
@@ -350,7 +350,7 @@ interface Node {
   type: NodeType;
   name: string;
   next?: string;
-  negativeNext?: string;
+  altNext?: string;
   notes?: string[];
 }
 ```
@@ -361,8 +361,8 @@ interface Node {
 - `containers` defines named process groups inside a diagram, rendered as dashed sub-boxes.
 - `children` inside a container holds `Node` elements or nested `Container` elements (recursive nesting supported).
 - `next` links to another node in the same container and renders to the **right**. **`next` is optional** — if omitted, the node automatically connects to the immediately following sibling in the container, so you only need to set it when jumping non-sequentially.
-- When a node has a `negativeNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
-- `negativeNext` is used for policy failure paths and renders **below** the policy.
+- When a node has a `altNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
+- `altNext` is used for policy failure paths and renders **below** the policy.
 - If a policy omits a matching negative-path node, the renderer creates a default error node.
 - Notes can be added to diagrams, containers, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip. In the XML DSL, add one or more `<note>` child elements (without a `name` attribute) to attach notes; in the JSON DSL, use the `notes` string array.
 - `Note` is a supported node type and renders as a light-yellow note node rather than a command. In the XML DSL a note node requires a `name` attribute: `<note name="My Note" />`.
@@ -383,7 +383,7 @@ This extension only tests up to 2 levels of nesting.
       <container name="Place Order">
         <actor name="Customer" />
         <command name="PlaceOrder" />
-        <policy name="Is Payment Valid?" negativeNext="PaymentFailed" />
+        <policy name="Is Payment Valid?" altNext="PaymentFailed" />
         <error name="PaymentFailed" />
         <event name="OrderPlaced" />
       </container>
@@ -407,7 +407,7 @@ Rendered:
       <container name="Place Order">
         <actor name="Customer" />
         <command name="PlaceOrder" />
-        <policy name="Is Payment Valid?" negativeNext="PaymentFailed" />
+        <policy name="Is Payment Valid?" altNext="PaymentFailed" />
         <error name="PaymentFailed" />
         <event name="OrderPlaced" />
       </container>
