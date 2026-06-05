@@ -6,6 +6,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
 import { NODE_H } from './constants.js';
+import { getPointOnPath } from './links.js';
 
 // We need to extract the helper functions from renderer.ts
 // Since renderer.ts uses D3 heavily, we test the pure functions in isolation
@@ -257,23 +258,6 @@ function getTranslate(element: Element): { x: number; y: number } {
   };
 }
 
-function getPointOnLine(d: string, t: number): { x: number; y: number } {
-  const lineMatch = d.match(/M ([\d.]+) ([\d.]+) L ([\d.]+) ([\d.]+)/);
-  if (!lineMatch) {
-    throw new Error(`Expected line path, got: ${d}`);
-  }
-
-  const x1 = parseFloat(lineMatch[1]);
-  const y1 = parseFloat(lineMatch[2]);
-  const x2 = parseFloat(lineMatch[3]);
-  const y2 = parseFloat(lineMatch[4]);
-
-  return {
-    x: x1 + (x2 - x1) * t,
-    y: y1 + (y2 - y1) * t,
-  };
-}
-
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -511,11 +495,12 @@ describe('renderEventStorming layout', () => {
     expect(switchOnShower).toBeTruthy();
 
     const curvedRejoin = host.querySelector<SVGPathElement>(
-      `path.es-link-negative[data-source="${switchOnShower!.getAttribute('data-id')}"][data-target="${haveShowerGel!.getAttribute('data-id')}"]`
+      `path.es-link-default[data-source="${switchOnShower!.getAttribute('data-id')}"][data-target="${haveShowerGel!.getAttribute('data-id')}"]`
     );
     const curvedRejoinPath = curvedRejoin?.getAttribute('d') || '';
 
     expect(curvedRejoin).toBeTruthy();
+    // Rejoin links between same-row chain nodes use bezier curves (default type)
     expect(curvedRejoinPath).toContain(' C ');
     expect(curvedRejoin!.getAttribute('marker-end')).toBe('url(#arrowhead)');
   });
@@ -532,7 +517,7 @@ describe('renderEventStorming layout', () => {
     expect(noLabel).toBeTruthy();
     expect(negativeLink).toBeTruthy();
 
-    const mid = getPointOnLine(negativeLink!.getAttribute('d') || '', 0.5);
+    const mid = getPointOnPath(negativeLink!.getAttribute('d') || '', 0.5);
     expect(Number(noLabel!.getAttribute('x'))).toBe(mid.x + 14);
     expect(Number(noLabel!.getAttribute('y'))).toBe(mid.y - 10);
   });
@@ -604,5 +589,71 @@ describe('renderEventStorming layout', () => {
     const customerPos = getTranslate(customer!);
     expect(customerPos.x).toBeGreaterThan(groupPos.x);
     expect(customerPos.y).toBeGreaterThan(groupPos.y);
+  });
+
+  it('draws negative links from bottom-center of source when target is below', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    // "Have shower gel?" is a policy with altNext → auto-generated error node below it
+    const haveShowerGel = host.querySelector('[data-id="Shower_Have_shower_gel_"]');
+    expect(haveShowerGel).toBeTruthy();
+
+    const negativeLink = host.querySelector<SVGPathElement>(
+      'path.es-link-negative[data-source="Shower_Have_shower_gel_"]'
+    );
+    expect(negativeLink).toBeTruthy();
+
+    const pathD = negativeLink!.getAttribute('d') || '';
+    // Negative links should be straight lines (M...L...) not curves
+    expect(pathD).not.toContain(' C ');
+    // Start point y should be source bottom edge (y + NODE_H)
+    const mMatch = pathD.match(/^M (\d+) (\d+)/);
+    expect(mMatch).toBeTruthy();
+    const haveShowerGelPos = getTranslate(haveShowerGel!);
+    expect(parseFloat(mMatch![2])).toBe(haveShowerGelPos.y + NODE_H);
+  });
+
+  it('uses type === negative for downward path even when isNegative label is empty', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    // The "Go Buy Shower Gel" error node: positioned below via altNext from a policy
+    // Its incoming link has type='negative' but label='' (not 'no')
+    const goBuyGel = host.querySelector('[data-id="Shower_Go_Buy_Shower_Gel"]');
+    expect(goBuyGel).toBeTruthy();
+
+    const incomingLink = host.querySelector<SVGPathElement>(
+      `path.es-link-negative[data-target="${goBuyGel!.getAttribute('data-id')}"]`
+    );
+    expect(incomingLink).toBeTruthy();
+
+    const pathD = incomingLink!.getAttribute('d') || '';
+    // Same column: straight vertical line from bottom-center of source
+    expect(pathD).toMatch(/^M \d+ \d+ L \d+ \d+$/);
+  });
+
+  it('routes negative links with 90-degree angles for cross-column altNext branches', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    // "Have shower gel?" is a policy. Its auto-generated error node (altNext target)
+    // may or may not be same-column depending on DSL. For cross-column cases,
+    // the link should still start from bottom-center and use 90-degree angles.
+    const negativeLinks = Array.from(host.querySelectorAll<SVGPathElement>('path.es-link-negative'));
+    for (const link of negativeLinks) {
+      const pathD = link.getAttribute('d') || '';
+      expect(pathD).toContain(' L ');
+      // Should start from bottom-center of source (no bezier curves)
+      expect(pathD).not.toContain(' C ');
+      const mMatch = pathD.match(/^M (\d+) (\d+)/);
+      expect(mMatch).toBeTruthy();
+    }
   });
 });

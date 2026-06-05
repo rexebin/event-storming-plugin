@@ -101,7 +101,7 @@ export function layoutAltBranch(
     // Skip if it rejoins the main chain (that node will be placed by the primary loop)
   if (node.next && processNodeMap.has(node.next)) {
     const nextNode = processNodeMap.get(node.next)!;
-    allLinks.push({ source: node.id, target: nextNode.id, label: '', type: 'negative' });
+    allLinks.push({ source: node.id, target: nextNode.id, label: '', type: 'default' });
     const rejoinsMainChain = node.next === mainChainNextId;
     if (!rejoinsMainChain && !processPositioned.has(nextNode.id)) {
       const crossesSubGroup =
