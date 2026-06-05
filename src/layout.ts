@@ -39,27 +39,29 @@ const NESTED_GAP_PRE = 14;
 const SUB_PAD_BASE = 8;
 const NESTED_GAP = 14;
 
-function computeMaxSubGroupDepth(subGroups: { nodeIds: string[] }[]): number {
+function computeSubGroupDepths(subGroups: { nodeIds: string[] }[]): number[] {
   const sets = subGroups.map((sg) => new Set(sg.nodeIds));
   const isStrictSubset = (a: Set<string>, b: Set<string>): boolean => {
     if (a.size >= b.size) return false;
     for (const id of a) if (!b.has(id)) return false;
     return true;
-   };
+  };
   const depthBelow = new Array<number>(sets.length).fill(0);
-  const order = sets.map((_: unknown, i: number) => i).sort((a: number, b: number) => a - b);
-  let maxDepth = 0;
+  const order = sets.map((_: unknown, i: number) => i).sort((a: number, b: number) => sets[a].size - sets[b].size);
   for (const i of order) {
     let childMax = -1;
     for (const j of order) {
       if (i !== j && isStrictSubset(sets[j], sets[i])) {
         childMax = Math.max(childMax, depthBelow[j]);
-        }
       }
+    }
     depthBelow[i] = childMax + 1;
-    maxDepth = Math.max(maxDepth, depthBelow[i]);
-     }
-  return maxDepth;
+  }
+  return depthBelow;
+}
+
+function computeMaxSubGroupDepth(subGroups: { nodeIds: string[] }[]): number {
+  return Math.max(0, ...computeSubGroupDepths(subGroups));
 }
 
 // ─── Chain & branch layout ───────────────────────────────────
@@ -583,10 +585,11 @@ export function computeLayout(model: DSLModel): LayoutResult {
 
            // Compute bounding boxes for inline sub-groups
       if (process.subGroups) {
+        const sgDepths = computeSubGroupDepths(process.subGroups);
+        const sgSetsList = process.subGroups.map((sg) => new Set(sg.nodeIds));
         for (let sgIdx = 0; sgIdx < process.subGroups.length; sgIdx++) {
           const subGroup = process.subGroups[sgIdx];
-          const depthBelowArr = new Array<number>(process.subGroups.length).fill(0);
-          const sgSets = new Set(process.subGroups[sgIdx].nodeIds);
+          const sgSets = sgSetsList[sgIdx];
           const subNodes = allNodes.filter((n) => sgSets.has(n.id));
           if (subNodes.length === 0) continue;
            // Also include negative/error nodes: either explicitly defined (altNext id)
@@ -598,10 +601,10 @@ export function computeLayout(model: DSLModel): LayoutResult {
              }
           const negNodes = allNodes.filter((n) => negIds.has(n.id));
           const allSub = [...subNodes, ...negNodes];
-          const minX = Math.min(...allSub.map((n) => n.x)) - (SUB_PAD_BASE + depthBelowArr[sgIdx] * NESTED_GAP);
-          const minY = Math.min(...allSub.map((n) => n.y)) - (SUB_PAD_BASE + depthBelowArr[sgIdx] * NESTED_GAP) - GROUP_HEADER_H;
-          const maxX = Math.max(...allSub.map((n) => n.x + NODE_W)) + (SUB_PAD_BASE + depthBelowArr[sgIdx] * NESTED_GAP);
-          const maxY = Math.max(...allSub.map((n) => n.y + NODE_H)) + (SUB_PAD_BASE + depthBelowArr[sgIdx] * NESTED_GAP);
+          const minX = Math.min(...allSub.map((n) => n.x)) - (SUB_PAD_BASE + sgDepths[sgIdx] * NESTED_GAP);
+          const minY = Math.min(...allSub.map((n) => n.y)) - (SUB_PAD_BASE + sgDepths[sgIdx] * NESTED_GAP) - GROUP_HEADER_H;
+          const maxX = Math.max(...allSub.map((n) => n.x + NODE_W)) + (SUB_PAD_BASE + sgDepths[sgIdx] * NESTED_GAP);
+          const maxY = Math.max(...allSub.map((n) => n.y + NODE_H)) + (SUB_PAD_BASE + sgDepths[sgIdx] * NESTED_GAP);
           allSubGroups.push({
             id: `${container.id}_subgroup_${processIndex}_${normalizeId(subGroup.name)}`,
             label: subGroup.name,
