@@ -76,9 +76,9 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
         <actor name="Customer1" next="Register" />
         <command name="Register" next="Is Email Valid?" />
         <policy name="Is Email Valid?" next="UserRegistered" negativeNext="Invalid Email" />
-        <error name="Invalid Email" notes="The email address provided is not valid. Please enter a valid email address and try again." />
+        <error name="Invalid Email"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
         <event name="UserRegistered" next="Some Note" />
-        <note name="Some Note" notes="This is a note attached to the UserRegistered event." />
+        <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
      </container>
   </aggregate>
     <aggregate name="Morning Routine">
@@ -99,11 +99,12 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
       </container>
   </aggregate>
   <aggregate name="User Profile">
-      <container name="Update Profile" notes="This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.">
+      <container name="Update Profile">
+          <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
           <actor name="Customer" next="UpdateProfile" />
           <command name="UpdateProfile" next="Is User Authenticated?" />
           <policy name="Is User Authenticated?" next="ProfileUpdated" negativeNext="Authentication Required" />
-          <error name="Authentication Required" notes="You must be logged in to update your profile. Please log in and try again." />
+          <error name="Authentication Required"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
           <event name="ProfileUpdated" />
       </container>
   </aggregate>
@@ -116,16 +117,16 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
                <container name="Another Sub Process">
                   <command name="Do Something" next="Is Something Valid?" />
                   <policy name="Is Something Valid?" next="InventoryService" negativeNext="Something Is Invalid" />
-                  <error name="Something Is Invalid" notes="Something is invalid, please review and try again." />
+                  <error name="Something Is Invalid"><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
           <externalSystem name="InventoryService" next="Do We Have Stock?" />
           <policy name="Do We Have Stock?" next="Is Order Detail Valid?" negativeNext="Out Of Stock" />
           <policy name="Is Order Detail Valid?" next="PaymentGateway" negativeNext="Invalid Order Detail" />
-          <error name="Invalid Order Detail" notes="Order details are invalid, please review your order and try again." />
+          <error name="Invalid Order Detail"><note>Order details are invalid, please review your order and try again.</note></error>
           <externalSystem name="PaymentGateway" next="Is Payment Successful?" />
           <policy name="Is Payment Successful?" next="OrderPlaced" negativeNext="PaymentFailed" />
-          <error name="PaymentFailed" notes="Payment failed, please try again or use a different payment method. Client should handle this error." />
+          <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>    
   </aggregate>
@@ -143,7 +144,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           <event name="OrderCancelled" next="Order Detail View" />
           <event name="OrderUpdated" next="Order Detail View" />
           <event name="OrderShipped" next="Order Detail View" />
-          <readModel name="Order Detail View" notes="This view is used to display the details of an order, including its status, items, and other relevant information." />
+          <readModel name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></readModel>
       </container>
   </projector>
   <process name="Customer Order View">
@@ -158,7 +159,31 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
 
 The diagram will render inline, replacing the code block automatically.
 
-For the JSON DSL shown above, supported diagram types are `Aggregate`, `ExternalSystem`, `Projector`, and `Process`.
+The same diagram can also be written in JSON (use a `json` fenced block for editor syntax help):
+
+```json
+[
+  {
+    "type": "Aggregate",
+    "name": "User",
+    "containers": [
+      {
+        "name": "User Registration",
+        "children": [
+          { "type": "Actor", "name": "Customer1", "next": "Register" },
+          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
+          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
+          { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
+          { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
+          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
+        ]
+      }
+    ]
+  }
+]
+```
+
+Supported diagram types are `Aggregate`, `ExternalSystem`, `Projector`, and `Process`.
 
 ## Usage in VS Code
 
@@ -223,8 +248,8 @@ interface Node {
 - `next` links to another node in the same container and renders to the **right**.
 - `negativeNext` is used for policy failure paths and renders **below** the policy.
 - If a policy omits a matching negative-path node, the renderer creates a default error node.
-- `notes` can be added to diagrams, containers, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
-- `Note` is a supported node type and renders as a light-yellow note node rather than a command.
+- Notes can be added to diagrams, containers, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip. In the XML DSL, add one or more `<note>` child elements (without a `name` attribute) to attach notes; in the JSON DSL, use the `notes` string array.
+- `Note` is a supported node type and renders as a light-yellow note node rather than a command. In the XML DSL a note node requires a `name` attribute: `<note name="My Note" />`.
 
 ### Recursive Containers
 

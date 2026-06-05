@@ -593,6 +593,9 @@ function collectXMLChildren(
       const nodeType = XML_NODE_TYPES[tagLower];
       if (!nodeType) continue;
 
+      // <note> without a name attribute is notes text, not a flow node
+      if (tagLower === 'note' && !child.getAttribute('name')) continue;
+
       const name = child.getAttribute('name') || '';
       const id = prefix + normalizeId(name);
       const rawNext = child.getAttribute('next') ?? undefined;
@@ -621,8 +624,12 @@ function collectXMLChildren(
 }
 
 function xmlAttrNotes(el: Element): string[] {
-  const notes = el.getAttribute('notes');
-  return notes ? [notes] : [];
+  const attr = el.getAttribute('notes');
+  const childNotes = Array.from(el.children)
+    .filter(c => c.tagName.toLowerCase() === 'note' && !c.getAttribute('name'))
+    .map(c => c.textContent?.trim() ?? '')
+    .filter(Boolean);
+  return attr ? [attr, ...childNotes] : childNotes;
 }
 
 function isEventStormingJSONValue(value: unknown): value is JSONDiagram[] {

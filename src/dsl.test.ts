@@ -627,6 +627,22 @@ describe('parseDSL', () => {
      expect(note?.color).toBe('#FFF1AA');
    });
 
+   it('parses notes from child <note> element on a note flow node', () => {
+     const xml = `\`\`\`eventstorming
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Test">
+      <event name="OrderPlaced" next="Some Note" />
+      <note name="Some Note"><note>This is a note attached to the event.</note></note>
+    </container>
+  </aggregate>
+</eventstorming>
+\`\`\``;
+     const result = parseDSL(xml);
+     const noteNode = result.nodes.find(n => n.label === 'Some Note');
+     expect(noteNode?.notes).toEqual(['This is a note attached to the event.']);
+   });
+
    it('should keep the README eventstorming example parseable', async () => {
      const readme = (await import('../README.md?raw')).default;
      const match = readme.match(/```(?:eventstorming|json)\n([\s\S]*?)\n```/);
