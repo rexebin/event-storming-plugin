@@ -64,12 +64,13 @@ This creates a `.vsix` file that can be shared or installed using **Extensions: 
 
 ## Usage on GitHub
 
-In any Markdown file (README, issue, PR comment, wiki), you can use:
+In any Markdown file (README, issue, PR comment, wiki), write a fenced code block using either DSL format. The extension replaces the block with an interactive diagram inline.
 
-- `eventstorming` for the text DSL
-- `json` for the JSON DSL, which gives editors JSON syntax help
+### XML DSL
 
-```eventstorming
+Use a ` ```xml ` block. XML is more concise to write by hand and supports multiple notes per element via child `<note>` elements.
+
+```text
 <eventstorming>
   <aggregate name="User">
      <container name="User Registration">
@@ -81,7 +82,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
      </container>
   </aggregate>
-    <aggregate name="Morning Routine">
+  <aggregate name="Morning Routine">
       <container name="Wake Up">
           <actor name="Me" next="Wake Up" />
           <command name="Wake Up" next="Is Alarm Ringing?" />
@@ -128,7 +129,7 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
           <policy name="Is Payment Successful?" next="OrderPlaced" negativeNext="PaymentFailed" />
           <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
-      </container>    
+      </container>
   </aggregate>
   <externalSystem name="Inventory Service">
       <container name="Inventory Check">
@@ -157,9 +158,123 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
 </eventstorming>
 ```
 
-The diagram will render inline, replacing the code block automatically.
+Rendered:
 
-The same diagram can also be written in JSON (use a `json` fenced block for editor syntax help):
+```xml
+<eventstorming>
+  <aggregate name="User">
+     <container name="User Registration">
+        <actor name="Customer1" next="Register" />
+        <command name="Register" next="Is Email Valid?" />
+        <policy name="Is Email Valid?" next="UserRegistered" negativeNext="Invalid Email" />
+        <error name="Invalid Email"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
+        <event name="UserRegistered" next="Some Note" />
+        <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
+     </container>
+  </aggregate>
+  <aggregate name="Morning Routine">
+      <container name="Wake Up">
+          <actor name="Me" next="Wake Up" />
+          <command name="Wake Up" next="Is Alarm Ringing?" />
+          <policy name="Is Alarm Ringing?" next="Got Out of Bed" negativeNext="Sleep In" />
+          <error name="Sleep In" />
+          <event name="Got Out of Bed" />
+      </container>
+      <container name="Shower">
+          <command name="Have Shower" next="Is the shower running?" />
+          <policy name="Is the shower running?" next="Have shower gel?" negativeNext="Switch on shower" />
+          <externalSystem name="Switch on shower" next="Have shower gel?" />
+          <policy name="Have shower gel?" next="Had Shower" negativeNext="Go Buy Shower Gel" />
+          <error name="Go Buy Shower Gel" />
+          <event name="Had Shower" />
+      </container>
+  </aggregate>
+  <aggregate name="User Profile">
+      <container name="Update Profile">
+          <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
+          <actor name="Customer" next="UpdateProfile" />
+          <command name="UpdateProfile" next="Is User Authenticated?" />
+          <policy name="Is User Authenticated?" next="ProfileUpdated" negativeNext="Authentication Required" />
+          <error name="Authentication Required"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
+          <event name="ProfileUpdated" />
+      </container>
+  </aggregate>
+  <aggregate name="Order">
+      <container name="Place Order">
+          <command name="PlaceOrder" next="IsAddressValid" />
+          <container name="PlaceOrder">
+               <policy name="IsAddressValid" next="IsEmailValid" negativeNext="AddressIsInValid" />
+               <policy name="IsEmailValid" next="Do Something" negativeNext="Email is invalid" />
+               <container name="Another Sub Process">
+                  <command name="Do Something" next="Is Something Valid?" />
+                  <policy name="Is Something Valid?" next="InventoryService" negativeNext="Something Is Invalid" />
+                  <error name="Something Is Invalid"><note>Something is invalid, please review and try again.</note></error>
+               </container>
+          </container>
+          <externalSystem name="InventoryService" next="Do We Have Stock?" />
+          <policy name="Do We Have Stock?" next="Is Order Detail Valid?" negativeNext="Out Of Stock" />
+          <policy name="Is Order Detail Valid?" next="PaymentGateway" negativeNext="Invalid Order Detail" />
+          <error name="Invalid Order Detail"><note>Order details are invalid, please review your order and try again.</note></error>
+          <externalSystem name="PaymentGateway" next="Is Payment Successful?" />
+          <policy name="Is Payment Successful?" next="OrderPlaced" negativeNext="PaymentFailed" />
+          <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
+          <event name="OrderPlaced" />
+      </container>
+  </aggregate>
+  <externalSystem name="Inventory Service">
+      <container name="Inventory Check">
+          <command name="Check Inventory" next="Get Inventory" />
+          <query name="Get Inventory" next="Has Stock?" />
+          <policy name="Has Stock?" next="InventoryCheckPassed" negativeNext="Out of Stock" />
+          <event name="Inventory Check Passed" />
+      </container>
+  </externalSystem>
+  <projector name="OrderDetail">
+      <container name="Order Detail Projection">
+          <event name="OrderPlaced" next="Order Detail View" />
+          <event name="OrderCancelled" next="Order Detail View" />
+          <event name="OrderUpdated" next="Order Detail View" />
+          <event name="OrderShipped" next="Order Detail View" />
+          <readModel name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></readModel>
+      </container>
+  </projector>
+  <process name="Customer Order View">
+      <container name="View Order Details">
+          <actor name="Customer" next="GetOrderDetails" />
+          <query name="GetOrderDetails" next="Order Detail Projection" />
+          <readModel name="Order Detail Projection" />
+      </container>
+  </process>
+</eventstorming>
+```
+
+### JSON DSL
+
+Use a ` ```json ` block. JSON gives editors full schema validation and autocompletion.
+
+```text
+[
+  {
+    "type": "Aggregate",
+    "name": "User",
+    "containers": [
+      {
+        "name": "User Registration",
+        "children": [
+          { "type": "Actor", "name": "Customer1", "next": "Register" },
+          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
+          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
+          { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
+          { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
+          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
+        ]
+      }
+    ]
+  }
+]
+```
+
+Rendered:
 
 ```json
 [
@@ -257,41 +372,52 @@ A container's `children` array may mix `Node` elements with nested `Container` e
 
 However, the event storming diagram should be kept as flat as possible for readability, so use nested containers sparingly. They can be useful for grouping related sub-flows together, but too much nesting can make the diagram harder to read. 
 
-This extension only test up to 2 levels of nesting.
+This extension only tests up to 2 levels of nesting.
 
-```json
-[
-  {
-    "type": "Aggregate",
-    "name": "Order",
-    "containers": [
-      {
-        "name": "Order Lifecycle",
-        "notes": ["Top-level group grouping placement and cancellation sub-flows."],
-        "children": [
-          {
-            "name": "Place Order",
-            "children": [
-              { "type": "Actor", "name": "Customer", "next": "PlaceOrder" },
-              { "type": "Command", "name": "PlaceOrder", "next": "Is Payment Valid?" },
-              { "type": "Policy", "name": "Is Payment Valid?", "next": "OrderPlaced", "negativeNext": "PaymentFailed" },
-              { "type": "Error", "name": "PaymentFailed" },
-              { "type": "Event", "name": "OrderPlaced" }
-            ]
-          },
-          {
-            "name": "Cancel Order",
-            "children": [
-              { "type": "Actor", "name": "Customer", "next": "CancelOrder" },
-              { "type": "Command", "name": "CancelOrder", "next": "OrderCancelled" },
-              { "type": "Event", "name": "OrderCancelled" }
-            ]
-          }
-        ]
-      }
-    ]
-  }
-]
+```text
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Order Lifecycle">
+      <note>Top-level group grouping placement and cancellation sub-flows.</note>
+      <container name="Place Order">
+        <actor name="Customer" next="PlaceOrder" />
+        <command name="PlaceOrder" next="Is Payment Valid?" />
+        <policy name="Is Payment Valid?" next="OrderPlaced" negativeNext="PaymentFailed" />
+        <error name="PaymentFailed" />
+        <event name="OrderPlaced" />
+      </container>
+      <container name="Cancel Order">
+        <actor name="Customer" next="CancelOrder" />
+        <command name="CancelOrder" next="OrderCancelled" />
+        <event name="OrderCancelled" />
+      </container>
+    </container>
+  </aggregate>
+</eventstorming>
+```
+
+Rendered:
+
+```xml
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Order Lifecycle">
+      <note>Top-level group grouping placement and cancellation sub-flows.</note>
+      <container name="Place Order">
+        <actor name="Customer" next="PlaceOrder" />
+        <command name="PlaceOrder" next="Is Payment Valid?" />
+        <policy name="Is Payment Valid?" next="OrderPlaced" negativeNext="PaymentFailed" />
+        <error name="PaymentFailed" />
+        <event name="OrderPlaced" />
+      </container>
+      <container name="Cancel Order">
+        <actor name="Customer" next="CancelOrder" />
+        <command name="CancelOrder" next="OrderCancelled" />
+        <event name="OrderCancelled" />
+      </container>
+    </container>
+  </aggregate>
+</eventstorming>
 ```
 
 ## Project Structure
