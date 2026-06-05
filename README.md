@@ -69,152 +69,91 @@ In any Markdown file (README, issue, PR comment, wiki), you can use:
 - `eventstorming` for the text DSL
 - `json` for the JSON DSL, which gives editors JSON syntax help
 
-```json
-[
-  {
-    "type": "Aggregate",
-    "name": "User",
-    "notes": ["This aggregate represents a user in the system, including their registration and profile management processes."],
-    "containers": [
-      {
-        "name": "User Registration",
-        "notes": ["This process handles user registration, including validating the email address and creating a new user account if the email is valid."],
-        "children": [
-          { "type": "Actor", "name": "Customer1", "next": "Register" },
-          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
-          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
-          { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
-          { "type": "Event", "name": "UserRegistered", "next":"Some Note" },
-          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Aggregate",
-    "name": "Morning Routine",
-    "containers": [
-      {
-        "name": "Wake Up",
-        "children": [
-          { "type": "Actor", "name": "Me", "next": "Wake Up" },
-          { "type": "Command", "name": "Wake Up", "next": "Is Alarm Ringing?" },
-          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "negativeNext": "Sleep In" },
-          { "type": "Error", "name": "Sleep In" },
-          { "type": "Event", "name": "Got Out of Bed" }
-        ]
-      },
-      {
-        "name": "Shower",
-        "children": [
-          { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
-          { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "negativeNext": "Switch on shower" },
-          { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
-          { "type": "Policy", "name": "Have shower gel?", "next": "Had Shower", "negativeNext": "Go Buy Shower Gel" },
-          { "type": "Error", "name": "Go Buy Shower Gel" },
-          { "type": "Event", "name": "Had Shower" }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Aggregate",
-    "name": "User Profile",
-    "containers": [
-      {
-        "name": "Update Profile",
-        "notes": ["This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned."],
-        "children": [
-          { "type": "Actor", "name": "Customer", "next": "UpdateProfile" },
-          { "type": "Command", "name": "UpdateProfile", "next": "Is User Authenticated?" },
-          { "type": "Policy", "name": "Is User Authenticated?", "next": "ProfileUpdated", "negativeNext": "Authentication Required" },
-          { "type": "Error", "name": "Authentication Required", "notes": ["You must be logged in to update your profile. Please log in and try again."] },
-          { "type": "Event", "name": "ProfileUpdated" }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Aggregate",
-    "name": "Order",
-    "containers": [
-      {
-        "name": "Place Order",
-        "children": [
-          { "type": "Command", "name": "PlaceOrder", "next": "IsAddressValid" },
-          { 
-            "name": "PlaceOrder", 
-            "children": [
-               { "type": "Policy", "name": "IsAddressValid", "next": "IsEmailValid", "negativeNext": "AddressIsInValid" },
-               { "type": "Policy", "name": "IsEmailValid", "next": "Do Something", "negativeNext": "Email is invalid" },
-               { 
-                "name": "Another Sub Process", 
-                "children": [
-                  { "type": "Command", "name": "Do Something", "next": "Is Something Valid?" },
-                  { "type": "Policy", "name": "Is Something Valid?", "next": "InventoryService", "negativeNext": "Something Is Invalid" },
-                  { "type": "Error", "name": "Something Is Invalid", "notes": ["Something is invalid, please review and try again."] }
-                ]
-               }
-            ]
-          },
-          { "type": "ExternalSystem", "name": "InventoryService", "next": "Do We Have Stock?" },
-          { "type": "Policy", "name": "Do We Have Stock?", "next": "Is Order Detail Valid?", "negativeNext": "Out Of Stock" },
-          { "type": "Policy", "name": "Is Order Detail Valid?", "next": "PaymentGateway", "negativeNext": "Invalid Order Detail" },
-          { "type": "Error", "name": "Invalid Order Detail", "notes": ["Order details are invalid, please review your order and try again."] },
-          { "type": "ExternalSystem", "name": "PaymentGateway", "next": "Is Payment Successful?" },
-          { "type": "Policy", "name": "Is Payment Successful?", "next": "OrderPlaced", "negativeNext": "PaymentFailed" },
-          { "type": "Error", "name": "PaymentFailed", "notes": ["Payment failed, please try again or use a different payment method.", "Client should handle this error."] },
-          { "type": "Event", "name": "OrderPlaced" }
-        ]
-      }    
-    ]
-  },
-  {
-    "type": "ExternalSystem",
-    "name": "Inventory Service",
-    "containers": [
-      {
-        "name": "Inventory Check",
-        "children": [
-          { "type": "Command", "name": "Check Inventory", "next": "Get Inventory" },
-          { "type": "Query", "name": "Get Inventory", "next": "Has Stock?" },
-          { "type": "Policy", "name": "Has Stock?", "next": "InventoryCheckPassed", "negativeNext": "Out of Stock" },
-          { "type": "Event", "name": "Inventory Check Passed" }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Projector",
-    "name": "OrderDetail",
-    "containers": [
-      {
-        "name": "Order Detail Projection",
-        "children": [
-          { "type": "Event", "name": "OrderPlaced", "next": "Order Detail View" },
-          { "type": "Event", "name": "OrderCancelled", "next": "Order Detail View" },
-          { "type": "Event", "name": "OrderUpdated", "next": "Order Detail View" },
-          { "type": "Event", "name": "OrderShipped", "next": "Order Detail View" },
-          { "type": "ReadModel", "name": "Order Detail View", "notes": ["This view is used to display the details of an order, including its status, items, and other relevant information."] }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Process",
-    "name": "Customer Order View",
-    "containers": [
-      {
-        "name": "View Order Details",
-        "children": [
-          { "type": "Actor", "name": "Customer", "next": "GetOrderDetails" },
-          { "type": "Query", "name": "GetOrderDetails", "next": "Order Detail Projection" },
-          { "type": "ReadModel", "name": "Order Detail Projection" }
-        ]
-      }
-    ]
-  }
-]
+```eventstorming
+<eventstorming>
+  <aggregate name="User">
+     <container name="User Registration">
+        <actor name="Customer1" next="Register" />
+        <command name="Register" next="Is Email Valid?" />
+        <policy name="Is Email Valid?" next="UserRegistered" negativeNext="Invalid Email" />
+        <error name="Invalid Email" notes="The email address provided is not valid. Please enter a valid email address and try again." />
+        <event name="UserRegistered" next="Some Note" />
+        <note name="Some Note" notes="This is a note attached to the UserRegistered event." />
+     </container>
+  </aggregate>
+    <aggregate name="Morning Routine">
+      <container name="Wake Up">
+          <actor name="Me" next="Wake Up" />
+          <command name="Wake Up" next="Is Alarm Ringing?" />
+          <policy name="Is Alarm Ringing?" next="Got Out of Bed" negativeNext="Sleep In" />
+          <error name="Sleep In" />
+          <event name="Got Out of Bed" />
+      </container>
+      <container name="Shower">
+          <command name="Have Shower" next="Is the shower running?" />
+          <policy name="Is the shower running?" next="Have shower gel?" negativeNext="Switch on shower" />
+          <externalSystem name="Switch on shower" next="Have shower gel?" />
+          <policy name="Have shower gel?" next="Had Shower" negativeNext="Go Buy Shower Gel" />
+          <error name="Go Buy Shower Gel" />
+          <event name="Had Shower" />
+      </container>
+  </aggregate>
+  <aggregate name="User Profile">
+      <container name="Update Profile" notes="This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.">
+          <actor name="Customer" next="UpdateProfile" />
+          <command name="UpdateProfile" next="Is User Authenticated?" />
+          <policy name="Is User Authenticated?" next="ProfileUpdated" negativeNext="Authentication Required" />
+          <error name="Authentication Required" notes="You must be logged in to update your profile. Please log in and try again." />
+          <event name="ProfileUpdated" />
+      </container>
+  </aggregate>
+  <aggregate name="Order">
+      <container name="Place Order">
+          <command name="PlaceOrder" next="IsAddressValid" />
+          <container name="PlaceOrder">
+               <policy name="IsAddressValid" next="IsEmailValid" negativeNext="AddressIsInValid" />
+               <policy name="IsEmailValid" next="Do Something" negativeNext="Email is invalid" />
+               <container name="Another Sub Process">
+                  <command name="Do Something" next="Is Something Valid?" />
+                  <policy name="Is Something Valid?" next="InventoryService" negativeNext="Something Is Invalid" />
+                  <error name="Something Is Invalid" notes="Something is invalid, please review and try again." />
+               </container>
+          </container>
+          <externalSystem name="InventoryService" next="Do We Have Stock?" />
+          <policy name="Do We Have Stock?" next="Is Order Detail Valid?" negativeNext="Out Of Stock" />
+          <policy name="Is Order Detail Valid?" next="PaymentGateway" negativeNext="Invalid Order Detail" />
+          <error name="Invalid Order Detail" notes="Order details are invalid, please review your order and try again." />
+          <externalSystem name="PaymentGateway" next="Is Payment Successful?" />
+          <policy name="Is Payment Successful?" next="OrderPlaced" negativeNext="PaymentFailed" />
+          <error name="PaymentFailed" notes="Payment failed, please try again or use a different payment method. Client should handle this error." />
+          <event name="OrderPlaced" />
+      </container>    
+  </aggregate>
+  <externalSystem name="Inventory Service">
+      <container name="Inventory Check">
+          <command name="Check Inventory" next="Get Inventory" />
+          <query name="Get Inventory" next="Has Stock?" />
+          <policy name="Has Stock?" next="InventoryCheckPassed" negativeNext="Out of Stock" />
+          <event name="Inventory Check Passed" />
+      </container>
+  </externalSystem>
+  <projector name="OrderDetail">
+      <container name="Order Detail Projection">
+          <event name="OrderPlaced" next="Order Detail View" />
+          <event name="OrderCancelled" next="Order Detail View" />
+          <event name="OrderUpdated" next="Order Detail View" />
+          <event name="OrderShipped" next="Order Detail View" />
+          <readModel name="Order Detail View" notes="This view is used to display the details of an order, including its status, items, and other relevant information." />
+      </container>
+  </projector>
+  <process name="Customer Order View">
+      <container name="View Order Details">
+          <actor name="Customer" next="GetOrderDetails" />
+          <query name="GetOrderDetails" next="Order Detail Projection" />
+          <readModel name="Order Detail Projection" />
+      </container>
+  </process>
+</eventstorming>
 ```
 
 The diagram will render inline, replacing the code block automatically.

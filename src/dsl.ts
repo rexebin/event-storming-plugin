@@ -96,12 +96,18 @@ const COLOR_MAP: Record<string, string> = {
 /**
  * Parse raw DSL text into a structured model.
  *
- * Supports two input formats:
- *  1. Text-based DSL (e.g. "actor: Customer [purple]")
+ * Supports three input formats:
+ *  1. XML-based DSL (<eventstorming> ... </eventstorming>)
  *  2. JSON array of containers (from dsl-type.ts spec)
+ *  3. Text-based DSL (e.g. "actor: Customer [purple]")
  */
 export function parseDSL(text: string): DSLModel {
- // Try JSON format first (dsl-type.ts spec)
+  // Try XML format first
+  if (isEventStormingXML(text)) {
+    return parseXMLDSL(text);
+  }
+
+ // Try JSON format (dsl-type.ts spec)
  const trimmed = text.trim();
  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
    try {
@@ -456,6 +462,167 @@ export function isEventStormingJSON(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function isEventStormingXML(text: string): boolean {
+  return text.includes('<eventstorming') && text.includes('</eventstorming>');
+}
+
+function parseXMLDSL(text: string): DSLModel {
+  const model: DSLModel = {
+    title: 'Event Storming',
+    description: '',
+    containers: [],
+    nodes: [],
+    links: [],
+  };
+
+  const start = text.indexOf('<eventstorming');
+  const end = text.lastIndexOf('</eventstorming>') + '</eventstorming>'.length;
+  const xml = text.slice(start, end);
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const root = doc.documentElement;
+  if (root.tagName !== 'eventstorming' || root.querySelector('parsererror')) return model;
+
+  const XML_CONTAINER_TYPES: Record<string, 'aggregate' | 'readModel' | 'process' | 'externalSystem'> = {
+    aggregate: 'aggregate',
+    externalsystem: 'externalSystem',
+    projector: 'readModel',
+    process: 'process',
+  };
+
+  const CONTAINER_COLORS: Record<string, string> = {
+    aggregate: '#FEE254',
+    readModel: '#5BAA62',
+    externalSystem: '#FB8597',
+    process: '#859EBF',
+  };
+
+  for (const diagramEl of Array.from(root.children)) {
+    const tagLower = diagramEl.tagName.toLowerCase();
+    const cType = XML_CONTAINER_TYPES[tagLower];
+    if (!cType) continue;
+
+    const containerName = diagramEl.getAttribute('name') || diagramEl.tagName;
+    const containerId = normalizeId(containerName);
+    const dslContainer: DSLContainer = {
+      id: containerId,
+      label: containerName,
+      type: cType,
+      color: CONTAINER_COLORS[cType],
+      nodeIds: [],
+      processes: [],
+      notes: xmlAttrNotes(diagramEl),
+    };
+
+    for (const containerEl of Array.from(diagramEl.children)) {
+      if (containerEl.tagName.toLowerCase() === 'container') {
+        expandXMLContainer(containerEl, dslContainer, model, normalizeId(containerEl.getAttribute('name') || '') + '_');
+      }
+    }
+
+    model.containers.push(dslContainer);
+  }
+
+  return model;
+}
+
+function expandXMLContainer(
+  containerEl: Element,
+  dslContainer: DSLContainer,
+  model: DSLModel,
+  prefix: string,
+  parentAliases?: Map<string, string>
+): void {
+  const stepIds: string[] = [];
+  const subGroups: DSLSubGroup[] = [];
+  const aliases = new Map<string, string>();
+  const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
+
+  collectXMLChildren(containerEl, dslContainer, model, prefix, aliases, stepIds, subGroups, pending);
+
+  for (const { node, rawNext, rawNegativeNext, nodePrefix } of pending) {
+    node.next = resolveJSONReference(rawNext, nodePrefix, aliases, parentAliases);
+    node.negativeNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
+  }
+
+  dslContainer.processes.push({
+    name: containerEl.getAttribute('name') || '',
+    stepIds,
+    notes: xmlAttrNotes(containerEl),
+    subGroups: subGroups.length > 0 ? subGroups : undefined,
+  });
+}
+
+const XML_NODE_TYPES: Record<string, NodeType> = {
+  actor: 'actor',
+  command: 'command',
+  event: 'event',
+  policy: 'policy',
+  query: 'query',
+  externalsystem: 'externalSystem',
+  readmodel: 'readModel',
+  error: 'error',
+  note: 'note',
+  aggregate: 'aggregate',
+};
+
+function collectXMLChildren(
+  containerEl: Element,
+  dslContainer: DSLContainer,
+  model: DSLModel,
+  prefix: string,
+  aliases: Map<string, string>,
+  stepIds: string[],
+  subGroups: DSLSubGroup[],
+  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }>
+): void {
+  for (const child of Array.from(containerEl.children)) {
+    const tagLower = child.tagName.toLowerCase();
+
+    if (tagLower === 'container') {
+      const subName = child.getAttribute('name') || '';
+      const subPrefix = prefix + normalizeId(subName) + '_';
+      const subStepIds: string[] = [];
+      collectXMLChildren(child, dslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending);
+      for (const id of subStepIds) stepIds.push(id);
+      subGroups.push({ name: subName, nodeIds: subStepIds, notes: xmlAttrNotes(child) });
+    } else {
+      const nodeType = XML_NODE_TYPES[tagLower];
+      if (!nodeType) continue;
+
+      const name = child.getAttribute('name') || '';
+      const id = prefix + normalizeId(name);
+      const rawNext = child.getAttribute('next') ?? undefined;
+      const rawNegativeNext = child.getAttribute('negativeNext') ?? undefined;
+
+      const n: DSLNode = {
+        id,
+        label: name,
+        type: nodeType,
+        color: DEFAULT_COLORS[nodeType] || '#6a737d',
+        containerId: dslContainer.id,
+        processIndex: -1,
+        noteTarget: null,
+        next: undefined,
+        negativeNext: undefined,
+        negativeNextText: rawNegativeNext,
+        notes: xmlAttrNotes(child),
+      };
+      model.nodes.push(n);
+      pending.push({ node: n, rawNext, rawNegativeNext, nodePrefix: prefix });
+      aliases.set(canonicalizeReference(name), id);
+      dslContainer.nodeIds.push(id);
+      stepIds.push(id);
+    }
+  }
+}
+
+function xmlAttrNotes(el: Element): string[] {
+  const notes = el.getAttribute('notes');
+  return notes ? [notes] : [];
 }
 
 function isEventStormingJSONValue(value: unknown): value is JSONDiagram[] {
