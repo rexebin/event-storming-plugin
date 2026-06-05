@@ -375,19 +375,18 @@ export function renderEventStorming(
       const node = layout.nodes.find((n) => n.id === id);
       if (!node) return;
       const nodeNotes = getNodeNotes(node, model);
-      if (nodeNotes.length === 0) {
-        tooltip.style('display', 'none');
-        return;
-      }
       const notesHtml = nodeNotes.length > 0
         ? `<div class="es-tooltip-notes"><div class="es-tooltip-notes-label">Notes</div><ul>${
             nodeNotes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')
           }</ul></div>`
         : '';
+      const html = `<div class="es-tooltip-title">${escapeHtml(node.label)}</div>`
+        + `<div class="es-tooltip-type">${formatNodeType(node.type)}</div>`
+        + notesHtml;
 
       tooltip
         .style('display', 'block')
-        .html(notesHtml)
+        .html(html)
         .style('left', (event.pageX + 12) + 'px')
         .style('top', (event.pageY - 10) + 'px');
     })
@@ -1353,6 +1352,16 @@ function buildNotesHtml(notes: string[]): string {
   return `<div class="es-tooltip-notes"><div class="es-tooltip-notes-label">Notes</div><ul>${
     notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')
   }</ul></div>`;
+}
+
+function formatNodeType(type: string): string {
+  const labels: Record<string, string> = {
+    event: 'Domain Event', command: 'Command', aggregate: 'Aggregate',
+    actor: 'Actor', policy: 'Policy', readModel: 'Read Model',
+    externalSystem: 'External System', tempObject: 'Object', note: 'Note',
+    query: 'Query', view: 'View', error: 'Error',
+  };
+  return labels[type] ?? type;
 }
 
 // ─── Color Helpers ─────────────────────────────────────────

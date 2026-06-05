@@ -424,14 +424,14 @@ describe('renderEventStorming layout', () => {
 
     const tooltip = document.body.querySelector('.es-tooltip');
     expect(tooltip).toBeTruthy();
+    expect(tooltip!.innerHTML).toContain('PlaceOrder');
+    expect(tooltip!.innerHTML).toContain('Command');
     expect(tooltip!.innerHTML).toContain('Requires manager approval');
     expect(tooltip!.innerHTML).toContain('Audit this action');
-    expect(tooltip!.innerHTML).not.toContain('PlaceOrder');
-    expect(tooltip!.innerHTML).not.toContain('command');
     expect(tooltip!.innerHTML).not.toContain('in: Order');
   });
 
-  it('does not show a tooltip for nodes without notes', () => {
+  it('shows a tooltip with node name for nodes without notes', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -444,7 +444,8 @@ describe('renderEventStorming layout', () => {
 
     const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
     expect(tooltip).toBeTruthy();
-    expect(tooltip!.style.display).toBe('none');
+    expect(tooltip!.style.display).toBe('block');
+    expect(tooltip!.innerHTML).toContain('CancelOrder');
   });
 
   it('shows a note icon and tooltip for process groups with notes', () => {
