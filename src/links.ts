@@ -11,19 +11,43 @@ export function computeLinkPath(
   type: string,
   isNegative: boolean = false,
 ): string {
-  if (isNegative) {
+  // Negative links (altNext branches) use 90-degree orthogonal routing:
+  // down → sideways → down to target (half-way bend avoids crossing intermediate nodes).
+  const isNeg = isNegative || type === 'negative';
+  if (isNeg) {
     const sourceCenterX = source.x + NODE_W / 2;
-    const sourceBottomY = source.y + NODE_H;
     const targetCenterX = target.x + NODE_W / 2;
-    const targetTopY = target.y;
 
-    return `M ${sourceCenterX} ${sourceBottomY} L ${targetCenterX} ${targetTopY}`;
+    if (source.y < target.y) {
+      // Target below: bottom-center → half-way → sideways → down to top of target
+      const sourceBottomY = source.y + NODE_H;
+      const targetTopY = target.y;
+      const midY = sourceBottomY + (targetTopY - sourceBottomY) / 2;
+
+      if (sourceCenterX === targetCenterX) {
+        return `M ${sourceCenterX} ${sourceBottomY} L ${targetCenterX} ${targetTopY}`;
+      }
+      return `M ${sourceCenterX} ${sourceBottomY} L ${sourceCenterX} ${midY} L ${targetCenterX} ${midY} L ${targetCenterX} ${targetTopY}`;
+    }
+
+    // Target above: top-center → half-way → sideways → up to bottom of target
+    const sourceTopY = source.y;
+    const targetBottomY = target.y + NODE_H;
+    const midY = sourceTopY + (targetBottomY - sourceTopY) / 2;
+
+    if (sourceCenterX === targetCenterX) {
+      return `M ${sourceCenterX} ${sourceTopY} L ${targetCenterX} ${targetBottomY}`;
+    }
+    return `M ${sourceCenterX} ${sourceTopY} L ${sourceCenterX} ${midY} L ${targetCenterX} ${midY} L ${targetCenterX} ${targetBottomY}`;
   }
 
-   // Same column, target below: draw straight vertical arrow (bottom-center → top-center)
-  if (source.x === target.x && source.y < target.y) {
+   // Same column: draw straight vertical arrow (bottom-center → top-center or vice versa)
+  if (source.x === target.x) {
     const cx = source.x + NODE_W / 2;
-    return `M ${cx} ${source.y + NODE_H} L ${cx} ${target.y}`;
+    if (source.y < target.y) {
+      return `M ${cx} ${source.y + NODE_H} L ${cx} ${target.y}`;
+    }
+    return `M ${cx} ${source.y} L ${cx} ${target.y + NODE_H}`;
   }
 
   const sourceIsLeft = source.x <= target.x;
@@ -62,6 +86,12 @@ export function computeLinkPath(
   return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
 }
 
+function dist(x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 export function getPointOnPath(d: string, t: number): { x: number; y: number } {
    // Handle cubic bezier
   const bezierMatch = d.match(/M ([\d.]+) ([\d.]+) C ([\d.]+) ([\d.]+), ([\d.]+) ([\d.]+), ([\d.]+) ([\d.]+)/);
@@ -76,6 +106,38 @@ export function getPointOnPath(d: string, t: number): { x: number; y: number } {
       y: u*u*u*y0 + 3*u*u*t*cy1 + 3*u*t*t*cy2 + t*t*t*y3,
      };
    }
+
+   // Handle polylines (M ... L ... L ...) — walk segments by length
+  const coords = d.match(/[\d.]+/g)?.map(Number);
+  if (coords && coords.length >= 4) {
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i < coords.length; i += 2) {
+      if (i + 1 < coords.length) pts.push([coords[i], coords[i + 1]]);
+    }
+    if (pts.length >= 2) {
+      const segLens: number[] = [];
+      let totalLen = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const len = dist(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+        segLens.push(len);
+        totalLen += len;
+       }
+      const targetT = t * totalLen;
+      let acc = 0;
+      for (let i = 0; i < segLens.length; i++) {
+        if (acc + segLens[i] >= targetT) {
+          const localT = segLens[i] > 0 ? (targetT - acc) / segLens[i] : 0;
+          return {
+            x: pts[i][0] + (pts[i + 1][0] - pts[i][0]) * localT,
+            y: pts[i][1] + (pts[i + 1][1] - pts[i][1]) * localT,
+           };
+          }
+        acc += segLens[i];
+       }
+      return { x: pts[pts.length - 1][0], y: pts[pts.length - 1][1] };
+     }
+   }
+
    // Fallback: straight line
   const lineMatch = d.match(/M ([\d.]+) ([\d.]+) L ([\d.]+) ([\d.]+)/);
   if (lineMatch) {

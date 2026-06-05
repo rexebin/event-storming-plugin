@@ -64,7 +64,7 @@ This creates a `.vsix` file that can be shared or installed using **Extensions: 
 
 ## Usage on GitHub
 
-In any Markdown file (README, issue, PR comment, wiki), write a fenced code block with language `xml` or `eventstorming`. The extension replaces the block with an interactive diagram inline.
+In any Markdown file (README, issue, PR comment, wiki), write a fenced code block using either DSL format. The extension replaces the block with an interactive diagram inline.
 
 ### XML DSL
 
@@ -186,7 +186,7 @@ Rendered:
           <error name="Rejected Exception?" noNext="true"></error>
           <policy name="Have reached max retries?" altNext="Failed Exception" />
           <command name="Record Failed Attempt" altNext="Failed Exception" />
-          <error name="Failed Exception" noNext="true"></error>
+          <error name="Failed Exception"></error>
       </container>
   </aggregate>
   <aggregate name="User">
@@ -210,7 +210,7 @@ Rendered:
       <container name="Shower">
           <command name="Have Shower" />
           <policy name="Is the shower running?" next="Have shower gel?" altNext="Switch on shower" />
-          <externalSystem name="Switch on shower" noNext="true" />
+          <externalSystem name="Switch on shower" />
           <policy name="Have shower gel?" altNext="Go Buy Shower Gel" />
           <error name="Go Buy Shower Gel" noNext="true" />
           <event name="Had Shower" />
