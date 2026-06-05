@@ -1,5 +1,10 @@
 .gitignore
 .copilot/**
+.claude/**
+.codegraph/**
+.idea/**
+.remember/**
+.serena/**
 .git/**
 .github/**
 node_modules/**

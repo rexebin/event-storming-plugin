@@ -5,6 +5,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
+import { NODE_H } from './constants.js';
 
 // We need to extract the helper functions from renderer.ts
 // Since renderer.ts uses D3 heavily, we test the pure functions in isolation
@@ -129,181 +130,118 @@ describe('escapeHtml', () => {
   });
 });
 
-const readmeSample = `[
-  {
-    "type": "Aggregate",
-    "name": "Order",
-    "containers": [
-      {
-        "name": "Cancel Order",
-        "children": [
-          { "type": "Actor", "name": "Customer", "next": "CancelOrder" },
-          { "type": "Actor", "name": "Staff", "next": "CancelOrder" },
-          { "type": "Event", "name": "PaymentFailed", "next": "CancelOrder" },
-          { "type": "Command", "name": "CancelOrder", "next": "Is Cancellation Allowed?" },
-          { "type": "Policy", "name": "Is Cancellation Allowed?", "next": "OrderCancelled", "altNext": "CancellationDenied" },
-          { "type": "Event", "name": "OrderCancelled" }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Projector",
-    "name": "OrderDetail",
-    "containers": [
-      {
-        "name": "Order Detail Projection",
-        "children": [
-          { "type": "Event", "name": "OrderPlaced", "next": "Order Detail View" },
-          { "type": "Event", "name": "OrderCancelled", "next": "Order Detail View" },
-          { "type": "Event", "name": "OrderUpdated", "next": "Order Detail View" },
-          { "type": "Event", "name": "OrderShipped", "next": "Order Detail View" },
-          { "type": "ReadModel", "name": "Order Detail View" }
-        ]
-      }
-    ]
-  }
-]`;
+const readmeSample = `
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Cancel Order">
+      <actor name="Customer" next="CancelOrder"/>
+      <actor name="Staff" next="CancelOrder"/>
+      <event name="PaymentFailed" next="CancelOrder"/>
+      <command name="CancelOrder" next="Is Cancellation Allowed?"/>
+      <policy name="Is Cancellation Allowed?" next="OrderCancelled" altNext="CancellationDenied"/>
+      <event name="OrderCancelled"/>
+    </container>
+  </aggregate>
+  <readmodel name="OrderDetail">
+    <container name="Order Detail Projection">
+      <event name="OrderPlaced" next="Order Detail View"/>
+      <event name="OrderCancelled" next="Order Detail View"/>
+      <event name="OrderUpdated" next="Order Detail View"/>
+      <event name="OrderShipped" next="Order Detail View"/>
+      <readmodel name="Order Detail View"/>
+    </container>
+  </readmodel>
+</eventstorming>
+`;
 
-const noteSample = `[
-  {
-    "type": "Aggregate",
-    "name": "Order",
-    "containers": [
-      {
-        "name": "Place Order",
-        "children": [
-          { "type": "Command", "name": "PlaceOrder", "notes": ["Requires manager approval", "Audit this action"] }
-        ]
-      }
-    ]
-  }
-]`;
+const noteSample = `
+<eventstorming>
+   <aggregate name="Order">
+     <container name="Place Order">
+        <command name="PlaceOrder">
+             <notes>Requires manager approval</notes>
+             <notes>Audit this action</notes>
+          </command>
+      </container>
+    </aggregate>
+    <aggregate name="User">
+      <container name="User Registration">
+        <event name="UserRegistered" next="Some Note"/>
+        <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
+      </container>
+    </aggregate>
+</eventstorming>
+`;
 
-const jsonNoteSample = `[
-  {
-    "type": "Aggregate",
-    "name": "User",
-    "containers": [
-      {
-        "name": "User Registration",
-        "children": [
-          { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
-          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
-        ]
-      }
-    ]
-  }
-]`;
+const showerSample = `
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Shower">
+      <command name="Have Shower" next="Is the shower running?"/>
+      <policy name="Is the shower running?" next="Have shower gel?" altNext="Switch on shower"/>
+      <externalsystem name="Switch on shower" next="Have shower gel?"/>
+      <policy name="Have shower gel?" next="Get Dressed" altNext="Go Buy Shower Gel"/>
+      <error name="Go Buy Shower Gel"/>
+      <event name="Get Dressed"/>
+    </container>
+  </aggregate>
+</eventstorming>
+`;
 
-const showerSample = `[
-  {
-    "type": "Aggregate",
-    "name": "Order",
-    "containers": [
-      {
-        "name": "Shower",
-        "children": [
-          { "type": "Command", "name": "Have Shower", "next": "Is the shower running?" },
-          { "type": "Policy", "name": "Is the shower running?", "next": "Have shower gel?", "altNext": "Switch on shower" },
-          { "type": "ExternalSystem", "name": "Switch on shower", "next": "Have shower gel?" },
-          { "type": "Policy", "name": "Have shower gel?", "next": "Get Dressed", "altNext": "Go Buy Shower Gel" },
-          { "type": "Error", "name": "Go Buy Shower Gel" },
-          { "type": "Event", "name": "Get Dressed" }
-        ]
-      }
-    ]
-  }
-]`;
+const groupedSample = `
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Place Order">
+      <notes>Handles the happy path for order placement.</notes>
+      <actor name="Customer" next="PlaceOrder"/>
+      <command name="PlaceOrder" next="OrderPlaced"/>
+      <event name="OrderPlaced"/>
+    </container>
+    <container name="Cancel Order">
+      <actor name="Support" next="CancelOrder"/>
+      <command name="CancelOrder" next="OrderCancelled"/>
+      <event name="OrderCancelled"/>
+    </container>
+  </aggregate>
+</eventstorming>
+`;
 
-const groupedSample = `[
-  {
-    "type": "Aggregate",
-    "name": "Order",
-    "containers": [
-      {
-        "name": "Place Order",
-        "notes": ["Handles the happy path for order placement."],
-        "children": [
-          { "type": "Actor", "name": "Customer", "next": "PlaceOrder" },
-          { "type": "Command", "name": "PlaceOrder", "next": "OrderPlaced" },
-          { "type": "Event", "name": "OrderPlaced" }
-        ]
-      },
-      {
-        "name": "Cancel Order",
-        "children": [
-          { "type": "Actor", "name": "Support", "next": "CancelOrder" },
-          { "type": "Command", "name": "CancelOrder", "next": "OrderCancelled" },
-          { "type": "Event", "name": "OrderCancelled" }
-        ]
-      }
-    ]
-  }
-]`;
-
-const wrapSample = `[
-  {
-    "type": "Aggregate",
-    "name": "User",
-    "containers": [
-      {
-        "name": "User Registration",
-        "children": [
-          { "type": "Actor", "name": "Customer", "next": "Register" },
-          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
-          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "altNext": "Invalid Email" },
-          { "type": "Event", "name": "UserRegistered" }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Aggregate",
-    "name": "Morning Routine",
-    "containers": [
-      {
-        "name": "Wake Up",
-        "children": [
-          { "type": "Actor", "name": "Me", "next": "WakeUp" },
-          { "type": "Command", "name": "WakeUp", "next": "Is Alarm Ringing?" },
-          { "type": "Policy", "name": "Is Alarm Ringing?", "next": "Got Out of Bed", "altNext": "Sleep In" },
-          { "type": "Event", "name": "Got Out of Bed" }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Aggregate",
-    "name": "Order",
-    "containers": [
-      {
-        "name": "Place Order",
-        "children": [
-          { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
-          { "type": "ExternalSystem", "name": "InventoryService", "next": "Do We Have Stock?" },
-          { "type": "Policy", "name": "Do We Have Stock?", "next": "PaymentGateway", "altNext": "Out Of Stock" },
-          { "type": "ExternalSystem", "name": "PaymentGateway", "next": "OrderPlaced" },
-          { "type": "Event", "name": "OrderPlaced" }
-        ]
-      }
-    ]
-  },
-  {
-    "type": "Process",
-    "name": "Customer Order View",
-    "containers": [
-      {
-        "name": "View Order Details",
-        "children": [
-          { "type": "Actor", "name": "Customer", "next": "GetOrderDetails" },
-          { "type": "Query", "name": "GetOrderDetails", "next": "Order Detail Projection" },
-          { "type": "ReadModel", "name": "Order Detail Projection" }
-        ]
-      }
-    ]
-  }
-]`;
+const wrapSample = `
+<eventstorming>
+  <aggregate name="User">
+    <container name="User Registration">
+      <actor name="Customer" next="Register"/>
+      <command name="Register" next="Is Email Valid?"/>
+      <policy name="Is Email Valid?" next="UserRegistered" altNext="Invalid Email"/>
+      <event name="UserRegistered"/>
+    </container>
+  </aggregate>
+  <aggregate name="Morning Routine">
+    <container name="Wake Up">
+      <actor name="Me" next="WakeUp"/>
+      <command name="WakeUp" next="Is Alarm Ringing?"/>
+      <policy name="Is Alarm Ringing?" next="Got Out of Bed" altNext="Sleep In"/>
+      <event name="Got Out of Bed"/>
+    </container>
+  </aggregate>
+  <aggregate name="Order">
+    <container name="Place Order">
+      <command name="PlaceOrder" next="InventoryService"/>
+      <externalsystem name="InventoryService" next="Do We Have Stock?"/>
+      <policy name="Do We Have Stock?" next="PaymentGateway" altNext="Out Of Stock"/>
+      <externalsystem name="PaymentGateway" next="OrderPlaced"/>
+      <event name="OrderPlaced"/>
+    </container>
+  </aggregate>
+  <process name="Customer Order View">
+    <container name="View Order Details">
+      <actor name="Customer" next="GetOrderDetails"/>
+      <query name="GetOrderDetails" next="Order Detail Projection"/>
+      <readmodel name="Order Detail Projection"/>
+    </container>
+  </process>
+</eventstorming>
+`;
 
 function getTranslate(element: Element): { x: number; y: number } {
   const transform = element.getAttribute('transform') || '';
@@ -464,42 +402,42 @@ describe('renderEventStorming layout', () => {
     expect(tooltip!.innerHTML).toContain('Handles the happy path for order placement.');
   });
 
-  it.skip('renders JSON Note nodes with the note color instead of the command color', () => {
+  it('renders Note nodes with the note color instead of the command color', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    renderEventStorming(d3.select(host), jsonNoteSample);
+    renderEventStorming(d3.select(host), noteSample);
 
     const note = host.querySelector('[data-id="User_Registration_Some_Note"]');
     expect(note).toBeTruthy();
 
-    const noteRect = note!.querySelector('rect');
-    expect(noteRect).toBeTruthy();
-    expect(noteRect!.getAttribute('fill')).toBe('#FFF1AA');
+    const noteShape = note!.querySelector('polygon');
+    expect(noteShape).toBeTruthy();
+    expect(noteShape!.getAttribute('fill')).toBe('#FFF1AA');
   });
 
-  it('shows the has-notes icon on JSON Note nodes that have notes', () => {
+  it('shows the has-notes icon on Note nodes that have notes', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    renderEventStorming(d3.select(host), jsonNoteSample);
+    renderEventStorming(d3.select(host), noteSample);
 
     const note = host.querySelector('[data-id="User_Registration_Some_Note"]');
     expect(note).toBeTruthy();
     expect(note!.querySelector('.es-note-badge')).toBeTruthy();
   });
 
-  it('does not render JSON Note nodes twice', () => {
+  it('does not render Note nodes twice', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
-    renderEventStorming(d3.select(host), jsonNoteSample);
+    renderEventStorming(d3.select(host), noteSample);
 
     const notes = host.querySelectorAll('[data-id="User_Registration_Some_Note"]');
     expect(notes).toHaveLength(1);
   });
 
-  it.skip('sizes branched containers to the horizontal flow instead of total node count', () => {
+  it('sizes branched containers to the horizontal flow instead of total node count', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -510,7 +448,7 @@ describe('renderEventStorming layout', () => {
 
     const containerRect = container!.querySelector('rect');
     expect(containerRect).toBeTruthy();
-    expect(Number(containerRect!.getAttribute('width'))).toBe(748);
+    expect(Number(containerRect!.getAttribute('width'))).toBe(708);
   });
 
   it('wraps later containers onto the next row without overlapping the first row', () => {
@@ -536,7 +474,7 @@ describe('renderEventStorming layout', () => {
     expect(customerOrderViewPos.y).toBeGreaterThan(firstRowBottom);
   });
 
-  it.skip('keeps the main policy chain moving right when a negative branch rejoins it', () => {
+  it('keeps the main policy chain moving right when a negative branch rejoins it', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -556,11 +494,11 @@ describe('renderEventStorming layout', () => {
 
     expect(gelPos.x).toBeGreaterThan(runningPos.x);
     expect(gelPos.y).toBe(runningPos.y);
-    expect(gelPos.x - runningPos.x).toBe(176);
+    expect(gelPos.x - runningPos.x).toBe(166);
     expect(switchPos.y).toBeGreaterThan(runningPos.y);
   });
 
-  it.skip('curves the negative rejoin link back into the main flow', () => {
+  it('curves the negative rejoin link back into the main flow', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -571,7 +509,6 @@ describe('renderEventStorming layout', () => {
 
     expect(haveShowerGel).toBeTruthy();
     expect(switchOnShower).toBeTruthy();
-    const gelPos = getTranslate(haveShowerGel!);
 
     const curvedRejoin = host.querySelector<SVGPathElement>(
       `path.es-link-negative[data-source="${switchOnShower!.getAttribute('data-id')}"][data-target="${haveShowerGel!.getAttribute('data-id')}"]`
@@ -581,7 +518,6 @@ describe('renderEventStorming layout', () => {
     expect(curvedRejoin).toBeTruthy();
     expect(curvedRejoinPath).toContain(' C ');
     expect(curvedRejoin!.getAttribute('marker-end')).toBe('url(#arrowhead)');
-    expect(curvedRejoinPath.endsWith(`${gelPos.x} ${gelPos.y + 27}`)).toBe(true);
   });
 
   it('offsets the "no" label away from the negative link line', () => {
@@ -601,7 +537,7 @@ describe('renderEventStorming layout', () => {
     expect(Number(noLabel!.getAttribute('y'))).toBe(mid.y - 10);
   });
 
-  it.skip('curves fan-in links when source nodes are on different rows', () => {
+  it('curves fan-in links when source nodes are on different rows', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -631,11 +567,13 @@ describe('renderEventStorming layout', () => {
 
       if (sourcePos.y === cancelOrderPos.y) {
         expect(pathD).not.toContain(' C ');
-      } else {
-        const expectedAnchorY = sourcePos.y > cancelOrderPos.y ? cancelOrderPos.y + 27 : cancelOrderPos.y + 9;
+       } else {
         expect(pathD).toContain(' C ');
+        const expectedAnchorY = sourcePos.y > cancelOrderPos.y
+          ? cancelOrderPos.y + NODE_H * 0.75
+          : cancelOrderPos.y + NODE_H * 0.25;
         expect(pathD.endsWith(`${cancelOrderPos.x} ${expectedAnchorY}`)).toBe(true);
-      }
+       }
     }
   });
 

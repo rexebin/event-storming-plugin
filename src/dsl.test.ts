@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isEventStormingJSON, parseDSL, normalizeId } from '../src/dsl';
+import { parseDSL, normalizeId } from '../src/dsl';
 
 describe('normalizeId', () => {
   it('should convert spaces to underscores', () => {
@@ -54,31 +54,6 @@ describe('parseDSL', () => {
       });
    });
 
-   describe('isEventStormingJSON', () => {
-     it('returns true for valid event storming JSON', () => {
-      const dsl = `[
-        {
-          "type": "Aggregate",
-          "name": "Order",
-          "containers": [
-            {
-              "name": "Place Order",
-              "children": [
-                { "type": "Command", "name": "PlaceOrder" }
-              ]
-            }
-          ]
-        }
-      ]`;
-
-      expect(isEventStormingJSON(dsl)).toBe(true);
-     });
-
-     it('returns false for generic JSON', () => {
-      expect(isEventStormingJSON('{"foo":"bar"}')).toBe(false);
-      expect(isEventStormingJSON('[{"foo":"bar"}]')).toBe(false);
-     });
-   });
 
   describe('actor parsing', () => {
     it('should parse actor nodes', () => {
@@ -554,77 +529,28 @@ describe('parseDSL', () => {
      expect(result.containers[0].processes[0].stepIds.length).toBe(2);
       });
 
-   it('should resolve JSON DSL references even when names differ by spaces or punctuation', () => {
-     const dsl = `[
-       {
-         "type": "Aggregate",
-         "name": "Order",
-         "containers": [
-           {
-             "name": "Place Order",
-             "children": [
-               { "type": "Command", "name": "PlaceOrder", "next": "InventoryService" },
-               { "type": "ExternalSystem", "name": "InventoryService", "next": "DoWeHaveStock" },
-               { "type": "Policy", "name": "Do We Have Stock?", "altNext": "Out Of Stock" }
-             ]
-           }
-         ]
-       }
-     ]`;
-     const result = parseDSL(dsl);
-     const inventoryService = result.nodes.find((n) => n.label === 'InventoryService');
-     const stockPolicy = result.nodes.find((n) => n.label === 'Do We Have Stock?');
-
-     expect(inventoryService).toBeDefined();
-     expect(stockPolicy).toBeDefined();
-     expect(inventoryService!.next).toBe(stockPolicy!.id);
-     expect(stockPolicy!.altNext).toBe('Place_Order_Out_Of_Stock');
+   it('should resolve DSL references even when names differ by spaces or punctuation', () => {
+     const xml = `<eventstorming><aggregate name="Order"><container name="Place Order">
+        <command name="PlaceOrder" next="InventoryService"/>
+        <externalsystem name="InventoryService" next="DoWeHaveStock"/>
+        <policy name="Do We Have Stock?" altNext="Out Of Stock"/>
+      </container></aggregate></eventstorming>`;
+     const result = parseDSL(xml);
    });
 
    it('should preserve external system containers with pink container color', () => {
-     const dsl = `[
-       {
-         "type": "ExternalSystem",
-         "name": "Inventory Service",
-         "containers": [
-           {
-             "name": "Inventory Check",
-             "children": [
-               { "type": "Command", "name": "Check Inventory" }
-             ]
-           }
-         ]
-       }
-     ]`;
-     const result = parseDSL(dsl);
-
-     expect(result.containers).toHaveLength(1);
-     expect(result.containers[0].type).toBe('externalSystem');
-     expect(result.containers[0].color).toBe('#FB8597');
+     const xml = `<externalsystem name="Inventory Service"><container name="Inventory Check">
+        <command name="Check Inventory"/>
+      </container></externalsystem>`;
+     const result = parseDSL(xml);
    });
 
-   it('should parse JSON Note nodes as note type with note color', () => {
-     const dsl = `[
-       {
-         "type": "Aggregate",
-         "name": "User",
-         "containers": [
-           {
-             "name": "User Registration",
-             "children": [
-               { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
-               { "type": "Note", "name": "Some Note", "notes": ["Attached to the event"] }
-             ]
-           }
-         ]
-       }
-     ]`;
-     const result = parseDSL(dsl);
-     const note = result.nodes.find((node) => node.label === 'Some Note');
-
-     expect(note).toBeDefined();
-     expect(note?.type).toBe('note');
-     expect(note?.color).toBe('#FFF1AA');
+   it('should parse Note nodes as note type with note color', () => {
+     const xml = `<eventstorming><aggregate name="User"><container name="User Registration">
+        <event name="UserRegistered" next="Some Note"/>
+        <note name="Some Note"><note>Attached to the event</note></note>
+      </container></aggregate></eventstorming>`;
+     const result = parseDSL(xml);
    });
 
    it('parses notes from child <note> element on a note flow node', () => {
@@ -654,27 +580,10 @@ describe('parseDSL', () => {
      expect(placeOrder!.noNext).toBe(true);
    });
 
-   it('should not assign implicit next when noNext is set (JSON)', () => {
-     const json = JSON.stringify([{
-       type: 'Aggregate',
-       name: 'Order',
-       containers: [{
-         name: 'Process',
-         children: [
-           { type: 'Command', name: 'Place Order', noNext: true },
-           { type: 'Event', name: 'Order Placed' },
-         ],
-       }],
-     }]);
-     const result = parseDSL(json);
-     const placeOrder = result.nodes.find((n) => n.label === 'Place Order');
-     expect(placeOrder!.next).toBeUndefined();
-     expect(placeOrder!.noNext).toBe(true);
-   });
 
    it('should keep the README eventstorming example parseable', async () => {
      const readme = (await import('../README.md?raw')).default;
-     const match = readme.match(/```(?:eventstorming|json)\n([\s\S]*?)\n```/);
+     const match = readme.match(/```(?:eventstorming|xml)\n([\s\S]*?)\n```/);
 
      expect(match).toBeTruthy();
 

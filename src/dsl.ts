@@ -1,8 +1,4 @@
-/**
- * Event Storming DSL Parser
- *
- * ─── DSL Syntax ───────────────────────────────────────────
- */
+/**\n    * Event Storming DSL Parser\n    *\n    * Supports two input formats:\n    *   1. XML-based DSL (&lt;eventstorming&gt; ... &lt;/eventstorming&gt;)\n    *   2. Text-based DSL (e.g. "actor: Customer [purple]")\n    */
 
 export interface DSLNode {
   id: string;
@@ -97,29 +93,15 @@ const COLOR_MAP: Record<string, string> = {
 /**
  * Parse raw DSL text into a structured model.
  *
- * Supports three input formats:
- *  1. XML-based DSL (<eventstorming> ... </eventstorming>)
- *  2. JSON array of containers (from dsl-type.ts spec)
- *  3. Text-based DSL (e.g. "actor: Customer [purple]")
+ * Supports two input formats:
+ *  1. XML-based DSL (&lt;eventstorming&gt; ... &lt;/eventstorming&gt;)
+ *  2. Text-based DSL (e.g. "actor: Customer [purple]")
  */
 export function parseDSL(text: string): DSLModel {
   // Try XML format first
   if (isEventStormingXML(text)) {
     return parseXMLDSL(text);
   }
-
- // Try JSON format (dsl-type.ts spec)
- const trimmed = text.trim();
- if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-   try {
-     const parsed = JSON.parse(trimmed);
-     if (isEventStormingJSONValue(parsed)) {
-       return parseJSONDSL(parsed);
-     }
-   } catch {
-     // Fall through to text-based parser
-   }
- }
 
   const model: DSLModel = {
   title: 'Event Storming',
@@ -431,41 +413,6 @@ const DEFAULT_COLORS: Record<NodeType, string> = {
   error: '#8DCFF9',
 };
 
-// ─── JSON DSL (dsl-type.ts spec) ───────────────────────────
-
-interface JSONNode {
-  type: string;
-  name: string;
-  next?: string;
-  noNext?: boolean;
-  altNext?: string;
-  notes?: string[];
-}
-
-interface JSONContainerNode {
-  name: string;
-  notes?: string[];
-  children: (JSONNode | JSONContainerNode)[];
-}
-
-interface JSONDiagram {
-  type: string;
-  name: string;
-  notes?: string[];
-  containers: JSONContainerNode[];
-}
-
-export function isEventStormingJSON(text: string): boolean {
-  const trimmed = text.trim();
-  if (!(trimmed.startsWith('[') || trimmed.startsWith('{'))) return false;
-
-  try {
-    return isEventStormingJSONValue(JSON.parse(trimmed));
-  } catch {
-    return false;
-  }
-}
-
 export function isEventStormingXML(text: string): boolean {
   return text.includes('<eventstorming') && text.includes('</eventstorming>');
 }
@@ -492,6 +439,7 @@ function parseXMLDSL(text: string): DSLModel {
     aggregate: 'aggregate',
     externalsystem: 'externalSystem',
     projector: 'readModel',
+    readmodel: 'readModel',
     process: 'process',
   };
 
@@ -546,8 +494,8 @@ function expandXMLContainer(
   collectXMLChildren(containerEl, dslContainer, model, prefix, aliases, stepIds, subGroups, pending);
 
   for (const { node, rawNext, rawNegativeNext, nodePrefix } of pending) {
-    node.next = resolveJSONReference(rawNext, nodePrefix, aliases, parentAliases);
-    node.altNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
+    node.next = resolveReference(rawNext, prefix, aliases, parentAliases);
+    node.altNext = resolveReference(rawNegativeNext, prefix, aliases, parentAliases);
   }
 
   fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
@@ -632,126 +580,10 @@ function collectXMLChildren(
 function xmlAttrNotes(el: Element): string[] {
   const attr = el.getAttribute('notes');
   const childNotes = Array.from(el.children)
-    .filter(c => c.tagName.toLowerCase() === 'note' && !c.getAttribute('name'))
+    .filter(c => ['note', 'notes'].includes(c.tagName.toLowerCase()) && !c.getAttribute('name'))
     .map(c => c.textContent?.trim() ?? '')
     .filter(Boolean);
   return attr ? [attr, ...childNotes] : childNotes;
-}
-
-function isEventStormingJSONValue(value: unknown): value is JSONDiagram[] {
-  return Array.isArray(value) && value.every(isJSONDiagram);
-}
-
-function isJSONDiagram(value: unknown): value is JSONDiagram {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.type === 'string' &&
-    typeof value.name === 'string' &&
-    Array.isArray(value.containers) &&
-    value.containers.every(isJSONContainerNode) &&
-    isStringArrayOrUndefined(value.notes)
-  );
-}
-
-function isJSONContainerNode(value: unknown): value is JSONContainerNode {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.name === 'string' &&
-    !('type' in value) &&
-    Array.isArray(value.children) &&
-    value.children.every(isJSONNodeOrContainer) &&
-    isStringArrayOrUndefined(value.notes)
-  );
-}
-
-function isJSONNodeOrContainer(value: unknown): value is JSONNode | JSONContainerNode {
-  return isJSONNode(value) || isJSONContainerNode(value);
-}
-
-function isJSONNode(value: unknown): value is JSONNode {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.type === 'string' &&
-    typeof value.name === 'string' &&
-    (value.next === undefined || typeof value.next === 'string') &&
-    (value.altNext === undefined || typeof value.altNext === 'string') &&
-    isStringArrayOrUndefined(value.notes)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isStringArrayOrUndefined(value: unknown): value is string[] | undefined {
-  return value === undefined || (Array.isArray(value) && value.every((item) => typeof item === 'string'));
-}
-
-/**
- * Map dsl-type.ts NodeType strings to internal NodeType.
- */
-function mapNodeType(type: string): NodeType {
-  const m: Record<string, NodeType> = {
-    Event: 'event',
-    Command: 'command',
-    Aggregate: 'aggregate',
-    Actor: 'actor',
-    Query: 'query',
-    Policy: 'policy',
-    Error: 'error',
-    ExternalSystem: 'externalSystem',
-    Note: 'note',
-    ReadModel: 'view',
-  };
-  return m[type] || 'command';
-}
-
-/**
- * Map dsl-type.ts ContainerType strings to internal container types.
- */
-function mapContainerType(type: string): 'aggregate' | 'readModel' | 'process' | 'externalSystem' {
-  const l = type.toLowerCase();
-  if (l === 'projector') return 'readModel';
-  if (l === 'externalsystem') return 'externalSystem';
-  if (l === 'process') return 'process';
-  return 'aggregate';
-}
-
-function parseJSONDSL(data: JSONDiagram[]): DSLModel {
-  const model: DSLModel = {
-    title: 'Event Storming',
-    description: '',
-    containers: [],
-    nodes: [],
-    links: [],
-  };
-
-  for (const diagram of data) {
-    const containerId = normalizeId(diagram.name);
-    const cType = mapContainerType(diagram.type);
-
-    const dslContainer: DSLContainer = {
-      id: containerId,
-      label: diagram.name,
-      type: cType,
-      color:
-        cType === 'aggregate' ? '#FEE254' :
-        cType === 'readModel' ? '#5BAA62' :
-        cType === 'externalSystem' ? '#FB8597' :
-        '#859EBF',
-      nodeIds: [],
-      processes: [],
-      notes: diagram.notes || [],
-    };
-
-    for (const container of diagram.containers) {
-      expandJSONContainer(container, dslContainer, model, normalizeId(container.name) + '_');
-    }
-
-    model.containers.push(dslContainer);
-  }
-
-  return model;
 }
 
 function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSubGroup[]): void {
@@ -782,82 +614,6 @@ function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSu
     }
   }
 }
-
-function expandJSONContainer(
-  container: JSONContainerNode,
-  dslContainer: DSLContainer,
-  model: DSLModel,
-  prefix: string,
-  parentAliases?: Map<string, string>
-): void {
-  const stepIds: string[] = [];
-  const subGroups: DSLSubGroup[] = [];
-  const aliases = new Map<string, string>();
-  const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
-
-  collectChildren(container, dslContainer, model, prefix, aliases, stepIds, subGroups, pending);
-
-  for (const { node, rawNext, rawNegativeNext, nodePrefix } of pending) {
-    node.next = resolveJSONReference(rawNext, nodePrefix, aliases, parentAliases);
-    node.altNext = resolveJSONReference(rawNegativeNext, nodePrefix, aliases, parentAliases);
-  }
-
-  fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
-
-  dslContainer.processes.push({
-    name: container.name,
-    stepIds,
-    notes: container.notes || [],
-    subGroups: subGroups.length > 0 ? subGroups : undefined,
-  });
-}
-
-function collectChildren(
-  container: JSONContainerNode,
-  dslContainer: DSLContainer,
-  model: DSLModel,
-  prefix: string,
-  aliases: Map<string, string>,
-  stepIds: string[],
-  subGroups: DSLSubGroup[],
-  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }>
-): void {
-  for (const child of container.children) {
-    if (isJSONNode(child)) {
-      const id = prefix + normalizeId(child.name);
-      const type = mapNodeType(child.type);
-      const n: DSLNode = {
-        id,
-        label: child.name,
-        type,
-        color: DEFAULT_COLORS[type] || '#6a737d',
-        containerId: dslContainer.id,
-        processIndex: -1,
-        noteTarget: null,
-        next: undefined,
-        noNext: child.noNext || undefined,
-        altNext: undefined,
-        altNextText: child.altNext || undefined,
-        notes: child.notes || [],
-      };
-      model.nodes.push(n);
-      pending.push({ node: n, rawNext: child.next, rawNegativeNext: child.altNext, nodePrefix: prefix });
-      aliases.set(canonicalizeReference(child.name), id);
-      dslContainer.nodeIds.push(id);
-      stepIds.push(id);
-    } else {
-      // Sub-container: inline-expand into the parent process flow
-      const subPrefix = prefix + normalizeId(child.name) + '_';
-      const subStepIds: string[] = [];
-      collectChildren(child, dslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending);
-      for (const id of subStepIds) stepIds.push(id);
-      subGroups.push({ name: child.name, nodeIds: subStepIds, notes: child.notes || [] });
-    }
-  }
-}
-
-// ─── Helpers ─────────────────────────────────────────────
-
 export function normalizeId(text: string): string {
   return text.replace(/[^a-zA-Z0-9]/g, '_');
 }
@@ -866,24 +622,20 @@ function canonicalizeReference(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function resolveJSONReference(
+function resolveReference(
   reference: string | undefined,
   prefix: string,
   aliases: Map<string, string>,
   parentAliases?: Map<string, string>
 ): string | undefined {
   if (!reference) return undefined;
-
   const key = canonicalizeReference(reference);
-
   const localMatch = aliases.get(key);
   if (localMatch) return localMatch;
-
   if (parentAliases) {
     const parentMatch = parentAliases.get(key);
     if (parentMatch) return parentMatch;
   }
-
   return prefix + normalizeId(reference);
 }
 

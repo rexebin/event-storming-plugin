@@ -5,7 +5,7 @@ A **browser extension** (Manifest V3) and **VS Code Markdown preview extension**
 ## Features
 
 - 🎨 Full event storming visual language: events, commands, queries, aggregates, actors, policies, views, read models, external systems, errors, and note nodes
-- 📦 Container-based layout: JSON DSL containers render as visual boxes for aggregates, external systems, read models, and process containers
+- 📦 Container-based layout: XML DSL containers render as visual boxes for aggregates, external systems, read models, and process containers
 - 🗂️ Nested process groups: each child group renders inside a dashed sub-container with the group name in the top-left corner
 - ⬅️→ Left-to-right process flows: actor → command/query/policy → event inside containers, with policy failure branches rendered below
 - ↘️ Directional arrows with shared-target fan-in layouts for commands and views
@@ -64,7 +64,7 @@ This creates a `.vsix` file that can be shared or installed using **Extensions: 
 
 ## Usage on GitHub
 
-In any Markdown file (README, issue, PR comment, wiki), write a fenced code block using either DSL format. The extension replaces the block with an interactive diagram inline.
+In any Markdown file (README, issue, PR comment, wiki), write a fenced code block with language `xml` or `eventstorming`. The extension replaces the block with an interactive diagram inline.
 
 ### XML DSL
 
@@ -276,130 +276,46 @@ Rendered:
 </eventstorming>
 ```
 
-### JSON DSL
-
-Use a ` ```json ` block. JSON gives editors full schema validation and autocompletion.
-
-```text
-[
-  {
-    "type": "Aggregate",
-    "name": "User",
-    "containers": [
-      {
-        "name": "User Registration",
-        "children": [
-          { "type": "Actor", "name": "Customer1" },
-          { "type": "Command", "name": "Register" },
-          { "type": "Policy", "name": "Is Email Valid?", "altNext": "Invalid Email" },
-          { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
-          { "type": "Event", "name": "UserRegistered" },
-          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
-        ]
-      }
-    ]
-  }
-]
-```
-
-Rendered:
-
-```json
-[
-  {
-    "type": "Aggregate",
-    "name": "User",
-    "containers": [
-      {
-        "name": "User Registration",
-        "children": [
-          { "type": "Actor", "name": "Customer1" },
-          { "type": "Command", "name": "Register" },
-          { "type": "Policy", "name": "Is Email Valid?", "altNext": "Invalid Email" },
-          { "type": "Error", "name": "Invalid Email", "noNext": true, "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
-          { "type": "Event", "name": "UserRegistered" },
-          { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
-        ]
-      }
-    ]
-  }
-]
-```
-
-Supported diagram types are `Aggregate`, `ExternalSystem`, `Projector`, and `Process`.
-
-## Usage in VS Code
-
-Open a Markdown file containing an `eventstorming` fenced block or a matching `json` fenced block, then run **Markdown: Open Preview to the Side**.
-
-The built-in Markdown preview keeps normal Markdown rendering and replaces matching blocks with the diagram UI.
-
-> **Note:** The current VS Code integration targets the desktop Markdown preview.
-
 ## DSL Reference
 
-The current DSL is JSON. Its shape matches the implementation in `src/dsl-type.ts`:
+### Node Types
 
-```ts
-enum DiagramType {
-  Aggregate = "Aggregate",
-  ExternalSystem = "ExternalSystem",
-  Projector = "Projector",
-  Process = "Process",
-}
+| XML Element      | Event Storming Type | Color              |
+| ---------------- | ------------------- | ------------------ |
+| `<event>`        | Domain Event        | Orange             |
+| `<command>`      | Command             | Light Green        |
+| `<query>`        | Query               | Dark Green         |
+| `<aggregate>`    | Aggregate           | Yellow             |
+| `<projector>`    | Projector (View)    | Yellow             |
+| `<actor>`        | Actor               | Gray               |
+| `<policy>`       | Policy              | Blue               |
+| `<error>`        | Error               | Cyan               |
+| `<externalSystem>` | External System   | Pink               |
+| `<readModel>`    | Read Model          | Dark Green         |
+| `<note>`         | Note                | Light Yellow       |
 
-enum NodeType {
-  Aggregate = "Aggregate",
-  Actor = "Actor",
-  Command = "Command",
-  Event = "Event",
-  Query = "Query",
-  Policy = "Policy",
-  Error = "Error",
-  ExternalSystem = "ExternalSystem",
-  Note = "Note",
-  ReadModel = "ReadModel",
-}
+### Attributes
 
-interface Diagram {
-  type: DiagramType;
-  name: string;
-  notes?: string[];
-  containers: Container[];
-}
+- `name` — the label shown on the node
+- `next` — links to another node in the same container and renders to the **right**. **`next` is optional** — if omitted, the node automatically connects to the immediately following sibling in the container, so you only need to set it when jumping non-sequentially.
+- `altNext` — used for policy failure paths and renders **below** the policy. When a policy has an `altNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
+- `noNext` — marks a node as the end of a chain (no outgoing link). Set to `true` e.g. `noNext="true"`.
+- `<note>...</note>` — child element to attach one or more notes to any node. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
 
-interface Container {
-  name: string;
-  notes?: string[];
-  children: (Node | Container)[];
-}
+### Diagram Types
 
-interface Node {
-  type: NodeType;
-  name: string;
-  next?: string;
-  altNext?: string;
-  notes?: string[];
-}
-```
+The top-level elements define the diagram layout container:
 
-### Schema Notes
-
-- The top-level array contains `Diagram` objects, each rendered as a labelled outer box.
-- `containers` defines named process groups inside a diagram, rendered as dashed sub-boxes.
-- `children` inside a container holds `Node` elements or nested `Container` elements (recursive nesting supported).
-- `next` links to another node in the same container and renders to the **right**. **`next` is optional** — if omitted, the node automatically connects to the immediately following sibling in the container, so you only need to set it when jumping non-sequentially.
-- When a node has a `altNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
-- `altNext` is used for policy failure paths and renders **below** the policy.
-- If a policy omits a matching negative-path node, the renderer creates a default error node.
-- Notes can be added to diagrams, containers, or nodes. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip. In the XML DSL, add one or more `<note>` child elements (without a `name` attribute) to attach notes; in the JSON DSL, use the `notes` string array.
-- `Note` is a supported node type and renders as a light-yellow note node rather than a command. In the XML DSL a note node requires a `name` attribute: `<note name="My Note" />`.
+- `<aggregate>` — represents an aggregate root; containers inside render as grouped boxes
+- `<externalSystem>` — represents an external system
+- `<projector>` — represents a projector/view
+- `<process>` — represents a business process
 
 ### Recursive Containers
 
-A container's `children` array may mix `Node` elements with nested `Container` elements. Each nested container becomes its own labelled sub-group rendered inside the parent container.
+A container may include nested `<container>` elements. Each nested container becomes its own labelled sub-group rendered inside the parent container.
 
-However, the event storming diagram should be kept as flat as possible for readability, so use nested containers sparingly. They can be useful for grouping related sub-flows together, but too much nesting can make the diagram harder to read. 
+However, the event storming diagram should be kept as flat as possible for readability, so use nested containers sparingly. They can be useful for grouping related sub-flows together, but too much nesting can make the diagram harder to read.
 
 This extension only tests up to 2 levels of nesting.
 
@@ -471,7 +387,7 @@ Rendered:
 
 ### Testing
 
-73 tests (51 DSL + 22 renderer) using Vitest with jsdom:
+95 tests (54 DSL + 34 renderer + 5 block detection + 2 preview source) using Vitest with jsdom:
 
 ```bash
 npm test              # Run once

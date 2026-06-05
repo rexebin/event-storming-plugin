@@ -1,4 +1,4 @@
-import { isEventStormingJSON, isEventStormingXML } from './dsl.js';
+import { isEventStormingXML } from './dsl.js';
 
 export function normalizeBlockText(text: string): string {
   return text.replace(/^\`\`\`.*\n?/, '').replace(/\n?\`\`\`.*$/, '').trim();
@@ -9,9 +9,8 @@ export function shouldRenderCodeBlock(language: string | undefined, text: string
 
   const normalizedLanguage = language?.trim().toLowerCase();
   if (normalizedLanguage === 'eventstorming') return true;
-  if (normalizedLanguage === 'json') return isEventStormingJSON(text);
   if (normalizedLanguage === 'xml') return isEventStormingXML(text);
-  if (!normalizedLanguage) return isEventStormingJSON(text) || isEventStormingXML(text);
+  if (!normalizedLanguage) return isEventStormingXML(text);
 
   return false;
 }

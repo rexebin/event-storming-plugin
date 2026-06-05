@@ -2,7 +2,7 @@
  * Event Storming — GitHub Content Script
  *
  * Scans GitHub pages for fenced code blocks with language "eventstorming"
- * or JSON blocks that match the event storming schema, and replaces them
+ * or "xml" blocks that match the event storming schema, and replaces them
  * with rendered D3 diagrams.
  */
 
