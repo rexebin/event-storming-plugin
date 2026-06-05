@@ -44,17 +44,32 @@ function scanAndRender(): void {
   console.log(`[Event Storming] Found ${highlightDivs.length} <pre> blocks in .highlight`);
 
   for (const pre of highlightDivs) {
-  const parent = pre.parentElement;
-  // Skip if already rendered
-  if (parent?.getAttribute('data-es-rendered') === 'true') continue;
+    const parent = pre.parentElement;
+    if (parent?.getAttribute('data-es-rendered') === 'true') continue;
 
-   const langSpan = pre.querySelector('span.pl-en');
-   const language = langSpan?.textContent?.trim().toLowerCase();
-   const dslText = normalizeBlockText(pre.textContent || '');
+    const langSpan = pre.querySelector('span.pl-en');
+    const language = langSpan?.textContent?.trim().toLowerCase();
+    const dslText = normalizeBlockText(pre.textContent || '');
 
-   if (shouldRenderCodeBlock(language, dslText)) {
-     renderBlock(parent!, dslText);
-   }
+    if (shouldRenderCodeBlock(language, dslText)) {
+      renderBlock(parent!, dslText);
+    }
+  }
+
+  // GitHub also renders some code blocks as:
+  // <pre lang="eventstorming" class="notranslate"><code>...</code></pre>
+  const langPreBlocks = document.querySelectorAll<HTMLElement>('pre[lang]');
+
+  for (const pre of langPreBlocks) {
+    if (pre.getAttribute('data-es-rendered') === 'true') continue;
+
+    const language = pre.getAttribute('lang')?.trim().toLowerCase();
+    const codeEl = pre.querySelector('code');
+    const dslText = (codeEl?.textContent || pre.textContent || '').trim();
+
+    if (shouldRenderCodeBlock(language, dslText)) {
+      renderBlock(pre, dslText);
+    }
   }
 }
 

@@ -461,8 +461,10 @@ function computeLayout(model: DSLModel): LayoutResult {
          ? computeMaxSubGroupDepth(process.subGroups)
          : 0;
        const maxSubPad = SUB_PAD_BASE_PRE + maxSubDepth * NESTED_GAP_PRE;
-       // Match the bottom gap (GROUP_PADDING below sub-group bbox) on the top side too.
-       const topPad = Math.max(GROUP_PADDING, maxSubPad + GROUP_PADDING);
+       // Sub-group bbox top = node.y - SUB_PAD - GROUP_HEADER_H. For it to clear the outer
+       // process group's header (height GROUP_HEADER_H), topPad must be at least
+       // GROUP_HEADER_H + SUB_PAD + clearance.
+       const topPad = Math.max(GROUP_PADDING, maxSubPad + GROUP_HEADER_H + GROUP_PADDING);
        const groupInnerX = groupX + GROUP_PADDING;
        const groupInnerY = groupY + GROUP_HEADER_H + topPad;
        const processNodes = getProcessNodes(process, model);
@@ -496,6 +498,12 @@ function computeLayout(model: DSLModel): LayoutResult {
        } else {
        let laneY = groupInnerY;
        const startNodes = roots.length > 0 ? roots : processNodes;
+       // When sub-groups are present, sub-group boxes extend SUB_PAD below the last node of
+       // the upper lane and SUB_PAD + GROUP_HEADER_H above the first node of the lower lane.
+       // The inter-lane gap must be at least 2*SUB_PAD + GROUP_HEADER_H to prevent overlap.
+       const interLaneGapY = process.subGroups
+         ? Math.max(NODE_GAP_Y, 2 * SUB_PAD_BASE_PRE + GROUP_HEADER_H + 8)
+         : NODE_GAP_Y;
 
        for (const startNode of startNodes) {
          if (processPositioned.has(startNode.id)) continue;
@@ -513,7 +521,7 @@ function computeLayout(model: DSLModel): LayoutResult {
            subGroupOf
          );
          processBottom = Math.max(processBottom, laneBottom);
-         laneY = laneBottom + NODE_GAP_Y;
+         laneY = laneBottom + interLaneGapY;
        }
 
        for (const node of processNodes) {
@@ -532,7 +540,7 @@ function computeLayout(model: DSLModel): LayoutResult {
            subGroupOf
          );
          processBottom = Math.max(processBottom, laneBottom);
-         laneY = laneBottom + NODE_GAP_Y;
+         laneY = laneBottom + interLaneGapY;
        }
        }
 

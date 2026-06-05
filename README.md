@@ -255,6 +255,10 @@ interface Node {
 
 A container's `children` array may mix `Node` elements with nested `Container` elements. Each nested container becomes its own labelled sub-group rendered inside the parent container.
 
+However, the event storming diagram should be kept as flat as possible for readability, so use nested containers sparingly. They can be useful for grouping related sub-flows together, but too much nesting can make the diagram harder to read. 
+
+This extension only test up to 2 levels of nesting.
+
 ```json
 [
   {
