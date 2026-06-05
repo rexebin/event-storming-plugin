@@ -6,35 +6,31 @@
   <link rel="stylesheet" href="dist/style.css">
 </head>
 <body style="background:#f0f4f8;padding:20px">
-  <pre><code class="language-json">[
-  {
-    "type": "Aggregate",
-    "name": "Place Order",
-    "children": [
-      {
-        "name": "PlaceOrder",
-        "nodes": [
-          { "type": "Policy", "name": "IsAddressValid", "negativeNext": "addr_err", "note": "Validates address" },
-          { "type": "Policy", "name": "IsEmailValid", "negativeNext": "email_err" }
-        ],
-        "nodes_after": [
-          { "id": "addr_err", "type": "ReadModel", "name": "AddressIsInValid" },
-          { "id": "email_err", "type": "ReadModel", "name": "Email is invalid" }
-        ]
-      },
-      {
-        "name": "Another Sub Process",
-        "nodes": [
-          { "type": "Command", "name": "Do Something" },
-          { "type": "Policy", "name": "Is Something Valid?", "negativeNext": "some_err" }
-        ],
-        "nodes_after": [
-          { "id": "some_err", "type": "ReadModel", "name": "Something Is Invalid" }
-        ]
-      }
-    ]
-  }
-]</code></pre>
+  <pre lang="xml">&lt;eventstorming&gt;
+  &lt;aggregate name="User"&gt;
+    &lt;container name="User Registration"&gt;
+      &lt;actor name="Customer" /&gt;
+      &lt;command name="Register" /&gt;
+      &lt;policy name="Is Email Valid?" negativeNext="Invalid Email" /&gt;
+      &lt;error name="Invalid Email"&gt;&lt;note&gt;The email address provided is not valid.&lt;/note&gt;&lt;/error&gt;
+      &lt;event name="UserRegistered" /&gt;
+    &lt;/container&gt;
+  &lt;/aggregate&gt;
+  &lt;aggregate name="Order"&gt;
+    &lt;container name="Place Order"&gt;
+      &lt;command name="PlaceOrder" /&gt;
+      &lt;container name="Validate Order"&gt;
+        &lt;policy name="IsAddressValid" negativeNext="AddressIsInValid" /&gt;
+        &lt;policy name="IsEmailValid" negativeNext="Email is invalid" /&gt;
+        &lt;error name="AddressIsInValid"&gt;&lt;note&gt;The address provided is not valid.&lt;/note&gt;&lt;/error&gt;
+        &lt;error name="Email is invalid"&gt;&lt;note&gt;The email address is not valid.&lt;/note&gt;&lt;/error&gt;
+      &lt;/container&gt;
+      &lt;policy name="Is Payment Successful?" negativeNext="PaymentFailed" /&gt;
+      &lt;error name="PaymentFailed"&gt;&lt;note&gt;Payment failed, please try again.&lt;/note&gt;&lt;/error&gt;
+      &lt;event name="OrderPlaced" /&gt;
+    &lt;/container&gt;
+  &lt;/aggregate&gt;
+&lt;/eventstorming&gt;</pre>
   <script src="dist/content.js"></script>
 </body>
 </html>
