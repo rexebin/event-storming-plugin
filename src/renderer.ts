@@ -452,8 +452,18 @@ function computeLayout(model: DSLModel): LayoutResult {
        const groupX = innerX;
        const groupY = processY;
        const groupWidth = containerW - CONTAINER_PADDING * 2;
+       // When nested sub-groups exist, the outermost sub-group's bbox extends above its nodes
+       // by (SUB_PAD + GROUP_HEADER_H). Push the first row of nodes down so that bbox top
+       // still sits inside the process group.
+       const SUB_PAD_BASE_PRE = 8;
+       const NESTED_GAP_PRE = 14;
+       const maxSubDepth = process.subGroups
+         ? computeMaxSubGroupDepth(process.subGroups)
+         : 0;
+       const maxSubPad = SUB_PAD_BASE_PRE + maxSubDepth * NESTED_GAP_PRE;
+       const topPad = Math.max(GROUP_PADDING, maxSubPad + 4);
        const groupInnerX = groupX + GROUP_PADDING;
-       const groupInnerY = groupY + GROUP_HEADER_H + GROUP_PADDING;
+       const groupInnerY = groupY + GROUP_HEADER_H + topPad;
        const processNodes = getProcessNodes(process, model);
        const processNodeMap = new Map(processNodes.map((node) => [node.id, node]));
        const processPositioned = new Set<string>();
@@ -525,12 +535,12 @@ function computeLayout(model: DSLModel): LayoutResult {
        }
        }
 
-      const groupHeight = Math.max(
+      let groupHeight = Math.max(
         GROUP_HEADER_H + GROUP_PADDING * 2 + NODE_H,
         processBottom - groupY + GROUP_PADDING
       );
 
-      allGroups.push({
+      const processGroupRef = {
         id: `${container.id}_group_${processIndex}`,
         label: process.name,
         containerId: container.id,
@@ -539,13 +549,41 @@ function computeLayout(model: DSLModel): LayoutResult {
         width: groupWidth,
         height: groupHeight,
         notes: process.notes,
-      });
+      };
+      allGroups.push(processGroupRef);
 
       // Compute bounding boxes for inline sub-groups
       if (process.subGroups) {
-        const SUB_PAD = 8;
-        for (const subGroup of process.subGroups) {
-          const subNodeIdSet = new Set(subGroup.nodeIds);
+        const SUB_PAD_BASE = 8;
+        const NESTED_GAP = 14;
+
+        // Compute nesting depth from below: max depth of any sub-group strictly contained in this one + 1.
+        // Used to inflate outer sub-group padding so its border sits clear of nested sub-group borders.
+        const sgList = process.subGroups;
+        const sgSets = sgList.map((sg) => new Set(sg.nodeIds));
+        const isStrictSubset = (a: Set<string>, b: Set<string>): boolean => {
+          if (a.size >= b.size) return false;
+          for (const id of a) if (!b.has(id)) return false;
+          return true;
+        };
+        const depthBelow = new Array<number>(sgList.length).fill(0);
+        // Order by size ascending so child depths are known before parents.
+        const order = sgList.map((_, i) => i).sort((a, b) => sgSets[a].size - sgSets[b].size);
+        for (const i of order) {
+          let maxChildDepth = -1;
+          for (const j of order) {
+            if (i === j) continue;
+            if (isStrictSubset(sgSets[j], sgSets[i])) {
+              maxChildDepth = Math.max(maxChildDepth, depthBelow[j]);
+            }
+          }
+          depthBelow[i] = maxChildDepth + 1;
+        }
+
+        for (let sgIdx = 0; sgIdx < sgList.length; sgIdx++) {
+          const subGroup = sgList[sgIdx];
+          const SUB_PAD = SUB_PAD_BASE + depthBelow[sgIdx] * NESTED_GAP;
+          const subNodeIdSet = sgSets[sgIdx];
           const subNodes = allNodes.filter((n) => subNodeIdSet.has(n.id));
           if (subNodes.length === 0) continue;
           // Also include negative/error nodes: either explicitly defined (negativeNext id)
@@ -571,7 +609,18 @@ function computeLayout(model: DSLModel): LayoutResult {
             height: maxY - minY,
             notes: subGroup.notes,
           });
+
+          // Grow the process group so its bbox fully contains every sub-group bbox.
+          const sgRight = maxX;
+          const sgBottom = maxY;
+          if (sgBottom + GROUP_PADDING > processGroupRef.y + processGroupRef.height) {
+            processGroupRef.height = sgBottom + GROUP_PADDING - processGroupRef.y;
+          }
+          if (sgRight + GROUP_PADDING > processGroupRef.x + processGroupRef.width) {
+            processGroupRef.width = sgRight + GROUP_PADDING - processGroupRef.x;
+          }
         }
+        groupHeight = processGroupRef.height;
       }
 
       processY = groupY + groupHeight + GROUP_GAP_Y;
@@ -613,27 +662,40 @@ function computeLayout(model: DSLModel): LayoutResult {
        }
     }
 
-    // Adjust container height to fit everything
+    // Adjust container width/height to fit everything (nodes, process groups, sub-group bboxes)
     const containerNodes = allNodes.filter((n) => n.containerId === container.id || (n as any)._cx !== undefined);
     let maxNodeBottom = 0;
+    let maxNodeRight = 0;
     for (const n of allNodes) {
        if (n.x >= cx && n.x < cx + containerW) {
        maxNodeBottom = Math.max(maxNodeBottom, n.y + NODE_H);
+       maxNodeRight = Math.max(maxNodeRight, n.x + NODE_W);
        }
     }
     for (const group of allGroups) {
       if (group.containerId === container.id) {
        maxNodeBottom = Math.max(maxNodeBottom, group.y + group.height);
+       maxNodeRight = Math.max(maxNodeRight, group.x + group.width);
       }
     }
+    for (const sg of allSubGroups) {
+      if (sg.containerId === container.id) {
+       maxNodeBottom = Math.max(maxNodeBottom, sg.y + sg.height);
+       maxNodeRight = Math.max(maxNodeRight, sg.x + sg.width);
+      }
+    }
+    const finalContainer = allContainers[allContainers.length - 1];
     // Update container height
-    allContainers[allContainers.length - 1].height = Math.max(
+    finalContainer.height = Math.max(
       containerH,
        maxNodeBottom - cy + CONTAINER_PADDING + 20
     );
-    rowBottom = Math.max(rowBottom, cy + allContainers[allContainers.length - 1].height);
+    // Update container width
+    const grownW = Math.max(containerW, maxNodeRight - cx + CONTAINER_PADDING);
+    finalContainer.width = grownW;
+    rowBottom = Math.max(rowBottom, cy + finalContainer.height);
 
-    x += containerW + CONTAINER_GAP_X;
+    x += grownW + CONTAINER_GAP_X;
   }
 
   // 2. Render standalone nodes (not in any container)
@@ -936,6 +998,29 @@ function layoutFanInProcess(
   return Math.max(chainBottom, processY + (roots.length - 1) * rowHeight + NODE_H);
 }
 
+function computeMaxSubGroupDepth(subGroups: { nodeIds: string[] }[]): number {
+  const sets = subGroups.map((sg) => new Set(sg.nodeIds));
+  const isStrictSubset = (a: Set<string>, b: Set<string>): boolean => {
+    if (a.size >= b.size) return false;
+    for (const id of a) if (!b.has(id)) return false;
+    return true;
+  };
+  const depthBelow = new Array<number>(sets.length).fill(0);
+  const order = sets.map((_, i) => i).sort((a, b) => sets[a].size - sets[b].size);
+  let maxDepth = 0;
+  for (const i of order) {
+    let childMax = -1;
+    for (const j of order) {
+      if (i !== j && isStrictSubset(sets[j], sets[i])) {
+        childMax = Math.max(childMax, depthBelow[j]);
+      }
+    }
+    depthBelow[i] = childMax + 1;
+    maxDepth = Math.max(maxDepth, depthBelow[i]);
+  }
+  return maxDepth;
+}
+
 function computeContainerWidth(container: DSLContainer, model: DSLModel): number {
   let maxW = 0;
 
@@ -977,6 +1062,30 @@ function computeContainerWidth(container: DSLContainer, model: DSLModel): number
       w += transitions * SUB_GROUP_GAP_X;
       if (firstInSubGroup) w += SUB_GROUP_GAP_X;
       if (lastInSubGroup) w += SUB_GROUP_GAP_X;
+
+      // Reserve room for nested sub-group padding (the outermost sub-group's bbox extends
+      // beyond its inner nodes by depth * NESTED_GAP on each side).
+      const sgSets = proc.subGroups.map((sg) => new Set(sg.nodeIds));
+      const isStrictSubset = (a: Set<string>, b: Set<string>): boolean => {
+        if (a.size >= b.size) return false;
+        for (const id of a) if (!b.has(id)) return false;
+        return true;
+      };
+      let maxDepth = 0;
+      const depthBelow = new Array<number>(sgSets.length).fill(0);
+      const order = sgSets.map((_, i) => i).sort((a, b) => sgSets[a].size - sgSets[b].size);
+      for (const i of order) {
+        let childMax = -1;
+        for (const j of order) {
+          if (i !== j && isStrictSubset(sgSets[j], sgSets[i])) {
+            childMax = Math.max(childMax, depthBelow[j]);
+          }
+        }
+        depthBelow[i] = childMax + 1;
+        maxDepth = Math.max(maxDepth, depthBelow[i]);
+      }
+      const NESTED_GAP = 14;
+      w += maxDepth * NESTED_GAP * 2;
     }
 
     maxW = Math.max(maxW, w);
