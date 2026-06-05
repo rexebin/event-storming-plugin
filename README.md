@@ -74,11 +74,11 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
 <eventstorming>
   <aggregate name="User">
      <container name="User Registration">
-        <actor name="Customer1" next="Register" />
-        <command name="Register" next="Is Email Valid?" />
-        <policy name="Is Email Valid?" next="UserRegistered" negativeNext="Invalid Email" />
+        <actor name="Customer1" />
+        <command name="Register" />
+        <policy name="Is Email Valid?" negativeNext="Invalid Email" />
         <error name="Invalid Email"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
-        <event name="UserRegistered" next="Some Note" />
+        <event name="UserRegistered" />
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
      </container>
   </aggregate>
@@ -91,10 +91,10 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
-          <command name="Have Shower" next="Is the shower running?" />
+          <command name="Have Shower" />
           <policy name="Is the shower running?" next="Have shower gel?" negativeNext="Switch on shower" />
-          <externalSystem name="Switch on shower" next="Have shower gel?" />
-          <policy name="Have shower gel?" next="Had Shower" negativeNext="Go Buy Shower Gel" />
+          <externalSystem name="Switch on shower" />
+          <policy name="Have shower gel?" negativeNext="Go Buy Shower Gel" />
           <error name="Go Buy Shower Gel" />
           <event name="Had Shower" />
       </container>
@@ -102,9 +102,9 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
   <aggregate name="User Profile">
       <container name="Update Profile">
           <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
-          <actor name="Customer" next="UpdateProfile" />
-          <command name="UpdateProfile" next="Is User Authenticated?" />
-          <policy name="Is User Authenticated?" next="ProfileUpdated" negativeNext="Authentication Required" />
+          <actor name="Customer" />
+          <command name="UpdateProfile" />
+          <policy name="Is User Authenticated?" negativeNext="Authentication Required" />
           <error name="Authentication Required"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
           <event name="ProfileUpdated" />
       </container>
@@ -113,28 +113,28 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
       <container name="Place Order">
           <command name="PlaceOrder" next="IsAddressValid" />
           <container name="PlaceOrder">
-               <policy name="IsAddressValid" next="IsEmailValid" negativeNext="AddressIsInValid" />
+               <policy name="IsAddressValid" negativeNext="AddressIsInValid" />
                <policy name="IsEmailValid" next="Do Something" negativeNext="Email is invalid" />
                <container name="Another Sub Process">
-                  <command name="Do Something" next="Is Something Valid?" />
+                  <command name="Do Something" />
                   <policy name="Is Something Valid?" next="InventoryService" negativeNext="Something Is Invalid" />
                   <error name="Something Is Invalid"><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
-          <externalSystem name="InventoryService" next="Do We Have Stock?" />
-          <policy name="Do We Have Stock?" next="Is Order Detail Valid?" negativeNext="Out Of Stock" />
-          <policy name="Is Order Detail Valid?" next="PaymentGateway" negativeNext="Invalid Order Detail" />
+          <externalSystem name="InventoryService" />
+          <policy name="Do We Have Stock?" negativeNext="Out Of Stock" />
+          <policy name="Is Order Detail Valid?" negativeNext="Invalid Order Detail" />
           <error name="Invalid Order Detail"><note>Order details are invalid, please review your order and try again.</note></error>
-          <externalSystem name="PaymentGateway" next="Is Payment Successful?" />
-          <policy name="Is Payment Successful?" next="OrderPlaced" negativeNext="PaymentFailed" />
+          <externalSystem name="PaymentGateway" />
+          <policy name="Is Payment Successful?" negativeNext="PaymentFailed" />
           <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>
   </aggregate>
   <externalSystem name="Inventory Service">
       <container name="Inventory Check">
-          <command name="Check Inventory" next="Get Inventory" />
-          <query name="Get Inventory" next="Has Stock?" />
+          <command name="Check Inventory" />
+          <query name="Get Inventory" />
           <policy name="Has Stock?" next="InventoryCheckPassed" negativeNext="Out of Stock" />
           <event name="Inventory Check Passed" />
       </container>
@@ -144,14 +144,14 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <event name="OrderPlaced" next="Order Detail View" />
           <event name="OrderCancelled" next="Order Detail View" />
           <event name="OrderUpdated" next="Order Detail View" />
-          <event name="OrderShipped" next="Order Detail View" />
+          <event name="OrderShipped" />
           <readModel name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></readModel>
       </container>
   </projector>
   <process name="Customer Order View">
       <container name="View Order Details">
-          <actor name="Customer" next="GetOrderDetails" />
-          <query name="GetOrderDetails" next="Order Detail Projection" />
+          <actor name="Customer" />
+          <query name="GetOrderDetails" />
           <readModel name="Order Detail Projection" />
       </container>
   </process>
@@ -164,11 +164,11 @@ Rendered:
 <eventstorming>
   <aggregate name="User">
      <container name="User Registration">
-        <actor name="Customer1" next="Register" />
-        <command name="Register" next="Is Email Valid?" />
-        <policy name="Is Email Valid?" next="UserRegistered" negativeNext="Invalid Email" />
+        <actor name="Customer1" />
+        <command name="Register" />
+        <policy name="Is Email Valid?" negativeNext="Invalid Email" />
         <error name="Invalid Email"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
-        <event name="UserRegistered" next="Some Note" />
+        <event name="UserRegistered" />
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
      </container>
   </aggregate>
@@ -181,10 +181,10 @@ Rendered:
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
-          <command name="Have Shower" next="Is the shower running?" />
+          <command name="Have Shower" />
           <policy name="Is the shower running?" next="Have shower gel?" negativeNext="Switch on shower" />
-          <externalSystem name="Switch on shower" next="Have shower gel?" />
-          <policy name="Have shower gel?" next="Had Shower" negativeNext="Go Buy Shower Gel" />
+          <externalSystem name="Switch on shower" />
+          <policy name="Have shower gel?" negativeNext="Go Buy Shower Gel" />
           <error name="Go Buy Shower Gel" />
           <event name="Had Shower" />
       </container>
@@ -192,9 +192,9 @@ Rendered:
   <aggregate name="User Profile">
       <container name="Update Profile">
           <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
-          <actor name="Customer" next="UpdateProfile" />
-          <command name="UpdateProfile" next="Is User Authenticated?" />
-          <policy name="Is User Authenticated?" next="ProfileUpdated" negativeNext="Authentication Required" />
+          <actor name="Customer" />
+          <command name="UpdateProfile" />
+          <policy name="Is User Authenticated?" negativeNext="Authentication Required" />
           <error name="Authentication Required"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
           <event name="ProfileUpdated" />
       </container>
@@ -203,28 +203,28 @@ Rendered:
       <container name="Place Order">
           <command name="PlaceOrder" next="IsAddressValid" />
           <container name="PlaceOrder">
-               <policy name="IsAddressValid" next="IsEmailValid" negativeNext="AddressIsInValid" />
+               <policy name="IsAddressValid" negativeNext="AddressIsInValid" />
                <policy name="IsEmailValid" next="Do Something" negativeNext="Email is invalid" />
                <container name="Another Sub Process">
-                  <command name="Do Something" next="Is Something Valid?" />
+                  <command name="Do Something" />
                   <policy name="Is Something Valid?" next="InventoryService" negativeNext="Something Is Invalid" />
                   <error name="Something Is Invalid"><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
-          <externalSystem name="InventoryService" next="Do We Have Stock?" />
-          <policy name="Do We Have Stock?" next="Is Order Detail Valid?" negativeNext="Out Of Stock" />
-          <policy name="Is Order Detail Valid?" next="PaymentGateway" negativeNext="Invalid Order Detail" />
+          <externalSystem name="InventoryService" />
+          <policy name="Do We Have Stock?" negativeNext="Out Of Stock" />
+          <policy name="Is Order Detail Valid?" negativeNext="Invalid Order Detail" />
           <error name="Invalid Order Detail"><note>Order details are invalid, please review your order and try again.</note></error>
-          <externalSystem name="PaymentGateway" next="Is Payment Successful?" />
-          <policy name="Is Payment Successful?" next="OrderPlaced" negativeNext="PaymentFailed" />
+          <externalSystem name="PaymentGateway" />
+          <policy name="Is Payment Successful?" negativeNext="PaymentFailed" />
           <error name="PaymentFailed"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>
   </aggregate>
   <externalSystem name="Inventory Service">
       <container name="Inventory Check">
-          <command name="Check Inventory" next="Get Inventory" />
-          <query name="Get Inventory" next="Has Stock?" />
+          <command name="Check Inventory" />
+          <query name="Get Inventory" />
           <policy name="Has Stock?" next="InventoryCheckPassed" negativeNext="Out of Stock" />
           <event name="Inventory Check Passed" />
       </container>
@@ -234,14 +234,14 @@ Rendered:
           <event name="OrderPlaced" next="Order Detail View" />
           <event name="OrderCancelled" next="Order Detail View" />
           <event name="OrderUpdated" next="Order Detail View" />
-          <event name="OrderShipped" next="Order Detail View" />
+          <event name="OrderShipped" />
           <readModel name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></readModel>
       </container>
   </projector>
   <process name="Customer Order View">
       <container name="View Order Details">
-          <actor name="Customer" next="GetOrderDetails" />
-          <query name="GetOrderDetails" next="Order Detail Projection" />
+          <actor name="Customer" />
+          <query name="GetOrderDetails" />
           <readModel name="Order Detail Projection" />
       </container>
   </process>
@@ -261,11 +261,11 @@ Use a ` ```json ` block. JSON gives editors full schema validation and autocompl
       {
         "name": "User Registration",
         "children": [
-          { "type": "Actor", "name": "Customer1", "next": "Register" },
-          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
-          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
+          { "type": "Actor", "name": "Customer1" },
+          { "type": "Command", "name": "Register" },
+          { "type": "Policy", "name": "Is Email Valid?", "negativeNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
-          { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
+          { "type": "Event", "name": "UserRegistered" },
           { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
         ]
       }
@@ -285,11 +285,11 @@ Rendered:
       {
         "name": "User Registration",
         "children": [
-          { "type": "Actor", "name": "Customer1", "next": "Register" },
-          { "type": "Command", "name": "Register", "next": "Is Email Valid?" },
-          { "type": "Policy", "name": "Is Email Valid?", "next": "UserRegistered", "negativeNext": "Invalid Email" },
+          { "type": "Actor", "name": "Customer1" },
+          { "type": "Command", "name": "Register" },
+          { "type": "Policy", "name": "Is Email Valid?", "negativeNext": "Invalid Email" },
           { "type": "Error", "name": "Invalid Email", "notes": ["The email address provided is not valid. Please enter a valid email address and try again."] },
-          { "type": "Event", "name": "UserRegistered", "next": "Some Note" },
+          { "type": "Event", "name": "UserRegistered" },
           { "type": "Note", "name": "Some Note", "notes": ["This is a note attached to the UserRegistered event."] }
         ]
       }
@@ -381,15 +381,15 @@ This extension only tests up to 2 levels of nesting.
     <container name="Order Lifecycle">
       <note>Top-level group grouping placement and cancellation sub-flows.</note>
       <container name="Place Order">
-        <actor name="Customer" next="PlaceOrder" />
-        <command name="PlaceOrder" next="Is Payment Valid?" />
-        <policy name="Is Payment Valid?" next="OrderPlaced" negativeNext="PaymentFailed" />
+        <actor name="Customer" />
+        <command name="PlaceOrder" />
+        <policy name="Is Payment Valid?" negativeNext="PaymentFailed" />
         <error name="PaymentFailed" />
         <event name="OrderPlaced" />
       </container>
       <container name="Cancel Order">
-        <actor name="Customer" next="CancelOrder" />
-        <command name="CancelOrder" next="OrderCancelled" />
+        <actor name="Customer" />
+        <command name="CancelOrder" />
         <event name="OrderCancelled" />
       </container>
     </container>
@@ -405,15 +405,15 @@ Rendered:
     <container name="Order Lifecycle">
       <note>Top-level group grouping placement and cancellation sub-flows.</note>
       <container name="Place Order">
-        <actor name="Customer" next="PlaceOrder" />
-        <command name="PlaceOrder" next="Is Payment Valid?" />
-        <policy name="Is Payment Valid?" next="OrderPlaced" negativeNext="PaymentFailed" />
+        <actor name="Customer" />
+        <command name="PlaceOrder" />
+        <policy name="Is Payment Valid?" negativeNext="PaymentFailed" />
         <error name="PaymentFailed" />
         <event name="OrderPlaced" />
       </container>
       <container name="Cancel Order">
-        <actor name="Customer" next="CancelOrder" />
-        <command name="CancelOrder" next="OrderCancelled" />
+        <actor name="Customer" />
+        <command name="CancelOrder" />
         <event name="OrderCancelled" />
       </container>
     </container>
