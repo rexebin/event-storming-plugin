@@ -275,7 +275,6 @@ export function renderEventStorming(
   if (!source || !target) return;
 
   const pathD = computeLinkPath(source, target, link.type, link.label === 'no');
-
   linksGroup
      .append('path')
      .attr('class', `es-link es-link-${link.type}`)
@@ -283,7 +282,6 @@ export function renderEventStorming(
      .attr('data-target', link.target)
      .attr('d', pathD)
      .attr('fill', 'none')
-     .attr('stroke', LINK_COLOR)
      .attr('stroke-width', 1.5)
      .attr('marker-end', 'url(#arrowhead)');
 
