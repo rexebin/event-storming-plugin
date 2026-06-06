@@ -12,6 +12,7 @@ import {
   CONTAINER_PADDING, CONTAINER_HEADER_H,
   GROUP_HEADER_H,
   LINK_COLOR,
+  CONTAINER_TYPE_LABELS,
 } from './constants.js';
 import { computeLayout } from './layout.js';
 import { computeLinkPath, getLinkLabelPosition } from './links.js';
@@ -115,6 +116,34 @@ export function renderEventStorming(
        .attr('font-weight', '700')
        .attr('fill', isLight(c.color) ? '#333' : '#fff')
        .text(`${c.type === 'aggregate' ? '📦' : c.type === 'readModel' ? '📊' : c.type === 'externalSystem' ? '🔌' : '🔄'} ${c.label}`);
+
+    // Container type badge outside the box, above the header band
+    const containerTypeLabel = CONTAINER_TYPE_LABELS[c.type] ?? c.type;
+    const badgePadding = 6;
+    const badgeHeight = 14;
+    const badgeWidths: Record<string, number> = { 'Aggregate': 76, 'Projector': 68, 'Process': 60, 'External System': 116 };
+    const typeBadgeW = (badgeWidths[containerTypeLabel] ?? 82) + badgePadding * 2;
+    const typeBadgeX = 8;
+    const typeBadgeY = -badgeHeight - 6;
+
+    g.append('rect')
+       .attr('x', typeBadgeX)
+       .attr('y', typeBadgeY)
+       .attr('width', typeBadgeW)
+       .attr('height', badgeHeight)
+       .attr('rx', 4)
+       .attr('fill', c.color);
+
+    g.append('text')
+       .attr('class', 'es-container-type-badge')
+       .attr('x', typeBadgeX + typeBadgeW / 2)
+       .attr('y', typeBadgeY + badgeHeight / 2 + 1)
+       .attr('text-anchor', 'middle')
+       .attr('dominant-baseline', 'middle')
+       .attr('font-size', '9px')
+       .attr('font-weight', '700')
+       .attr('fill', isLight(c.color) ? '#333' : '#fff')
+       .text(containerTypeLabel);
 
     if (c.notes && c.notes.length > 0) {
       appendNotesBadge(g, c.width - 14, 12, c.notes, tooltip, 'es-container-note-badge');

@@ -56,6 +56,7 @@ export interface LayoutContainer {
 export interface LayoutGroup {
   id: string;
   label: string;
+  type: 'aggregate' | 'readModel' | 'process' | 'externalSystem';
   containerId: string;
   x: number;
   y: number;
@@ -67,6 +68,7 @@ export interface LayoutGroup {
 export interface LayoutSubGroup {
   id: string;
   label: string;
+  type: 'aggregate' | 'readModel' | 'process' | 'externalSystem';
   containerId: string;
   x: number;
   y: number;
@@ -120,6 +122,13 @@ export function getProcessRoots(process: DSLProcess, processNodeMap: Map<string,
     .map((id) => processNodeMap.get(id))
     .filter((node): node is DSLNode => !!node && (incomingCounts.get(node.id) || 0) === 0);
 }
+
+export const CONTAINER_TYPE_LABELS: Record<string, string> = {
+  aggregate: 'Aggregate',
+  readModel: 'Projector',
+  process: 'Process',
+  externalSystem: 'External System',
+};
 
 export function detectSharedTargetFanIn(roots: DSLNode[], processNodeMap: Map<string, DSLNode>): DSLNode | null {
   if (roots.length <= 1) return null;

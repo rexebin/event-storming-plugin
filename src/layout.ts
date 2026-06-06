@@ -592,6 +592,7 @@ export function computeLayout(model: DSLModel): LayoutResult {
       const processGroupRef = {
         id: `${container.id}_group_${processIndex}`,
         label: process.name,
+        type: container.type,
         containerId: container.id,
         x: groupX,
         y: groupY,
@@ -626,6 +627,7 @@ export function computeLayout(model: DSLModel): LayoutResult {
           allSubGroups.push({
             id: `${container.id}_subgroup_${processIndex}_${normalizeId(subGroup.name)}`,
             label: subGroup.name,
+            type: container.type,
             containerId: container.id,
             x: minX,
             y: minY,

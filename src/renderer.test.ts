@@ -264,6 +264,19 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+const simpleGroupTypeSample = `
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Aggregate Container">
+      <container name="Order Processing">
+        <command name="ProcessOrder"/>
+        <event name="OrderProcessed"/>
+      </container>
+    </container>
+  </aggregate>
+</eventstorming>
+`;
+
 describe('renderEventStorming layout', () => {
   it('stacks shared inputs to the left of CancelOrder without overlap', () => {
     const host = document.createElement('div');
@@ -837,5 +850,94 @@ describe('renderEventStorming layout', () => {
     const svgWidth = Number(svg!.getAttribute('width'));
     const layout = computeLayout(parseDSL(readmeSample));
     expect(svgWidth).toBeCloseTo(layout.width + CONTAINER_PADDING * 2, 0);
+  });
+
+  it('renders a type badge on containers showing their type', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), simpleGroupTypeSample);
+
+    const containers = Array.from(host.querySelectorAll<SVGGElement>('g.containers g'));
+    for (const container of containers) {
+      const badge = container.querySelector('text.es-container-type-badge');
+      expect(badge).toBeTruthy();
+    }
+  });
+
+  it('shows correct type label text for aggregate containers', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), simpleGroupTypeSample);
+
+    const containers = Array.from(host.querySelectorAll<SVGGElement>('g.containers g'));
+    expect(containers.length).toBeGreaterThan(0);
+
+    const badge = containers[0].querySelector<SVGTextElement>('text.es-container-type-badge');
+    expect(badge?.textContent).toBe('Aggregate');
+  });
+
+  it('shows correct type label text for readModel (projector) containers', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), `
+<eventstorming>
+  <readmodel name="Customer">
+    <container name="Main Flow">
+      <query name="ViewProfile"/>
+    </container>
+  </readmodel>
+</eventstorming>
+`);
+
+    const containers = Array.from(host.querySelectorAll<SVGGElement>('g.containers g'));
+    expect(containers.length).toBeGreaterThan(0);
+
+    const badge = containers[0].querySelector<SVGTextElement>('text.es-container-type-badge');
+    expect(badge?.textContent).toBe('Projector');
+  });
+
+  it('shows correct type label text for externalSystem containers', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), `
+<eventstorming>
+  <externalsystem name="Shipping">
+    <container name="Main Flow">
+      <command name="Ship"/>
+    </container>
+  </externalsystem>
+</eventstorming>
+`);
+
+    const containers = Array.from(host.querySelectorAll<SVGGElement>('g.containers g'));
+    expect(containers.length).toBeGreaterThan(0);
+
+    const badge = containers[0].querySelector<SVGTextElement>('text.es-container-type-badge');
+    expect(badge?.textContent).toBe('External System');
+  });
+
+  it('shows correct type label text for process containers', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), `
+<eventstorming>
+  <process name="Checkout">
+    <container name="Flow">
+      <command name="Pay"/>
+    </container>
+  </process>
+</eventstorming>
+`);
+
+    const containers = Array.from(host.querySelectorAll<SVGGElement>('g.containers g'));
+    expect(containers.length).toBeGreaterThan(0);
+
+    const badge = containers[0].querySelector<SVGTextElement>('text.es-container-type-badge');
+    expect(badge?.textContent).toBe('Process');
   });
 });
