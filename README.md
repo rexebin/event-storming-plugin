@@ -2,6 +2,18 @@
 
 A **browser extension** (Manifest V3) and **VS Code Markdown preview extension** that render **event storming** diagrams from fenced code blocks.
 
+> ⚠️ **Event storming diagrams should be small and concise.** A complex or sprawling event storming diagram is often a signal — not an achievement — that the underlying domain design or code structure needs simplification. 
+
+> In DDD practice, event storming is a collaborative discovery tool for building shared understanding, not a comprehensive documentation artifact. 
+
+> If your diagram feels overwhelming, consider: 
+> 1. are you capturing implementation details instead of bounded behaviors? 
+> 2. Are aggregates too fat? Is a single bounded context trying to model an entire enterprise workflow? 
+
+> Good event storming models fit on a wall and spark conversation, not serve as reference architecture documents. See [Alberto Brandolini's Big Picture Event Storming](https://www.eventstorming.com/) and the [DDD Community guidelines](https://dddcommunity.org/) for best practices.
+
+> This project aims to accommodate moderate complexity. PRs are welcome, but simplicity wins over supporting overly complex event storming diagrams.
+
 ## Features
 
 - 🎨 Full event storming visual language: events, commands, queries, aggregates, actors, policies, views, read models, external systems, errors, and note nodes
