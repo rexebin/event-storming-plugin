@@ -5,8 +5,10 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
-import { NODE_H } from './constants.js';
+import { computeLayout } from './layout.js';
+import { NODE_H, NODE_W, CONTAINER_PADDING, GROUP_PADDING } from './constants.js';
 import { getPointOnPath } from './links.js';
+import { parseDSL } from './dsl.js';
 
 // We need to extract the helper functions from renderer.ts
 // Since renderer.ts uses D3 heavily, we test the pure functions in isolation
@@ -654,6 +656,92 @@ describe('renderEventStorming layout', () => {
       expect(pathD).not.toContain(' C ');
       const mMatch = pathD.match(/^M (\d+) (\d+)/);
       expect(mMatch).toBeTruthy();
+    }
+  });
+
+  it('offset linear chain nodes fit inside aggregate container', () => {
+    const model = parseDSL(`
+<eventstorming>
+  <aggregate name="Test">
+    <container name="Offset Test">
+      <command name="Step1" next="Step2"/>
+      <command name="Step2" next="Step3"/>
+      <command name="Step3" next="Step4"/>
+      <command name="Step4" next="Step5"/>
+      <command name="Step5" next="Step6"/>
+      <command name="Step6" offset="3" next="FinalStep"/>
+      <command name="FinalStep"/>
+    </container>
+  </aggregate>
+</eventstorming>
+`);
+
+    const layout = computeLayout(model);
+    const container = layout.containers[0];
+
+    console.log('AGGREGATE CONTAINER:', { id: container.id, x: container.x, width: container.width });
+    for (const n of layout.nodes) {
+      if (n.containerId === container.id) {
+        console.log(`  NODE "${n.label}"`, { x: n.x, rightEdge: n.x + NODE_W });
+      }
+    }
+
+    const leftBound = container.x + CONTAINER_PADDING;
+    const rightBound = container.x + container.width - CONTAINER_PADDING;
+
+    for (const node of layout.nodes.filter((n) => n.containerId === container.id)) {
+      expect(node.x).toBeGreaterThanOrEqual(leftBound - 1);
+      expect(node.x + NODE_W).toBeLessThanOrEqual(rightBound + 1);
+    }
+  });
+
+  it('process group grows to include offset nodes', () => {
+    // A process-level container where one node has offset=3.
+    // Without fix: the process group width is fixed from container layout,
+    // so offset-shifted nodes land outside the group's right edge.
+    const model = parseDSL(`
+<eventstorming>
+  <process name="Test Process">
+    <container name="Inner Container">
+      <command name="Step1" next="Step2"/>
+      <command name="Step2" next="Step3"/>
+      <command name="Step3" next="Step4"/>
+      <command name="Step4" next="Step5"/>
+      <command name="Step5" next="Step6"/>
+      <!-- offset=3 pushes far right -->
+      <command name="Step6" offset="3" next="FinalStep"/>
+      <command name="FinalStep"/>
+    </container>
+  </process>
+</eventstorming>
+`);
+
+    const layout = computeLayout(model);
+
+    // Debug: list all containers, groups and node positions
+    for (const c of layout.containers) {
+      console.log('CONTAINER:', { id: c.id, label: c.label, x: c.x, width: c.width });
+    }
+    for (const g of layout.groups) {
+      console.log('GROUP:', { id: g.id, x: g.x, width: g.width, rightEdge: g.x + g.width });
+    }
+    for (const n of layout.nodes) {
+      console.log(`NODE "${n.label}"`, { containerId: n.containerId, x: n.x, rightEdge: n.x + NODE_W });
+    }
+
+    // The inner "Inner Container" is rendered as a group under the process container
+    const targetGroup = layout.groups[0];
+    expect(targetGroup).toBeTruthy();
+
+    const groupNodes = layout.nodes.filter((n) => n.containerId === targetGroup!.containerId);
+    expect(groupNodes.length).toBeGreaterThan(0);
+
+    // Group x is relative to its parent container. Group must fully contain all its nodes.
+    const rightBound = targetGroup.x + targetGroup.width - GROUP_PADDING;
+
+    for (const node of groupNodes) {
+      // Each node's right edge must be within the group's right boundary
+      expect(node.x + NODE_W).toBeLessThanOrEqual(rightBound + 1);
     }
   });
 });

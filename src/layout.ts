@@ -647,6 +647,15 @@ export function computeLayout(model: DSLModel): LayoutResult {
         groupHeight = processGroupRef.height;
          }
 
+          // Grow the process group rightward for any nodes that exceed its boundary (e.g. offset).
+          const maxNodeRightInProcess = processNodes.reduce((max, n) => {
+            const layoutNode = allNodes.find((a) => a.id === n.id);
+            return layoutNode ? Math.max(max, layoutNode.x + NODE_W) : max;
+           }, groupX + GROUP_PADDING);
+          if (maxNodeRightInProcess + GROUP_PADDING > processGroupRef.x + processGroupRef.width) {
+            processGroupRef.width = maxNodeRightInProcess + GROUP_PADDING - processGroupRef.x;
+             }
+
       processY = groupY + groupHeight + GROUP_GAP_Y;
          });
 
@@ -690,7 +699,7 @@ export function computeLayout(model: DSLModel): LayoutResult {
     let maxNodeBottom = 0;
     let maxNodeRight = 0;
     for (const n of allNodes) {
-       if (n.x >= cx && n.x < cx + containerW) {
+       if (n.containerId === container.id) {
            maxNodeBottom = Math.max(maxNodeBottom, n.y + NODE_H);
            maxNodeRight = Math.max(maxNodeRight, n.x + NODE_W);
             }
