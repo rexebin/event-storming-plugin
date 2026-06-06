@@ -210,7 +210,7 @@ Rendered:
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" />
-          <policy name="Failed Exception" next="Call Recorded"></policy>
+          <policy name="Failed Exception" next="Record Call"></policy>
       </container>
   </aggregate>
   <aggregate name="User">
@@ -427,4 +427,4 @@ npm run test:watch    # Watch mode
 
 ## License
 
-MIT
+GPL-3.0 License.

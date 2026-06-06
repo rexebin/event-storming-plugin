@@ -61,7 +61,13 @@ export function computeLinkPath(
     );
   }
 
-   // ─── Same column: straight vertical, unless event → readModel (use curved bezier) ───
+  // ─── next/default links: orthogonal routing from right edge, different columns only ───
+  const isEventToReadModelEarly = source.type === 'event' && target.type === 'readModel';
+  if ((type === 'next' || type === 'default') && source.y !== target.y && source.x !== target.x && !isEventToReadModelEarly) {
+    return nextOrthogonalPath(source, target);
+  }
+
+  // ─── Same column: straight vertical, unless event → readModel (use curved bezier) ───
   if (source.x === target.x) {
     const cx = source.x + NODE_W / 2;
     if (source.type === 'event' && target.type === 'readModel') {
@@ -89,6 +95,14 @@ export function computeLinkPath(
   const targetX = sourceIsLeft ? target.x : target.x + NODE_W;
   const sourceY = source.y + NODE_H / 2;
   const targetY = target.y + NODE_H / 2;
+
+  // ─── next-type same row: straight horizontal line ───
+  if (type === 'next') {
+    const sourceIsLeft = source.x <= target.x;
+    const sourceRight = sourceIsLeft ? source.x + NODE_W : source.x;
+    const targetEdge = sourceIsLeft ? target.x : target.x + NODE_W;
+    return `M ${sourceRight} ${source.y + NODE_H / 2} L ${targetEdge} ${target.y + NODE_H / 2}`;
+  }
 
   const isEventToReadModel = source.type === 'event' && target.type === 'readModel';
 
@@ -127,6 +141,54 @@ export function computeLinkPath(
   }
 
   return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
+}
+
+// ─── next-type orthogonal routing ─────────────────────────────────────
+// Always exits from source's right-edge middle, goes right by half GAP_X,
+// turns toward target's row stopping half GAP_Y past the target's near edge,
+// goes left to half GAP_X before the target's left edge, aligns to the
+// target's mid-Y, then enters the target's left-edge middle.
+
+/** Source → Target (target is below) */
+function nextPathBelow(source: LayoutNode, target: LayoutNode): string {
+  const rightEdgeX = source.x + NODE_W;
+  const rightMidY = source.y + NODE_H / 2;
+  const extX = rightEdgeX + NODE_GAP_X / 2;
+  const approachY = target.y - NODE_GAP_Y / 2;
+  const approachX = target.x - NODE_GAP_X / 2;
+  const targetMidY = target.y + NODE_H / 2;
+
+  return (
+    `M ${rightEdgeX} ${rightMidY} ` +
+    `L ${extX} ${rightMidY} ` +
+    `L ${extX} ${approachY} ` +
+    `L ${approachX} ${approachY} ` +
+    `L ${approachX} ${targetMidY} ` +
+    `L ${target.x} ${targetMidY}`
+  );
+}
+
+/** Source → Target (target is above) */
+function nextPathAbove(source: LayoutNode, target: LayoutNode): string {
+  const rightEdgeX = source.x + NODE_W;
+  const rightMidY = source.y + NODE_H / 2;
+  const extX = rightEdgeX + NODE_GAP_X / 2;
+  const approachY = target.y + NODE_H + NODE_GAP_Y / 2;
+  const approachX = target.x - NODE_GAP_X / 2;
+  const targetMidY = target.y + NODE_H / 2;
+
+  return (
+    `M ${rightEdgeX} ${rightMidY} ` +
+    `L ${extX} ${rightMidY} ` +
+    `L ${extX} ${approachY} ` +
+    `L ${approachX} ${approachY} ` +
+    `L ${approachX} ${targetMidY} ` +
+    `L ${target.x} ${targetMidY}`
+  );
+}
+
+function nextOrthogonalPath(source: LayoutNode, target: LayoutNode): string {
+  return source.y <= target.y ? nextPathBelow(source, target) : nextPathAbove(source, target);
 }
 
 function dist(x1: number, y1: number, x2: number, y2: number): number {
