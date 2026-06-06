@@ -89,7 +89,8 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <actor name="Customer" />
           <command name="Call Service" />
           <policy name="Call Succeeded?" altNext="Service didn't respond correctly" />
-          <command name="Record Call Result" noNext="true" />
+          <command name="Record Call" />
+          <event name="Call Recorded" noNext="true" />
           <error name="Service didn't respond correctly" altNext="Server Error?" noNext="true"></error>
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
           <error name="Status code is not 422" altNext="Rejected Exception?" ></error>
@@ -98,6 +99,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <error name="Rejected Exception?" noNext="true"></error>
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
+          <event name="Failed Attempt Recorded" />
           <error name="Failed Exception"></error>
       </container>
   </aggregate>
@@ -197,7 +199,8 @@ Rendered:
           <actor name="Customer" />
           <command name="Call Service" />
           <policy name="Call Succeeded?" altNext="Service didn't respond correctly" />
-          <command name="Record Call Result" noNext="true" />
+          <command name="Record Call" />
+          <event name="Call Recorded" noNext="true" />
           <error name="Service didn't respond correctly" altNext="Server Error?" noNext="true"></error>
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
           <error name="Status code is not 422" altNext="Rejected Exception?" ></error>
@@ -206,6 +209,7 @@ Rendered:
           <error name="Rejected Exception?" noNext="true"></error>
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
+          <event name="Failed Attempt Recorded" />
           <error name="Failed Exception"></error>
       </container>
   </aggregate>
