@@ -88,15 +88,15 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
       <container name="Complex Vertical Example">
           <actor name="Customer" />
           <command name="Call Service" />
-          <policy name="Call Succeeded?" altNext="Service didn't respond correctly" />
+          <policy name="Call Succeeded?" altNext="Service didn't respond correctly" next="Record Call" />
           <command name="Record Call" />
           <event name="Call Recorded" noNext="true" />
           <error name="Service didn't respond correctly" altNext="Server Error?" noNext="true"></error>
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
-          <error name="Status code is not 422" altNext="Rejected Exception?" ></error>
+          <error name="Status code is not 422" altNext="Another condition?" ></error>
           <command name="Reject Call" altNext="Rejected Exception?" />
-          <event name="Call Rejected" />
-          <error name="Rejected Exception?" noNext="true"></error>
+          <event name="Call Rejected" noNext="true" />
+          <policy name="Another condition?" noNext="true" altNext="Record Call" />
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" />
@@ -197,16 +197,16 @@ Rendered:
   <aggregate name="Complex Vertical Example (Ignore the logic, it's just for testing vertical layout)">
       <container name="Complex Vertical Example">
           <actor name="Customer" />
-          <command name="Call Service" />
-          <policy name="Call Succeeded?" altNext="Service didn't respond correctly" />
+          <command name="Call Service" altNext="Have reached max retries?" />
+          <policy name="Call Succeeded?" altNext="Service didn't respond correctly" next="Record Call" />
           <command name="Record Call" />
           <event name="Call Recorded" noNext="true" />
           <error name="Service didn't respond correctly" altNext="Server Error?" noNext="true"></error>
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
-          <error name="Status code is not 422" altNext="Rejected Exception?" ></error>
+          <error name="Status code is not 422" altNext="Another condition?" ></error>
           <command name="Reject Call" altNext="Rejected Exception?" />
-          <event name="Call Rejected" />
-          <error name="Rejected Exception?" noNext="true"></error>
+          <event name="Call Rejected" noNext="true" />
+          <policy name="Another condition?" noNext="true" altNext="Record Call" />
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" />

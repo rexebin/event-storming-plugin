@@ -7,7 +7,7 @@ import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
 import { computeLayout } from './layout.js';
 import { NODE_H, NODE_W, CONTAINER_PADDING, GROUP_PADDING } from './constants.js';
-import { getPointOnPath } from './links.js';
+import { getPointOnPath, computeLinkPath } from './links.js';
 import { parseDSL } from './dsl.js';
 
 // We need to extract the helper functions from renderer.ts
@@ -939,5 +939,83 @@ describe('renderEventStorming layout', () => {
 
     const badge = containers[0].querySelector<SVGTextElement>('text.es-container-type-badge');
     expect(badge?.textContent).toBe('Process');
+  });
+});
+
+describe('computeLinkPath obstacle avoidance', () => {
+  function makeNode(id: string, x: number, y: number): import('./constants.js').LayoutNode {
+    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
+  }
+
+  it('routes upward negative link around intermediate nodes by going down first', () => {
+    // Layout — obstacles between source and target that block the direct upward path:
+    //   C0                    C1
+    //   ┌──────┐              ┌──────┐
+    //   │Target│               │ Source│
+    //   └──────┘                └──┬───┘
+    //                          direct up crosses obstacle
+    //                      ┌─────▼─────┐
+    //                      │ Obstacle  │
+
+    const source = makeNode('src', 130 + 36, 0);        // x=166 (C1), y=0
+    const target = makeNode('tgt', 0, -80);                // x=0 (C0), y=-80 (above)
+    const obstacle = makeNode('obs', 130 + 36, 40);          // x=166 (same col, BELOW source bottom)
+
+    const pathD = computeLinkPath(source, target, 'negative', [target, obstacle], true);
+
+    // Path should NOT go directly upward through the obstacle
+    expect(pathD).not.toMatch(/^M \d+ \d+ L \d+ \d+$/);
+
+    // The path goes down first to clear obstacles below, routes sideways, then up
+    // Start from top of source since safeX=462 is outside source column [166, 296]
+    const mMatch = pathD.match(/^M (\d+) (\d+)/);
+    expect(mMatch).toBeTruthy();
+    expect(parseInt(mMatch![1])).toBe(source.x + NODE_W / 2); // starts at center X
+  });
+
+  it('goes down through first available gap when left side is blocked', () => {
+    // C0           C1           C2
+    // ┌──────┐     ┌──────┐     ┌──────┐
+    // │Obs L │     │Source│     │ Target (above)
+    // └──────┘     └──┬───┘     └──────┘
+    //                  │ direct up crosses ObsL
+    //            ┌─────▼─────┐
+    //            │  ObsM     │
+
+    const source = makeNode('src', 130 + 36, 0);        // x=166 (C1), y=0
+    const target = makeNode('tgt', 2 * (130 + 36), -80); // x=332 (C2), y=-80 (above)
+    const obsL = makeNode('obsL', 0, -40);                // C0, blocking left gap at source level
+    const obsM = makeNode('obsM', 130 + 36, -40);         // same col as source
+
+    const pathD = computeLinkPath(source, target, 'negative', [target, obsL, obsM], true);
+
+    // Path should start from bottom of source and go down
+    const mMatch = pathD.match(/^M (\d+) (\d+)/);
+    expect(mMatch).toBeTruthy();
+    expect(parseInt(mMatch![1])).toBe(source.x + NODE_W / 2);  // starts at center X
+    expect(parseInt(mMatch![2])).toBe(source.y + NODE_H);       // starts at bottom Y
+  });
+
+  it('finds gap on right side when left is blocked', () => {
+    // C0           C1
+    // ┌──────┐     ┌──────┐
+    // │ObsL  │     │Source│
+    // └──────┘     └──┬───┘
+    //                  │ direct up blocked
+    //            ┌─────▼─────┐
+    //            │  ObsM     │
+
+    const source = makeNode('src', 130 + 36, 0);        // C1
+    const target = makeNode('tgt', 0, -80);                // C0 (above)
+    const obsL = makeNode('obsL', 0, -40);                  // same col as target, blocks direct approach
+    const obsM = makeNode('obsM', 130 + 36, -40);           // same col as source
+
+    const pathD = computeLinkPath(source, target, 'negative', [target, obsL, obsM], true);
+
+    // Path should start from bottom of source and go down
+    const mMatch = pathD.match(/^M (\d+) (\d+)/);
+    expect(mMatch).toBeTruthy();
+    expect(parseInt(mMatch![1])).toBe(source.x + NODE_W / 2);  // center X
+    expect(parseInt(mMatch![2])).toBe(source.y + NODE_H);       // bottom Y
   });
 });

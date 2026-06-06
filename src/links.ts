@@ -9,36 +9,55 @@ export function computeLinkPath(
   source: LayoutNode,
   target: LayoutNode,
   type: string,
+  _allNodes?: LayoutNode[],
   isNegative: boolean = false,
 ): string {
-  // Negative links (altNext branches) use 90-degree orthogonal routing:
-  // down → sideways → down to target (half-way bend avoids crossing intermediate nodes).
+  // Negative links (altNext branches) use 90-degree orthogonal routing.
   const isNeg = isNegative || type === 'negative';
   if (isNeg) {
     const sourceCenterX = source.x + NODE_W / 2;
     const targetCenterX = target.x + NODE_W / 2;
 
     if (source.y < target.y) {
-      // Target below: bottom-center → half-way → sideways → down to top of target
-      const sourceBottomY = source.y + NODE_H;
-      const targetTopY = target.y;
-      const midY = sourceBottomY + (targetTopY - sourceBottomY) / 2;
-
+      // Target below — unified gap-based routing
       if (sourceCenterX === targetCenterX) {
-        return `M ${sourceCenterX} ${sourceBottomY} L ${targetCenterX} ${targetTopY}`;
+        return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
       }
-      return `M ${sourceCenterX} ${sourceBottomY} L ${sourceCenterX} ${midY} L ${targetCenterX} ${midY} L ${targetCenterX} ${targetTopY}`;
+
+      const safeX = source.x + NODE_W + NODE_GAP_X / 2; // right edge + half gap
+      const routeY = source.y + NODE_H + NODE_GAP_X / 2; // down half-gap, turn sideways
+      const aboveTarget = target.y - NODE_GAP_X / 2; // stop half-gap above target
+
+      return (
+        `M ${sourceCenterX} ${source.y + NODE_H} ` +   // start at bottom-center of source
+        `L ${sourceCenterX} ${routeY} ` +              // down half gap and turn sideways
+        `L ${safeX} ${routeY} ` +                      // to first column gap (right)
+        `L ${safeX} ${aboveTarget} ` +                 // up alongside target, stop half-gap above top
+        `L ${targetCenterX} ${aboveTarget} ` +         // turn to target center X
+        `L ${targetCenterX} ${target.y}`               // down into target top edge
+      );
     }
 
-    // Target above: top-center → half-way → sideways → up to bottom of target
-    const sourceTopY = source.y;
-    const targetBottomY = target.y + NODE_H;
-    const midY = sourceTopY + (targetBottomY - sourceTopY) / 2;
-
+    // ── Target above — unified gap-based routing ────────────────────────
     if (sourceCenterX === targetCenterX) {
-      return `M ${sourceCenterX} ${sourceTopY} L ${targetCenterX} ${targetBottomY}`;
+      return `M ${sourceCenterX} ${source.y} L ${targetCenterX} ${target.y + NODE_H}`;
     }
-    return `M ${sourceCenterX} ${sourceTopY} L ${sourceCenterX} ${midY} L ${targetCenterX} ${midY} L ${targetCenterX} ${targetBottomY}`;
+
+    // Route in the direction of the target, same as downward branch
+    const safeX = sourceCenterX > targetCenterX
+      ? source.x - NODE_GAP_X / 2                     // left edge (target is on left)
+      : source.x + NODE_W + NODE_GAP_X / 2;           // right edge (target is on right)
+    const safeY = source.y + NODE_H + NODE_GAP_X / 2; // down half-gap, turn sideways
+    const aboveTarget = target.y - NODE_GAP_X / 2;    // stop half-gap above target top
+
+    return (
+      `M ${sourceCenterX} ${source.y + NODE_H} ` +   // start at bottom-center of source
+      `L ${sourceCenterX} ${safeY} ` +               // down half gap and turn sideways
+      `L ${safeX} ${safeY} ` +                       // to first column gap toward target
+      `L ${safeX} ${aboveTarget} ` +                 // up alongside target, stop half-gap above top
+      `L ${targetCenterX} ${aboveTarget} ` +         // turn to target center X
+      `L ${targetCenterX} ${target.y}`               // down into target top edge
+    );
   }
 
    // Same column: draw straight vertical arrow (bottom-center → top-center or vice versa)

@@ -299,10 +299,13 @@ export function renderEventStorming(
 
   const adjustedSource = { ...source, x: source.x + offsetX };
   const adjustedTarget = { ...target, x: target.x + offsetX };
+  // Adjust all nodes for the same offset so obstacle detection works correctly
+  const adjustedNodes = layout.nodes.map((n) => ({ ...n, x: n.x + offsetX }));
   const pathD = computeLinkPath(
     adjustedSource,
     adjustedTarget,
     link.type,
+    adjustedNodes,
     link.label === 'no'
   );
   linksGroup
