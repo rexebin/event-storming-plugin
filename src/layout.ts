@@ -156,7 +156,9 @@ export function layoutChainFrom(
     const crossesSubGroup =
       !!subGroupOf &&
       (subGroupOf.get(current.id) ?? '') !== (subGroupOf.get(nextNode.id) ?? '');
-    currentX += NODE_W + NODE_GAP_X + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
+    // Shift chain advancement by each node's own offset so successors inherit the shift.
+    const ownOffset = (current.offset ?? 0) * (NODE_W + NODE_GAP_X);
+    currentX += NODE_W + NODE_GAP_X + ownOffset + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
     current = nextNode;
    }
 
@@ -177,8 +179,10 @@ export function layoutChainFrom(
     const mainChainNextId = chainNodes[i + 1]?.node.id;
 
     allLinks.push({ source: node.id, target: negativeNode.id, label: linkLabel, type: 'negative' });
+    // Use visual X (rawX + own offset) so altNext children align directly below the shifted parent.
+    const parentOwnOffset = (node.offset ?? 0) * (NODE_W + NODE_GAP_X);
     const altBottom = layoutAltBranch(
-      negativeNode, x, negativeY, container, model, processNodeMap,
+      negativeNode, x + parentOwnOffset, negativeY, container, model, processNodeMap,
       allNodes, allLinks, processPositioned, positioned, mainChainNextId, subGroupOf
      );
     maxBottom = Math.max(maxBottom, altBottom);

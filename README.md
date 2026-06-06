@@ -189,9 +189,10 @@ Rendered:
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
           <error name="Status code is not 422" altNext="Rejected Exception?" ></error>
           <command name="reject" altNext="Rejected Exception?" />
+          <event name="Rejected" />
           <error name="Rejected Exception?" noNext="true"></error>
-          <policy name="Have reached max retries?" altNext="Failed Exception" />
-          <command name="Record Failed Attempt" altNext="Failed Exception" />
+          <policy name="Have reached max retries?" altNext="Failed Exception"  />
+          <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <error name="Failed Exception"></error>
       </container>
   </aggregate>

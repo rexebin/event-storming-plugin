@@ -13,6 +13,7 @@ export interface DSLNode {
   altNext?: string; // negative next node id (for policy no-path, rendered below)
   altNextText?: string; // original text of altNext (for auto-generated error node label)
   notes?: string[]; // attached notes for this node
+  offset?: number; // additional column shift to avoid collisions (each unit = NODE_W + NODE_GAP_X)
 }
 
 export interface DSLLink {
@@ -553,6 +554,8 @@ function collectXMLChildren(
       const rawNext = child.getAttribute('next') ?? undefined;
       const rawNegativeNext = child.getAttribute('altNext') ?? undefined;
       const noNext = child.hasAttribute('noNext') || undefined;
+      const offsetAttr = child.getAttribute('offset');
+      const offset = offsetAttr !== null ? parseInt(offsetAttr, 10) : undefined;
 
       const n: DSLNode = {
         id,
@@ -567,6 +570,7 @@ function collectXMLChildren(
         altNext: undefined,
         altNextText: rawNegativeNext,
         notes: xmlAttrNotes(child),
+        offset,
       };
       model.nodes.push(n);
       pending.push({ node: n, rawNext, rawNegativeNext, nodePrefix: prefix });
