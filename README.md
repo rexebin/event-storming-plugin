@@ -19,7 +19,7 @@ A **browser extension** (Manifest V3) and **VS Code Markdown preview extension**
 - 🎨 Full event storming visual language: events, commands, queries, aggregates, actors, policies, views, read models, external systems, errors, and note nodes
 - 📦 Container-based layout: XML DSL containers render as visual boxes for aggregates, external systems, read models, and process containers
 - 🗂️ Nested process groups: each child group renders inside a dashed sub-container with the group name in the top-left corner
-- ⬅️→ Left-to-right process flows: actor → command/query/policy → event inside containers, with policy failure branches rendered below
+- ⬅️→ Left-to-right process flows: actor → command/query/policy → event inside containers, with failure branches rendered below nodes
 - ↘️ Directional arrows with shared-target fan-in layouts for commands and views
 - 🔍 Interactive zoom & pan
 - 💡 Notes-only tooltips: tooltips appear only for containers, groups, or nodes that have notes
