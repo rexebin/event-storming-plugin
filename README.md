@@ -307,6 +307,7 @@ Rendered:
 - `next` — links to another node in the same container and renders to the **right**. **`next` is optional** — if omitted, the node automatically connects to the immediately following sibling in the container, so you only need to set it when jumping non-sequentially.
 - `altNext` — used for policy failure paths and renders **below** the policy. When a policy has an `altNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
 - `noNext` — marks a node as the end of a chain (no outgoing link). Set to `true` e.g. `noNext="true"`.
+- `offset` — shifts a node horizontally to the right by the given number of units. Use when an `altNext` failure branch would visually collide with a sibling node, e.g. `offset="1"`. The entire subtree (including nested `<container>` and altNext children) shifts together.
 - `<note>...</note>` — child element to attach one or more notes to any node. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
 
 ### Diagram Types
@@ -394,7 +395,7 @@ Rendered:
 
 ### Testing
 
-95 tests (54 DSL + 34 renderer + 5 block detection + 2 preview source) using Vitest with jsdom:
+97 tests (56 DSL + 34 renderer + 5 block detection + 2 preview source) using Vitest with jsdom:
 
 ```bash
 npm test              # Run once
