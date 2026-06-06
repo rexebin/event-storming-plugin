@@ -238,17 +238,6 @@ export function renderEventStorming(
          .text('i');
      }
 
-     // Type badge (small label in corner)
-    if (node.type !== 'note') {
-      g.append('text')
-         .attr('x', 6)
-         .attr('y', -4)
-         .attr('font-size', '8px')
-         .attr('font-weight', '600')
-         .attr('fill', '#666')
-         .text(node.type);
-      }
-
      // Text label (centered, multi-line if needed)
     const textGroup = g
        .append('text')
@@ -331,9 +320,24 @@ export function renderEventStorming(
             nodeNotes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')
            }</ul></div>`
          : '';
+
+      const flowParts: string[] = [];
+      if (node.next) {
+        const nextNode = model.nodes.find((n) => n.id === node.next);
+        if (nextNode) flowParts.push(`→ ${escapeHtml(nextNode.label)}`);
+      }
+      if (node.altNext) {
+        const altNextNode = model.nodes.find((n) => n.id === node.altNext);
+        if (altNextNode) flowParts.push(`✕ ${escapeHtml(altNextNode.label)}`);
+      }
+      const flowHtml = flowParts.length > 0
+         ? `<div class="es-tooltip-flow">${flowParts.join('<br>')}</div>`
+         : '';
+
       const html = `<div class="es-tooltip-title">${escapeHtml(node.label)}</div>`
          + `<div class="es-tooltip-type">${formatNodeType(node.type)}</div>`
-         + notesHtml;
+         + notesHtml
+         + flowHtml;
 
       tooltip
          .style('display', 'block')

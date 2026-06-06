@@ -163,6 +163,12 @@
   margin-top: 2px;
 }
 
+.es-tooltip .es-tooltip-flow {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
 /* Legend */
 .es-legend {
   display: flex;

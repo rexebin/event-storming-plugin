@@ -725,4 +725,58 @@ describe('renderEventStorming layout', () => {
       expect(node.x + NODE_W).toBeLessThanOrEqual(rightBound + 1);
     }
   });
+
+  it('shows next and altNext node labels in tooltip when present', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), showerSample);
+
+    // "Is the shower running?" policy has next="Have shower gel?" and altNext="Switch on shower"
+    const node = host.querySelector('[data-id="Shower_Is_the_shower_running_"]');
+    expect(node).toBeTruthy();
+
+    node!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.innerHTML).toContain('Is the shower running?');
+    expect(tooltip!.innerHTML).toContain('Have shower gel?');
+    expect(tooltip!.innerHTML).toContain('Switch on shower');
+  });
+
+  it('shows next label but not altNext when only next is set', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), readmeSample);
+
+    // "CancelOrder" has next="Is Cancellation Allowed?" but no altNext
+    const node = host.querySelector('[data-id="Cancel_Order_CancelOrder"]');
+    expect(node).toBeTruthy();
+
+    node!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.innerHTML).toContain('CancelOrder');
+    expect(tooltip!.innerHTML).toContain('Is Cancellation Allowed?');
+  });
+
+  it('skips next and altNext in tooltip when neither is set', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), readmeSample);
+
+    // "OrderCancelled" event has no next or altNext (leaf node)
+    const node = host.querySelector('[data-id="Cancel_Order_OrderCancelled"]');
+    expect(node).toBeTruthy();
+
+    node!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.innerHTML).toContain('OrderCancelled');
+  });
 });
