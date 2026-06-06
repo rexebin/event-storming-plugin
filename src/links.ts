@@ -3,7 +3,7 @@
  */
 
 import { LayoutNode, LayoutLink } from './constants.js';
-import { NODE_W, NODE_H, NODE_GAP_X } from './constants.js';
+import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from './constants.js';
 
 export function computeLinkPath(
   source: LayoutNode,
@@ -14,6 +14,7 @@ export function computeLinkPath(
 ): string {
   // Negative links (altNext branches) use 90-degree orthogonal routing.
   const isNeg = isNegative || type === 'negative';
+  const gapY = NODE_GAP_Y + 20;
   if (isNeg) {
     const sourceCenterX = source.x + NODE_W / 2;
     const targetCenterX = target.x + NODE_W / 2;
@@ -23,10 +24,10 @@ export function computeLinkPath(
       if (sourceCenterX === targetCenterX) {
         return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
       }
-
+      
       const safeX = source.x + NODE_W + NODE_GAP_X / 2; // right edge + half gap
-      const routeY = source.y + NODE_H + NODE_GAP_X / 2; // down half-gap, turn sideways
-      const aboveTarget = target.y - NODE_GAP_X / 2; // stop half-gap above target
+      const routeY = source.y + NODE_H + gapY / 2; // down half-gap, turn sideways
+      const aboveTarget = target.y - gapY / 2; // stop half-gap above target
 
       return (
         `M ${sourceCenterX} ${source.y + NODE_H} ` +   // start at bottom-center of source
@@ -47,8 +48,8 @@ export function computeLinkPath(
     const safeX = sourceCenterX > targetCenterX
       ? source.x - NODE_GAP_X / 2                     // left edge (target is on left)
       : source.x + NODE_W + NODE_GAP_X / 2;           // right edge (target is on right)
-    const safeY = source.y + NODE_H + NODE_GAP_X / 2; // down half-gap, turn sideways
-    const aboveTarget = target.y - NODE_GAP_X / 2;    // stop half-gap above target top
+    const safeY = source.y + NODE_H + gapY / 2; // down half-gap, turn sideways
+    const aboveTarget = target.y - gapY / 2;    // stop half-gap above target top
 
     return (
       `M ${sourceCenterX} ${source.y + NODE_H} ` +   // start at bottom-center of source
