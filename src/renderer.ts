@@ -28,8 +28,13 @@ export function renderEventStorming(
   const model = parseDSL(dslText);
   const layout = computeLayout(model);
 
-  const svgWidth = layout.width + CONTAINER_PADDING * 2;
+  // Use container's actual width so the SVG always fills the available space.
+  // Center the diagram horizontally when it is narrower than the container.
+  const contentW = layout.width + CONTAINER_PADDING * 2;
+  const containerPx = container.node()?.getBoundingClientRect().width ?? 0;
+  const svgWidth = Math.max(containerPx, contentW);
   const svgHeight = layout.height + CONTAINER_PADDING * 2;
+  const offsetX = (svgWidth - contentW) / 2;
 
    // Create the SVG
   const svg = container
@@ -74,7 +79,7 @@ export function renderEventStorming(
 
   layout.containers.forEach((c) => {
     const g = containersGroup.append('g')
-       .attr('transform', `translate(${c.x}, ${c.y})`)
+       .attr('transform', `translate(${c.x + offsetX}, ${c.y})`)
        .attr('data-id', c.id)
        .attr('data-name', c.label);
 
@@ -122,7 +127,7 @@ export function renderEventStorming(
     const g = groupsGroup
        .append('g')
        .attr('class', 'es-process-group')
-       .attr('transform', `translate(${group.x}, ${group.y})`)
+       .attr('transform', `translate(${group.x + offsetX}, ${group.y})`)
        .attr('data-id', group.id)
        .attr('data-container-id', group.containerId)
        .attr('data-name', group.label);
@@ -158,7 +163,7 @@ export function renderEventStorming(
     const g = subGroupsGroup
        .append('g')
        .attr('class', 'es-sub-group')
-       .attr('transform', `translate(${sg.x}, ${sg.y})`)
+       .attr('transform', `translate(${sg.x + offsetX}, ${sg.y})`)
        .attr('data-name', sg.label);
 
     g.append('rect')
@@ -193,7 +198,7 @@ export function renderEventStorming(
     const g = nodesGroup
        .append('g')
        .attr('class', 'es-node')
-       .attr('transform', `translate(${node.x}, ${node.y})`)
+       .attr('transform', `translate(${node.x + offsetX}, ${node.y})`)
        .attr('data-id', node.id)
        .on('mouseover', function (this: Element) {
         d3.select(this).raise();
@@ -263,7 +268,14 @@ export function renderEventStorming(
   const target = layout.nodes.find((n) => n.id === link.target);
   if (!source || !target) return;
 
-  const pathD = computeLinkPath(source, target, link.type, link.label === 'no');
+  const adjustedSource = { ...source, x: source.x + offsetX };
+  const adjustedTarget = { ...target, x: target.x + offsetX };
+  const pathD = computeLinkPath(
+    adjustedSource,
+    adjustedTarget,
+    link.type,
+    link.label === 'no'
+  );
   linksGroup
      .append('path')
      .attr('class', `es-link es-link-${link.type}`)

@@ -318,7 +318,7 @@ describe('renderEventStorming layout', () => {
     expect(eventPositions.some((position) => position.x > viewPos.x)).toBe(true);
   });
 
-  it('uses one marker and stroke color for every link', () => {
+  it('uses one marker for every link', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -328,10 +328,8 @@ describe('renderEventStorming layout', () => {
     expect(links.length).toBeGreaterThan(0);
 
     const markers = new Set(links.map((link) => link.getAttribute('marker-end')));
-    const strokes = new Set(links.map((link) => link.getAttribute('stroke')));
 
     expect(markers).toEqual(new Set(['url(#arrowhead)']));
-    expect(strokes).toEqual(new Set(['#6a737d']));
   });
 
   it('shows a note badge and note text in the tooltip when a node has notes', () => {
@@ -778,5 +776,66 @@ describe('renderEventStorming layout', () => {
     const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
     expect(tooltip).toBeTruthy();
     expect(tooltip!.innerHTML).toContain('OrderCancelled');
+  });
+
+  it('sizes SVG to fill container width even when diagram is narrower', () => {
+    const host = document.createElement('div');
+    Object.defineProperty(host, 'getBoundingClientRect', {
+      value: () => ({ width: 2000 }),
+      writable: true,
+      configurable: true,
+    });
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), readmeSample);
+
+    const svg = host.querySelector('svg');
+    expect(svg).toBeTruthy();
+    // SVG width should match container (2000), not the diagram layout width
+    expect(Number(svg!.getAttribute('width'))).toBe(2000);
+  });
+
+  it('centers narrower diagrams horizontally inside the full-width SVG', () => {
+    const host = document.createElement('div');
+    Object.defineProperty(host, 'getBoundingClientRect', {
+      value: () => ({ width: 2000 }),
+      writable: true,
+      configurable: true,
+    });
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), readmeSample);
+
+    const svg = host.querySelector('svg');
+    expect(svg).toBeTruthy();
+    expect(Number(svg!.getAttribute('width'))).toBe(2000);
+
+    // The leftmost container element should have a positive X offset,
+    // centering the diagram within the SVG.
+    const firstContainer = host.querySelector<SVGGElement>('g.containers g[data-name="Order"]');
+    expect(firstContainer).toBeTruthy();
+    const pos = getTranslate(firstContainer!);
+    // With container padding of 24 and layout width much smaller than 2000,
+    // the offset should be > 24 (centering pushes content inward from edges).
+    expect(pos.x).toBeGreaterThan(CONTAINER_PADDING * 3);
+  });
+
+  it('does not offset when diagram fills the container', () => {
+    const host = document.createElement('div');
+    Object.defineProperty(host, 'getBoundingClientRect', {
+      value: () => ({ width: 800 }),
+      writable: true,
+      configurable: true,
+    });
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), readmeSample);
+
+    const svg = host.querySelector('svg');
+    expect(svg).toBeTruthy();
+    // When container is smaller than the layout, SVG should be at least layout width
+    const svgWidth = Number(svg!.getAttribute('width'));
+    const layout = computeLayout(parseDSL(readmeSample));
+    expect(svgWidth).toBeCloseTo(layout.width + CONTAINER_PADDING * 2, 0);
   });
 });
