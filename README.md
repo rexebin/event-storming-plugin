@@ -210,7 +210,7 @@ Rendered:
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" />
-          <error name="Failed Exception"></error>
+          <policy name="Failed Exception" next="Call Recorded"></policy>
       </container>
   </aggregate>
   <aggregate name="User">
@@ -285,6 +285,12 @@ Rendered:
           <event name="OrderPlaced" next="Order Detail View" />
           <event name="OrderCancelled" next="Order Detail View" />
           <event name="OrderUpdated" next="Order Detail View" />
+          <event name="OrderUpdated1" next="Order Detail View" />
+          <event name="OrderUpdated2" next="Order Detail View" />
+          <event name="OrderUpdated3" next="Order Detail View" />
+          <event name="OrderUpdated4" next="Order Detail View" />
+          <event name="OrderUpdated5" next="Order Detail View" />
+          <event name="OrderUpdated6" next="Order Detail View" />
           <event name="OrderShipped" />
           <readModel name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></readModel>
       </container>

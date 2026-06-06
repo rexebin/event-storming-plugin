@@ -495,7 +495,7 @@ describe('renderEventStorming layout', () => {
     expect(switchPos.y).toBeGreaterThan(runningPos.y);
   });
 
-  it('curves the negative rejoin link back into the main flow', () => {
+  it('uses straight line for non-event-to-readModel rejoin link between same-row nodes', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -507,15 +507,15 @@ describe('renderEventStorming layout', () => {
     expect(haveShowerGel).toBeTruthy();
     expect(switchOnShower).toBeTruthy();
 
-    const curvedRejoin = host.querySelector<SVGPathElement>(
+    const rejoinLink = host.querySelector<SVGPathElement>(
       `path.es-link-default[data-source="${switchOnShower!.getAttribute('data-id')}"][data-target="${haveShowerGel!.getAttribute('data-id')}"]`
     );
-    const curvedRejoinPath = curvedRejoin?.getAttribute('d') || '';
+    const rejoinPathD = rejoinLink?.getAttribute('d') || '';
 
-    expect(curvedRejoin).toBeTruthy();
-    // Rejoin links between same-row chain nodes use bezier curves (default type)
-    expect(curvedRejoinPath).toContain(' C ');
-    expect(curvedRejoin!.getAttribute('marker-end')).toBe('url(#arrowhead)');
+    expect(rejoinLink).toBeTruthy();
+    // Non-event-to-readModel same-row default links use straight lines
+    expect(rejoinPathD).toMatch(/^M \d+ \d+ L \d+ \d+$/);
+    expect(rejoinLink!.getAttribute('marker-end')).toBe('url(#arrowhead)');
   });
 
   it('offsets the "no" label away from the negative link line', () => {
@@ -535,7 +535,7 @@ describe('renderEventStorming layout', () => {
     expect(Number(noLabel!.getAttribute('y'))).toBe(mid.y - 10);
   });
 
-  it('curves fan-in links when source nodes are on different rows', () => {
+  it('uses straight lines for non-event-to-readModel fan-in links', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -563,14 +563,12 @@ describe('renderEventStorming layout', () => {
       expect(path).toBeTruthy();
       expect(path!.getAttribute('marker-end')).toBe('url(#arrowhead)');
 
+      // Fan-in links from actor/event → command are not event→readModel, so straight line
       if (sourcePos.y === cancelOrderPos.y) {
         expect(pathD).not.toContain(' C ');
        } else {
-        expect(pathD).toContain(' C ');
-        const expectedAnchorY = sourcePos.y > cancelOrderPos.y
-          ? cancelOrderPos.y + NODE_H * 0.75
-          : cancelOrderPos.y + NODE_H * 0.25;
-        expect(pathD.endsWith(`${cancelOrderPos.x} ${expectedAnchorY}`)).toBe(true);
+        // Different rows, still straight line for non-event-to-readModel
+        expect(pathD).not.toContain(' C ');
        }
     }
   });

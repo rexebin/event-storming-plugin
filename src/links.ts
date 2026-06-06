@@ -61,22 +61,39 @@ export function computeLinkPath(
     );
   }
 
-   // Same column: draw straight vertical arrow (bottom-center → top-center or vice versa)
+   // ─── Same column: straight vertical, unless event → readModel (use curved bezier) ───
   if (source.x === target.x) {
     const cx = source.x + NODE_W / 2;
+    if (source.type === 'event' && target.type === 'readModel') {
+      // Use gentle S-curve to stand out from the many straight vertical lines
+      const curveDir = -1; // curve left
+      const controlOffset = Math.max(28, NODE_GAP_X);
+      const cy1 = source.y + NODE_H / 2;
+      const targetYAnchor = target.y + (source.y < target.y ? NODE_H * 0.75 : NODE_H * 0.25);
+      const approachY = targetYAnchor + (cy1 - targetYAnchor) * 0.45;
+      const controlX = cx + curveDir * controlOffset;
+      if (source.y < target.y) {
+        return `M ${cx} ${source.y + NODE_H} C ${controlX} ${source.y + NODE_H}, ${controlX} ${approachY}, ${target.x + NODE_W / 2} ${target.y}`;
+      }
+      return `M ${cx} ${source.y} C ${controlX} ${source.y}, ${controlX} ${cy1}, ${target.x + NODE_W / 2} ${target.y + NODE_H}`;
+    }
     if (source.y < target.y) {
       return `M ${cx} ${source.y + NODE_H} L ${cx} ${target.y}`;
     }
     return `M ${cx} ${source.y} L ${cx} ${target.y + NODE_H}`;
   }
 
+  // ─── Different columns: curved only for event → readModel, otherwise straight horizontal line ───
   const sourceIsLeft = source.x <= target.x;
   const sourceX = sourceIsLeft ? source.x + NODE_W : source.x;
   const targetX = sourceIsLeft ? target.x : target.x + NODE_W;
   const sourceY = source.y + NODE_H / 2;
   const targetY = target.y + NODE_H / 2;
 
-  if (sourceY !== targetY) {
+  const isEventToReadModel = source.type === 'event' && target.type === 'readModel';
+
+  if (isEventToReadModel && sourceY !== targetY) {
+    // Curved bezier: keep the existing routing logic for event → readModel links
     const sourceIsBelowTarget = sourceY > targetY;
     const targetAnchorY = target.y + (sourceIsBelowTarget ? NODE_H * 0.75 : NODE_H * 0.25);
     const targetApproachY = targetAnchorY + (sourceY - targetAnchorY) * 0.45;
@@ -101,6 +118,12 @@ export function computeLinkPath(
     const controlX2 = targetX - (sourceIsLeft ? controlOffset : -controlOffset);
 
     return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetApproachY}, ${targetX} ${targetAnchorY}`;
+  }
+
+  // Straight horizontal line: right edge of source → left edge (or top/bottom-edge approach for non-same-row)
+  if (sourceY !== targetY) {
+    const straightTargetY = sourceIsLeft ? target.y : target.y + NODE_H;
+    return `M ${sourceX} ${sourceY} L ${targetX} ${straightTargetY}`;
   }
 
   return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
