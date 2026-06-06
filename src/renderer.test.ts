@@ -679,13 +679,6 @@ describe('renderEventStorming layout', () => {
     const layout = computeLayout(model);
     const container = layout.containers[0];
 
-    console.log('AGGREGATE CONTAINER:', { id: container.id, x: container.x, width: container.width });
-    for (const n of layout.nodes) {
-      if (n.containerId === container.id) {
-        console.log(`  NODE "${n.label}"`, { x: n.x, rightEdge: n.x + NODE_W });
-      }
-    }
-
     const leftBound = container.x + CONTAINER_PADDING;
     const rightBound = container.x + container.width - CONTAINER_PADDING;
 
@@ -718,17 +711,6 @@ describe('renderEventStorming layout', () => {
 
     const layout = computeLayout(model);
 
-    // Debug: list all containers, groups and node positions
-    for (const c of layout.containers) {
-      console.log('CONTAINER:', { id: c.id, label: c.label, x: c.x, width: c.width });
-    }
-    for (const g of layout.groups) {
-      console.log('GROUP:', { id: g.id, x: g.x, width: g.width, rightEdge: g.x + g.width });
-    }
-    for (const n of layout.nodes) {
-      console.log(`NODE "${n.label}"`, { containerId: n.containerId, x: n.x, rightEdge: n.x + NODE_W });
-    }
-
     // The inner "Inner Container" is rendered as a group under the process container
     const targetGroup = layout.groups[0];
     expect(targetGroup).toBeTruthy();
@@ -736,11 +718,10 @@ describe('renderEventStorming layout', () => {
     const groupNodes = layout.nodes.filter((n) => n.containerId === targetGroup!.containerId);
     expect(groupNodes.length).toBeGreaterThan(0);
 
-    // Group x is relative to its parent container. Group must fully contain all its nodes.
+    // Group must fully contain all its nodes including offset-shifted ones.
     const rightBound = targetGroup.x + targetGroup.width - GROUP_PADDING;
 
     for (const node of groupNodes) {
-      // Each node's right edge must be within the group's right boundary
       expect(node.x + NODE_W).toBeLessThanOrEqual(rightBound + 1);
     }
   });
