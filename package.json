@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "description": "Render event storming diagrams on GitHub and in VS Code Markdown preview.",
   "icon": "icon.png",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "type": "module",
   "repository": {
     "type": "git",

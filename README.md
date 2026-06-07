@@ -87,7 +87,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
   <aggregate name="Complex Vertical Example (Ignore the logic, it's just for testing vertical layout)">
       <container name="Complex Vertical Example">
           <actor name="Customer" />
-          <command name="Call Service" />
+          <command name="Call Service" altNext="Have reached max retries?" />
           <policy name="Call Succeeded?" altNext="Service didn't respond correctly" next="Record Call" />
           <command name="Record Call" />
           <event name="Call Recorded" noNext="true" />
@@ -100,7 +100,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" />
-          <error name="Failed Exception"></error>
+          <policy name="Failed Exception" next="Call Recorded"></policy>
       </container>
   </aggregate>
   <aggregate name="User">
@@ -210,7 +210,7 @@ Rendered:
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" />
-          <policy name="Failed Exception" next="Record Call"></policy>
+          <policy name="Failed Exception" next="Call Recorded"></policy>
       </container>
   </aggregate>
   <aggregate name="User">
