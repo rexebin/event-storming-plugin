@@ -495,7 +495,7 @@ describe('renderEventStorming layout', () => {
     expect(switchPos.y).toBeGreaterThan(runningPos.y);
   });
 
-  it('uses straight line for non-event-to-readModel rejoin link between same-row nodes', () => {
+  it('uses orthogonal routing for rejoin link between different-row nodes', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -513,8 +513,8 @@ describe('renderEventStorming layout', () => {
     const rejoinPathD = rejoinLink?.getAttribute('d') || '';
 
     expect(rejoinLink).toBeTruthy();
-    // Non-event-to-readModel same-row default links use straight lines
-    expect(rejoinPathD).toMatch(/^M \d+ \d+ L \d+ \d+$/);
+    // Switch on shower is an altNext branch (below main chain), Have shower gel? is on main chain — orthogonal routing
+    expect(rejoinPathD).toMatch(/^M \d+ \d+ L \d+ \d+( L \d+ \d+)+$/);
     expect(rejoinLink!.getAttribute('marker-end')).toBe('url(#arrowhead)');
   });
 
@@ -772,14 +772,14 @@ describe('renderEventStorming layout', () => {
     expect(tooltip!.innerHTML).toContain('OrderCancelled');
   });
 
-  it('shows implicitly generated altNext error node in tooltip', () => {
+  it('does not show implicit altNext branch when no explicit target exists', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), wrapSample);
 
     // "Is Email Valid?" policy has altNext="Invalid Email" but no explicit
-    // error target, so getOrCreateNegativeNode creates an implicit node.
+    // error target — without auto-creation, no branch node should be rendered.
     const node = host.querySelector('[data-id="user_registration_is_email_valid_"]');
     expect(node).toBeTruthy();
 
@@ -789,8 +789,8 @@ describe('renderEventStorming layout', () => {
     expect(tooltip).toBeTruthy();
     expect(tooltip!.innerHTML).toContain('Is Email Valid?');
     expect(tooltip!.innerHTML).toContain('UserRegistered'); // next target
-    // implicit altNext error should be shown (altNextText "Invalid Email" used as label)
-    expect(tooltip!.innerHTML).toContain('✕ Invalid Email');
+    // No implicit altNext error should be shown (auto-creation removed)
+    expect(tooltip!.innerHTML).not.toContain('✕ Invalid Email');
   });
 
   it('sizes SVG to fill container width even when diagram is narrower', () => {

@@ -29,7 +29,6 @@ import {
   getProcessRoots,
   detectSharedTargetFanIn,
   placeProcessNode,
-  getOrCreateNegativeNode,
 } from './constants.js';
 
 // ─── Sub-group depth ─────────────────────────────────────────
@@ -167,14 +166,10 @@ export function layoutChainFrom(
   const negativeY = currentY + NODE_H + NODE_GAP_Y + 20;
   for (let i = chainNodes.length - 1; i >= 0; i--) {
     const { node, x } = chainNodes[i];
-    const hasAltBranch =
-      node.type === 'policy' || (!!node.altNext && processNodeMap.has(node.altNext));
+    const hasAltBranch = !!node.altNext && processNodeMap.has(node.altNext);
     if (!hasAltBranch) continue;
 
-    const negativeNode =
-      node.type === 'policy'
-         ? getOrCreateNegativeNode(node, container, model, processNodeMap)
-         : processNodeMap.get(node.altNext!)!;
+    const negativeNode = processNodeMap.get(node.altNext!)!;
     const linkLabel = '';
     const mainChainNextId = chainNodes[i + 1]?.node.id;
 

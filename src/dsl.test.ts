@@ -611,4 +611,293 @@ describe('parseDSL', () => {
      expect(result.nodes.length).toBeGreaterThan(0);
    });
    });
+
+  describe('custom id support', () => {
+    it('should use custom id when provided in text DSL', () => {
+      const dsl = 'actor: Customer [purple] [id="cust123"]';
+      const result = parseDSL(dsl);
+      expect(result.nodes.length).toBe(1);
+      expect(result.nodes[0].id).toBe('cust123');
+      expect(result.nodes[0].label).toBe('Customer');
+    });
+
+    it('should auto-generate id from name when no custom id provided', () => {
+      const dsl = 'actor: Customer [purple]';
+      const result = parseDSL(dsl);
+      expect(result.nodes[0].id).toBe('Customer');
+    });
+
+    it('should allow multiple nodes with the same name but different custom ids', () => {
+      const dsl = `
+        actor: Customer [purple] [id="cust1"]
+        actor: Customer [purple] [id="cust2"]
+      `;
+      const result = parseDSL(dsl);
+      expect(result.nodes.length).toBe(2);
+      expect(result.nodes[0].id).toBe('cust1');
+      expect(result.nodes[1].id).toBe('cust2');
+      expect(result.nodes[0].label).toBe('Customer');
+      expect(result.nodes[1].label).toBe('Customer');
+    });
+
+    it('should preserve label when custom id differs from name', () => {
+      const dsl = 'command: PlaceOrder [blue] [id="PO_001"]';
+      const result = parseDSL(dsl);
+      expect(result.nodes[0].id).toBe('PO_001');
+      expect(result.nodes[0].label).toBe('PlaceOrder');
+    });
+
+    it('should parse XML nodes with custom id attribute', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="PlaceOrder" id="PO_001"/>
+        <event name="OrderPlaced" id="OP_001"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
+      const orderPlaced = result.nodes.find((n) => n.label === 'OrderPlaced');
+      expect(placeOrder!.id).toBe('PO_001');
+      expect(orderPlaced!.id).toBe('OP_001');
+    });
+
+    it('should resolve next reference by name first (current behavior)', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="Place Order" id="PO_001" next="Order Placed"/>
+        <event name="Order Placed" id="OP_001"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.id === 'PO_001');
+      // next resolves to the actual target node's id (custom id, not prefixed)
+      expect(placeOrder!.next).toBe('OP_001');
+    });
+
+    it('should use auto-generated id when next reference matches no node name', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="Place Order" id="PO_001" next="NonExistent"/>
+        <event name="Something Else" id="SE_001"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.id === 'PO_001');
+      // No name match → falls through to prefix + normalizeId
+      expect(placeOrder!.next).toBe('Flow_NonExistent');
+    });
+
+    it('should prefer name match over custom id match', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="Place Order" id="PO_A" next="Target"/>
+        <event name="Target" id="T1"/>
+        <command name="Other Target" id="PO_B"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.id === 'PO_A');
+      // Should resolve to "Target" by name, not "Other Target" by fallback id matching
+      expect(placeOrder!.next).toBe('T1');
+    });
+
+    it('should set next via custom id in text DSL process chain', () => {
+      const dsl = `
+        aggregate: Order [green] {
+          process: Customer [id="CUST"] -> PlaceOrder [id="PO"]
+        }
+      `;
+      const result = parseDSL(dsl);
+      const customer = result.nodes.find((n) => n.id === 'CUST');
+      expect(customer).toBeDefined();
+      expect(customer!.next).toBe('PO');
+    });
+
+    it('should support id attribute on all node types in text DSL', () => {
+      const dsl = `
+        event: OrderPlaced [orange] [id="evt1"]
+        command: PlaceOrder [blue] [id="cmd1"]
+        actor: Customer [purple] [id="act1"]
+        policy: Validate [yellow] [id="pol1"]
+        readModel: Summary [cyan] [id="rm1"]
+        externalSystem: Gateway [pink] [id="ext1"]
+      `;
+      const result = parseDSL(dsl);
+      expect(result.nodes[0].id).toBe('evt1');
+      expect(result.nodes[1].id).toBe('cmd1');
+      expect(result.nodes[2].id).toBe('act1');
+      expect(result.nodes[3].id).toBe('pol1');
+      expect(result.nodes[4].id).toBe('rm1');
+      expect(result.nodes[5].id).toBe('ext1');
+    });
+
+    it('should set id on XML nodes with attributes like next', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <policy name="Validate" id="pol1" next="Result" altNext="Fail"/>
+        <event name="Result" id="res1"/>
+        <error name="Fail" id="fail1"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const policy = result.nodes.find((n) => n.id === 'pol1');
+      expect(policy).toBeDefined();
+      expect(policy!.next).toBe('res1');
+      expect(policy!.altNext).toBe('fail1');
+    });
+
+    it('should preserve label when custom id contains special characters', () => {
+      const dsl = 'actor: Customer Service [purple] [id="cs-2024!"]';
+      const result = parseDSL(dsl);
+      expect(result.nodes[0].id).toBe('cs-2024!');
+      expect(result.nodes[0].label).toBe('Customer Service');
+    });
+
+    it('should not treat [id="..."] as color', () => {
+      const dsl = 'actor: Customer [id="cust1"]';
+      const result = parseDSL(dsl);
+      expect(result.nodes.length).toBe(1);
+      expect(result.nodes[0].id).toBe('cust1');
+      expect(result.nodes[0].label).toBe('Customer');
+      // Should use default actor color, not treat 'id' as a color
+      expect(result.nodes[0].color).toBe('#D4D3D3');
+    });
+
+    it('should support standalone nodes with custom id outside containers', () => {
+      const dsl = `
+        actor: Customer [purple] [id="ext_cust"]
+        externalSystem: Gateway [pink] [id="ext_gw"]
+      `;
+      const result = parseDSL(dsl);
+      expect(result.nodes.length).toBe(2);
+      expect(result.nodes[0].id).toBe('ext_cust');
+      expect(result.nodes[1].id).toBe('ext_gw');
+    });
+
+    it('should resolve altNext by node name, not custom id', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <policy name="Check Stock" id="pol1" altNext="StockError"/>
+        <error name="StockError" id="ERR_001"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const policy = result.nodes.find((n) => n.id === 'pol1');
+      // altNext matches by node NAME "StockError", resolves to that node's actual id
+      expect(policy!.altNext).toBe('ERR_001');
+    });
+
+    it('should generate id from name for XML nodes without custom id', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="PlaceOrder"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const node = result.nodes[0];
+      expect(node.id).toBe('Flow_PlaceOrder');
+    });
+
+    it('should use auto-generated id when XML id attribute is empty', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="PlaceOrder" id=""/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      expect(result.nodes.length).toBe(1);
+      expect(result.nodes[0].id).toBe('Flow_PlaceOrder');
+    });
+
+    it('should use auto-generated id when text DSL [id=""] is empty', () => {
+      const dsl = 'command: PlaceOrder [blue] [id=""]';
+      const result = parseDSL(dsl);
+      expect(result.nodes.length).toBe(1);
+      expect(result.nodes[0].id).toBe('PlaceOrder');
+    });
+
+    it('should resolve altNext by node name, not custom id', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <policy name="Check Stock" id="POL_01" next="GoodStock" altNext="OutOfStock"/>
+        <event name="GoodStock" id="GOOD"/>
+        <error name="OutOfStock" id="OUT"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const policy = result.nodes.find((n) => n.id === 'POL_01');
+      expect(policy!.next).toBe('GOOD');
+      // altNext matches by node NAME "OutOfStock", resolves to that node's actual id
+      expect(policy!.altNext).toBe('OUT');
+    });
+
+    it('should keep customId on nodes even when name resolves first', () => {
+      const dsl = `
+        aggregate: Order [green] {
+          process: Customer [id="CUST_123"] -> PlaceOrder [id="PO_456"]
+        }
+      `;
+      const result = parseDSL(dsl);
+      const customer = result.nodes.find((n) => n.label === 'Customer');
+      expect(customer!.id).toBe('CUST_123');
+      expect(customer!.customId).toBe('CUST_123');
+      const po = result.nodes.find((n) => n.label === 'PlaceOrder');
+      expect(po!.id).toBe('PO_456');
+      expect(po!.customId).toBe('PO_456');
+    });
+
+    it('should prefer policy over error when altNext name collides on same label', () => {
+      const xml = `<eventstorming><aggregate name="Test"><container name="Flow">
+        <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
+        <policy name="Failed Exception" next="Call Recorded"></policy>
+        <error id="failed-exception-1" name="Failed Exception"></error>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const cmd = result.nodes.find((n) => n.label === 'Record Failed Attempt');
+      // altNext="Failed Exception" should resolve to the policy (first match), not the error
+      expect(cmd!.altNext).toBe('Flow_Failed_Exception');
+    });
+
+    it('should resolve explicit custom id reference when name collides', () => {
+      const xml = `<eventstorming><aggregate name="Test"><container name="Flow">
+        <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
+        <policy name="Failed Exception" next="Call Recorded"></policy>
+        <error id="failed-exception-1" name="Failed Exception"></error>
+        <event name="Failed Attempt Recorded" next="" altNext="failed-exception-1"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const cmd = result.nodes.find((n) => n.label === 'Record Failed Attempt');
+      const evt = result.nodes.find((n) => n.label === 'Failed Attempt Recorded');
+      // altNext="Failed Exception" → first match by name = policy
+      expect(cmd!.altNext).toBe('Flow_Failed_Exception');
+      // altNext="failed-exception-1" is an explicit custom id → resolves to that node
+      expect(evt!.altNext).toBe('failed-exception-1');
+    });
+
+    it('should prefer non-error for next when label collides', () => {
+      const xml = `<eventstorming><aggregate name="Test"><container name="Flow">
+        <policy name="Check It" next="Failed Exception"/>
+        <policy name="Failed Exception"></policy>
+        <error id="err1" name="Failed Exception"></error>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const policy = result.nodes.find((n) => n.label === 'Check It');
+      expect(policy!.next).toBe('Flow_Failed_Exception');
+    });
+
+    it('should resolve Complex Vertical Example altNext references correctly', () => {
+      const xml = `<eventstorming><aggregate name="Complex Vertical Example">
+          <container name="Complex Vertical Example">
+              <actor name="Customer" />
+              <command name="Call Service" altNext="Have reached max retries?" />
+              <policy name="Call Succeeded?" altNext="Service didn't respond correctly" next="Record Call" />
+              <command name="Record Call" />
+              <event name="Call Recorded" next="" />
+              <error name="Service didn't respond correctly" altNext="Server Error?" next=""></error>
+              <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
+              <error name="Status code is not 422" altNext="Another condition?" ></error>
+              <command name="Reject Call" altNext="Rejected Exception?" />
+              <event name="Call Rejected" next="" />
+              <policy name="Another condition?" next="" altNext="Record Call" />
+              <policy name="Have reached max retries?" altNext="Failed Exception"  />
+              <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
+              <event name="Failed Attempt Recorded" next="" altNext="failed-exception-1"/>
+              <policy name="Failed Exception" next="Call Recorded" ></policy>
+              <error id="failed-exception-1" name="Failed Exception"></error>
+          </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      // "Have reached max retries?" altNext should resolve to the policy "Failed Exception"
+      const hasReachedMaxRetries = result.nodes.find((n) => n.label === 'Have reached max retries?');
+      expect(hasReachedMaxRetries!.altNext).toBe('Complex_Vertical_Example_Failed_Exception');
+      // "Record Failed Attempt" altNext should also resolve to the policy (name match, type preference)
+      const recordFailed = result.nodes.find((n) => n.label === 'Record Failed Attempt');
+      expect(recordFailed!.altNext).toBe('Complex_Vertical_Example_Failed_Exception');
+      // "Failed Attempt Recorded" altNext is explicit custom id → resolves to the error node
+      const failedRecorded = result.nodes.find((n) => n.label === 'Failed Attempt Recorded');
+      expect(failedRecorded!.altNext).toBe('failed-exception-1');
+    });
+  });
 });

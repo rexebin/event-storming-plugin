@@ -8,6 +8,7 @@ export interface DSLNode {
   containerId: string | null; // parent container id (aggregate/readModel/process)
   processIndex: number; // index within a process chain (-1 if standalone)
   noteTarget: string | null; // if type='note', the node it's attached to
+  customId?: string; // optional user-provided id (differs from auto-generated id when set)
   next?: string | null; // next node id; null = explicitly no next (from next="")
   altNext?: string | null; // negative next node id (for policy no-path, rendered below)
   altNextText?: string; // original text of altNext (for auto-generated error node label)
@@ -153,31 +154,43 @@ export function parseDSL(text: string): DSLModel {
    }
 
   // ─── Standalone aggregate / entity (no {) ───
-  const standaloneAggregateMatch = line.match(/^(?:aggregate|entity):\s*(.+?)\s*\[(\w+)\]\s*$/i);
+  let lineForStandalone = line;
+  let standaloneCustomId: string | undefined;
+  const saIdMatch = line.match(/^(.+?)\s*\[id="([^"]*)"\]\s*$/i);
+  if (saIdMatch) {
+    lineForStandalone = saIdMatch[1];
+    if (saIdMatch[2]) {
+      standaloneCustomId = saIdMatch[2];
+    }
+  }
+
+  const standaloneAggregateMatch = lineForStandalone.match(/^(?:aggregate|entity):\s*(.+?)\s*\[(\w+)\]\s*$/i);
   if (standaloneAggregateMatch && !currentContainer) {
    model.nodes.push({
-     id: normalizeId(standaloneAggregateMatch[1]),
+     id: standaloneCustomId ?? normalizeId(standaloneAggregateMatch[1]),
      label: standaloneAggregateMatch[1].trim(),
      type: 'aggregate',
      color: getColor(standaloneAggregateMatch[2]),
      containerId: null,
      processIndex: -1,
      noteTarget: null,
+     customId: standaloneCustomId,
      });
    continue;
    }
 
   // ─── Standalone readModel (no {) ───
-  const standaloneReadModelMatch = line.match(/^readModel:\s*(.+?)\s*\[(\w+)\]\s*$/i);
+  const standaloneReadModelMatch = lineForStandalone.match(/^readModel:\s*(.+?)\s*\[(\w+)\]\s*$/i);
   if (standaloneReadModelMatch && !currentContainer) {
    model.nodes.push({
-     id: normalizeId(standaloneReadModelMatch[1]),
+     id: standaloneCustomId ?? normalizeId(standaloneReadModelMatch[1]),
      label: standaloneReadModelMatch[1].trim(),
      type: 'readModel',
      color: getColor(standaloneReadModelMatch[2]),
      containerId: null,
      processIndex: -1,
      noteTarget: null,
+     customId: standaloneCustomId,
      });
    continue;
    }
@@ -210,7 +223,17 @@ export function parseDSL(text: string): DSLModel {
            .filter(Boolean);
      const stepIds: string[] = [];
      for (const step of steps) {
-      const node = ensureNode(model, step, inferProcessType(step, currentContainer.type), currentContainer.id, stepIds.length);
+      // Extract optional [id="..."] from step label for custom id support
+      let stepCustomId: string | undefined;
+      let stepLabel = step;
+      const stepIdMatch = step.match(/^(.+?)\s*\[id="([^"]*)"\]\s*$/i);
+      if (stepIdMatch) {
+        stepLabel = stepIdMatch[1].trim();
+        if (stepIdMatch[2]) {
+          stepCustomId = stepIdMatch[2];
+        }
+      }
+      const node = ensureNode(model, stepLabel, inferProcessType(stepLabel, currentContainer.type), currentContainer.id, stepIds.length, stepCustomId);
       stepIds.push(node.id);
        }
      const proc: DSLProcess = {
@@ -281,8 +304,18 @@ function parseNodeLine(
   line: string,
   containerId: string | null,
   processIndex: number,
-  noteTarget: string | null
+  _noteTarget: string | null
 ): DSLNode | null {
+  // Extract optional [id="..."] attribute from the end of the line (non-greedy so other brackets are preserved)
+  let customId: string | undefined;
+  const idMatch = line.match(/^(.+?)\s*\[id="([^"]*)"\]\s*$/i);
+  if (idMatch) {
+    line = idMatch[1];
+    if (idMatch[2]) {
+      customId = idMatch[2];
+    }
+  }
+
   const nodeDefaults: Record<string, { type: NodeType; color: string }> = {
   note: { type: 'note', color: '#FFF1AA' },
   actor: { type: 'actor', color: '#D4D3D3' },
@@ -310,6 +343,7 @@ function parseNodeLine(
   containerId,
   processIndex,
   noteTarget: noteMatch[2] ? normalizeId(noteMatch[2]) : null,
+  customId,
     };
   }
 
@@ -330,6 +364,7 @@ function parseNodeLine(
   next: normalizeId(yesNode),
   altNext: normalizeId(noNode),
   notes: [],
+  customId,
     };
     }
 
@@ -344,7 +379,7 @@ function parseNodeLine(
   const color = rawColor ? getColor(rawColor) : nodeDefaults[typeName].color;
 
   return {
-  id: normalizeId(label),
+  id: customId ?? normalizeId(label),
   label,
   type: nodeDefaults[typeName].type,
   color,
@@ -352,6 +387,7 @@ function parseNodeLine(
   processIndex,
   noteTarget: null,
   notes: [],
+  customId,
     };
   }
 
@@ -362,9 +398,23 @@ function parseNodeLine(
  * Ensure a node exists in the model (creates it if not).
  * Used inside process chains where nodes are referenced by label.
  */
-function ensureNode(model: DSLModel, label: string, type: NodeType, containerId: string | null, processIndex: number): DSLNode {
-  const id = normalizeId(label);
+function ensureNode(
+  model: DSLModel,
+  label: string,
+  type: NodeType,
+  containerId: string | null,
+  processIndex: number,
+  customId?: string
+): DSLNode {
+  const id = customId ?? normalizeId(label);
   let node = model.nodes.find((n) => n.id === id && n.containerId === containerId);
+  // Fallback to name-based resolution if exact id didn't match
+  if (!node) {
+    const canon = canonicalizeReference(label);
+    node = model.nodes.find(
+      (n) => !!n.label && n.containerId === containerId && canonicalizeReference(n.label!) === canon
+    );
+  }
   if (!node) {
   node = {
     id,
@@ -374,6 +424,7 @@ function ensureNode(model: DSLModel, label: string, type: NodeType, containerId:
     containerId,
     processIndex,
     noteTarget: null,
+    customId: customId ?? undefined,
     };
   model.nodes.push(node);
   }
@@ -484,18 +535,19 @@ function expandXMLContainer(
   dslContainer: DSLContainer,
   model: DSLModel,
   prefix: string,
-  parentAliases?: Map<string, string>
+  _parentAliases?: Map<string, string>
 ): void {
   const stepIds: string[] = [];
   const subGroups: DSLSubGroup[] = [];
   const aliases = new Map<string, string>();
   const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
 
-  collectXMLChildren(containerEl, dslContainer, model, prefix, aliases, stepIds, subGroups, pending);
+  collectXMLChildren(containerEl, dslContainer, model, prefix, aliases, stepIds, subGroups, pending, model.nodes);
 
-  for (const { node, rawNext, rawNegativeNext, nodePrefix } of pending) {
-    node.next = resolveReference(rawNext, prefix, aliases, parentAliases);
-    node.altNext = resolveReference(rawNegativeNext, prefix, aliases, parentAliases);
+  // Second pass: resolve references (after all aliases are registered)
+  for (const { node, rawNext, rawNegativeNext } of pending) {
+    node.next = resolveReference(rawNext, prefix, aliases, model.nodes, false);
+    node.altNext = resolveReference(rawNegativeNext, prefix, aliases, model.nodes, true);
   }
 
   fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
@@ -529,7 +581,8 @@ function collectXMLChildren(
   aliases: Map<string, string>,
   stepIds: string[],
   subGroups: DSLSubGroup[],
-  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }>
+  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }>,
+  allNodes?: DSLNode[]
 ): void {
   for (const child of Array.from(containerEl.children)) {
     const tagLower = child.tagName.toLowerCase();
@@ -538,7 +591,7 @@ function collectXMLChildren(
       const subName = child.getAttribute('name') || '';
       const subPrefix = prefix + normalizeId(subName) + '_';
       const subStepIds: string[] = [];
-      collectXMLChildren(child, dslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending);
+      collectXMLChildren(child, dslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending, allNodes);
       for (const id of subStepIds) stepIds.push(id);
       subGroups.push({ name: subName, nodeIds: subStepIds, notes: xmlAttrNotes(child) });
     } else {
@@ -549,11 +602,18 @@ function collectXMLChildren(
       if (tagLower === 'note' && !child.getAttribute('name')) continue;
 
       const name = child.getAttribute('name') || '';
-      const id = prefix + normalizeId(name);
-      const rawNext = child.getAttribute('next') ?? undefined;
-      const rawNegativeNext = child.getAttribute('altNext') ?? undefined;
+      const rawIdAttr = child.getAttribute('id');
+      const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
+      const autoId = prefix + normalizeId(name);
+      // Use id (actual node id) consistently for aliases and stepIds
+      const id = customIdAttr ?? autoId;
+
       const offsetAttr = child.getAttribute('offset');
       const offset = offsetAttr !== null ? parseInt(offsetAttr, 10) : undefined;
+
+      aliases.set(canonicalizeReference(name), id);
+      dslContainer.nodeIds.push(id);
+      stepIds.push(id);
 
       const n: DSLNode = {
         id,
@@ -563,17 +623,15 @@ function collectXMLChildren(
         containerId: dslContainer.id,
         processIndex: -1,
         noteTarget: null,
+        customId: customIdAttr ?? undefined,
         next: undefined,
         altNext: undefined,
-        altNextText: rawNegativeNext,
+        altNextText: child.getAttribute('altNext') ?? undefined,
         notes: xmlAttrNotes(child),
         offset,
       };
       model.nodes.push(n);
-      pending.push({ node: n, rawNext, rawNegativeNext, nodePrefix: prefix });
-      aliases.set(canonicalizeReference(name), id);
-      dslContainer.nodeIds.push(id);
-      stepIds.push(id);
+      pending.push({ node: n, rawNext: child.getAttribute('next') ?? undefined, rawNegativeNext: child.getAttribute('altNext') ?? undefined, nodePrefix: prefix });
     }
   }
 }
@@ -627,18 +685,50 @@ function resolveReference(
   reference: string | undefined,
   prefix: string,
   aliases: Map<string, string>,
-  parentAliases?: Map<string, string>
+  allNodes: DSLNode[],
+  isAltNext: boolean
 ): string | null | undefined {
   if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
   const key = canonicalizeReference(reference);
+
+  // 1) Check alias name match
   const localMatch = aliases.get(key);
-  if (localMatch) return localMatch;
-  if (parentAliases) {
-    const parentMatch = parentAliases.get(key);
-    if (parentMatch) return parentMatch;
+  // 2) Resolve to first match by type preference when multiple nodes share the name
+  const matches = allNodes.filter(
+    (n) => !!n.label && n.containerId !== null && canonicalizeReference(n.label!) === key
+  );
+  if (matches.length > 0 && localMatch) {
+    return resolveWithPreference(matches, isAltNext);
   }
+  if (matches.length === 1) return matches[0].id;
+  // 3) Parent alias fallback (name match only)
+  if (!localMatch && !matches.length) {
+    // 4) Explicit ID / customId match — reference directly matches a node's id or customId
+    const canon = canonicalizeReference(reference);
+    const directMatch = allNodes.find(
+      (n) => n.id === reference || (!!n.customId && canonicalizeReference(n.customId!) === canon)
+    );
+    if (directMatch) return directMatch.id;
+  }
+  // Fallback: generate an ID from the reference text
   return prefix + normalizeId(reference);
+}
+
+function resolveWithPreference(matches: DSLNode[], isAltNext: boolean): string {
+  if (isAltNext) {
+    // altNext: prefer policy first, then error, then others (by insertion order)
+    const policy = matches.find((n) => n.type === 'policy');
+    if (policy) return policy.id;
+    const error = matches.find((n) => n.type === 'error');
+    if (error) return error.id;
+  } else {
+    // next: prefer non-error nodes first, then errors
+    const nonError = matches.find((n) => n.type !== 'error');
+    if (nonError) return nonError.id;
+  }
+  // Fallback to first match (insertion order)
+  return matches[0].id;
 }
 
 function getColor(name: string): string {

@@ -2,7 +2,7 @@
  * Event Storming — Layout constants and types.
  */
 
-import { DSLContainer, DSLModel, DSLNode, DSLProcess, NodeType } from './dsl.js';
+import { DSLModel, DSLNode, DSLProcess } from './dsl.js';
 
 // ─── Node dimensions ─────────────────────────────────────────
 
@@ -163,39 +163,4 @@ export function placeProcessNode(
   });
   processPositioned.add(node.id);
   positioned.add(node.id);
-}
-
-export function getOrCreateNegativeNode(
-  node: DSLNode,
-  container: DSLContainer,
-  model: DSLModel,
-  processNodeMap: Map<string, DSLNode>,
-): DSLNode {
-  if (node.altNext && processNodeMap.has(node.altNext)) {
-    return processNodeMap.get(node.altNext)!;
-  }
-
-  const errorId = `error_default_${node.id}`;
-  const existing = model.nodes.find((candidate) => candidate.id === errorId);
-  if (existing) {
-    processNodeMap.set(existing.id, existing);
-    return existing;
-  }
-
-  const errorNode: DSLNode = {
-    id: errorId,
-    label: node.altNextText || node.label,
-    type: 'error' as NodeType,
-    color: '#8DCFF9',
-    containerId: container.id,
-    processIndex: -1,
-    noteTarget: null,
-    next: undefined,
-    altNext: undefined,
-    notes: [],
-  };
-
-  model.nodes.push(errorNode);
-  processNodeMap.set(errorNode.id, errorNode);
-  return errorNode;
 }
