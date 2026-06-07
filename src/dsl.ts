@@ -311,20 +311,6 @@ export function parseDSL(text: string): DSLModel {
         notes: [],
       });
     }
-    if (node.next && !model.nodes.find((n) => n.id === node.next)) {
-      const nid = normalizeId(node.next);
-      model.nodes.push({
-        id: nid,
-        label: node.next,
-        type: 'error',
-        containerId: node.containerId,
-        rootContainerId: node.rootContainerId,
-        processIndex: -1,
-        color: COLOR_MAP.red,
-        noteTarget: null,
-        notes: [],
-      });
-    }
   }
 
   // Add implicit error nodes to their parent process stepIds so layout routes them through altNext
@@ -591,9 +577,10 @@ function parseXMLDSL(text: string): DSLModel {
         const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
         collectXMLChildren(diagramEl, dslContainer, model, containerId + '_', aliases, stepIds, subGroups, pending, model.nodes);
 
+        const deferredErrorIds: string[] = [];
         for (const { node, rawNext, rawNegativeNext } of pending) {
           if (rawNext !== undefined && rawNext !== '') {
-            const nextId = resolveReference(rawNext, containerId + '_', model.nodes, node.rootContainerId);
+            const nextId = resolveReference(rawNext, containerId + '_', model.nodes, node.rootContainerId, false);
             node.next = nextId;
             if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
           } else {
@@ -602,10 +589,22 @@ function parseXMLDSL(text: string): DSLModel {
           if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
             const altNextId = resolveReference(rawNegativeNext, containerId + '_', model.nodes, node.rootContainerId);
             node.altNext = altNextId;
-            if (altNextId && !stepIds.includes(altNextId)) stepIds.push(altNextId);
+            if (altNextId && !stepIds.includes(altNextId)) {
+              const isError = model.nodes.find((n) => n.id === altNextId)?.type === 'error';
+              if (isError) {
+                deferredErrorIds.push(altNextId);
+              } else {
+                stepIds.push(altNextId);
+              }
+            }
           } else {
             node.altNext = rawNegativeNext === '' ? null : undefined;
           }
+        }
+
+        fillImplicitNext(pending.map((p) => p.node), stepIds);
+        for (const errId of deferredErrorIds) {
+          if (!stepIds.includes(errId)) stepIds.push(errId);
         }
 
         dslContainer.processes.push({
@@ -642,9 +641,10 @@ function expandXMLContainer(
   collectXMLChildren(containerEl, dslContainer, model, prefix, aliases, stepIds, subGroups, pending, model.nodes, localScopeId);
 
   // Second pass: resolve references (after all aliases are registered)
+  const deferredErrorIds: string[] = [];
   for (const { node, rawNext, rawNegativeNext } of pending) {
     if (rawNext !== undefined && rawNext !== '') {
-      const nextId = resolveReference(rawNext, prefix, model.nodes, node.rootContainerId);
+      const nextId = resolveReference(rawNext, prefix, model.nodes, node.rootContainerId, false);
       node.next = nextId;
       if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
     } else {
@@ -653,13 +653,24 @@ function expandXMLContainer(
     if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
       const altNextId = resolveReference(rawNegativeNext, prefix, model.nodes, node.rootContainerId);
       node.altNext = altNextId;
-      if (altNextId && !stepIds.includes(altNextId)) stepIds.push(altNextId);
+      if (altNextId && !stepIds.includes(altNextId)) {
+        const isError = model.nodes.find((n) => n.id === altNextId)?.type === 'error';
+        if (isError) {
+          deferredErrorIds.push(altNextId);
+        } else {
+          stepIds.push(altNextId);
+        }
+      }
     } else {
       node.altNext = rawNegativeNext === '' ? null : undefined;
     }
   }
 
   fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
+
+  for (const errId of deferredErrorIds) {
+    if (!stepIds.includes(errId)) stepIds.push(errId);
+  }
 
   dslContainer.processes.push({
     name: containerEl.getAttribute('name') || '',
@@ -798,7 +809,8 @@ function resolveReference(
   reference: string | undefined,
   prefix: string,
   allNodes: DSLNode[],
-  rootContainerId: string | null = null
+  rootContainerId: string | null = null,
+  allowImplicit: boolean = true
 ): string | null | undefined {
   if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
@@ -817,6 +829,7 @@ function resolveReference(
       )
     : [];
   if (matches.length >= 1) return matches[0].id;
+  if (!allowImplicit) return null;
   // Fallback: create implicit error node scoped to the current root container
   const nodeId = prefix + normalizeId(reference);
   allNodes.push({

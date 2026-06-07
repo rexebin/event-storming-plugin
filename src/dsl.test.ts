@@ -673,15 +673,17 @@ describe('parseDSL', () => {
       expect(placeOrder!.next).toBe('OP_001');
     });
 
-    it('should use auto-generated id when next reference matches no node name', () => {
+    it('should set next to null when next reference does not match any node', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
         <command name="Place Order" id="PO_001" next="NonExistent"/>
         <event name="Something Else" id="SE_001"/>
       </container></aggregate></eventstorming>`;
       const result = parseDSL(xml);
       const placeOrder = result.nodes.find((n) => n.id === 'PO_001');
-      // No name match → falls through to prefix + normalizeId
-      expect(placeOrder!.next).toBe('Flow_NonExistent');
+      expect(placeOrder!.next).toBeNull();
+
+      const errorNode = result.nodes.find((n) => n.label === 'NonExistent');
+      expect(errorNode).toBeUndefined();
     });
 
     it('should create implicit error node when altNext reference does not match any existing node', () => {
@@ -727,7 +729,7 @@ describe('parseDSL', () => {
       expect(errorNode!.containerId).toBe('ValidationSystem');
     });
 
-    it('should create implicit error node for unmatched next in text DSL', () => {
+    it('should NOT create implicit error node for unmatched next in text DSL', () => {
       const dsl = `
         readModel: ValidationSystem [purple] {
           policy: Validate [yes: MissingTarget, no: Success]
@@ -736,11 +738,64 @@ describe('parseDSL', () => {
       const result = parseDSL(dsl);
       const policy = result.nodes.find((n) => n.id === 'Validate');
       expect(policy!.next).toBe('MissingTarget');
+
       const errorNode = result.nodes.find((n) => n.id === 'MissingTarget');
+      expect(errorNode).toBeUndefined();
+    });
+
+    it('should NOT create implicit error node for unresolved next reference in XML DSL', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="Place Order" id="PO_001" next="CrossContainerTarget"/>
+        <event name="Order Placed" id="OP_001"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+
+      const placeOrder = result.nodes.find((n) => n.id === 'PO_001');
+      expect(placeOrder!.next).toBeNull();
+
+      const errorNode = result.nodes.find((n) => n.label === 'CrossContainerTarget');
+      expect(errorNode).toBeUndefined();
+    });
+
+    it('should NOT cause subsequent nodes to link to unresolved next ref error node', () => {
+      const xml = `<eventstorming><process name="Cancel Order">
+        <container name="Flow">
+          <actor name="Customer 1" next="Place Order" altNext="CancelOrder 1"/>
+          <command name="CancelOrder 1" altNext="Exception!"/>
+          <event name="OrderCancelled 1"/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+
+      // No error node should exist for the unresolved next="Place Order"
+      const placeOrderError = result.nodes.find((n) => n.label === 'Place Order' && n.type === 'error');
+      expect(placeOrderError).toBeUndefined();
+
+      // OrderCancelled 1 should NOT be linked to the "Place Order" error node
+      const orderCancelled = result.nodes.find((n) => n.label === 'OrderCancelled 1');
+      expect(orderCancelled).toBeTruthy();
+      expect(orderCancelled!.next).toBeUndefined();
+    });
+
+
+    it('should NOT assign altNext error node as next of the last regular node, but error node still appears in stepIds', () => {
+      const xml = `<eventstorming><process name="Cancel Order">
+        <container name="Flow">
+          <command name="CancelOrder" altNext="Exception!"/>
+          <event name="OrderCancelled"/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+
+      const orderCancelled = result.nodes.find((n) => n.label === 'OrderCancelled');
+      expect(orderCancelled).toBeTruthy();
+      expect(orderCancelled!.next).toBeUndefined();
+
+      // The error node should exist and be in the process stepIds for layout purposes
+      const errorNode = result.nodes.find((n) => n.label === 'Exception!' && n.type === 'error');
       expect(errorNode).toBeTruthy();
-      expect(errorNode!.type).toBe('error');
-      expect(errorNode!.label).toBe('MissingTarget');
-      expect(errorNode!.containerId).toBe('ValidationSystem');
+      const proc = result.containers.find((c) => c.label === 'Cancel Order')?.processes[0];
+      expect(proc?.stepIds).toContain(errorNode!.id);
     });
 
     it('should use COLOR_MAP.red (cyan) for implicit error node color', () => {
@@ -1141,16 +1196,18 @@ describe('parseDSL', () => {
       expect(cancelOrderCustomer!.altNext).toBe(cancelOrderCmd!.id);
     });
 
-    it('Customer 1 next="Place Order" is blocked across root containers and creates implicit error', () => {
+    it('Customer 1 next="Place Order" is blocked across root containers and resolves to null', () => {
       const result = parseDSL(crossRootXml);
       const customer1 = result.nodes.find((n) => n.label === 'Customer 1');
       const placeOrderCmd = result.nodes.find((n) => n.label === 'PlaceOrder');
 
       expect(customer1!.next).not.toBe(placeOrderCmd!.id);
+      expect(customer1!.next).toBeNull();
+
       const implicitError = result.nodes.find(
         (n) => n.type === 'error' && n.label === 'Place Order' && n.rootContainerId === customer1!.rootContainerId
       );
-      expect(implicitError).toBeTruthy();
+      expect(implicitError).toBeUndefined();
     });
 
     it('Customer 1 altNext="CancelOrder 1" resolves within Cancel Order 1 Container (same root)', () => {
