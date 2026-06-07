@@ -1059,8 +1059,8 @@ describe('parseDSL', () => {
       expect(implicitError!.rootContainerId).toBe('Order_Place_Order');
     });
 
-    it('should block linking between nodes in different nested sub-containers', () => {
-      // IsAddressValid (PlaceOrder) and AddressInvalid (Another Sub Process) are in DIFFERENT scopes
+    it('should allow linking between nodes in nested sub-containers sharing same root container', () => {
+      // IsAddressValid and AddressInvalid are both inside root container "Place Order" → should link
       const xml = `<eventstorming><aggregate name="Order">
         <container name="Place Order">
           <command name="PlaceOrder" next="DoSomething" />
@@ -1074,9 +1074,91 @@ describe('parseDSL', () => {
         </container>
       </aggregate></eventstorming>`;
       const result = parseDSL(xml);
-      // AddressInvalid is in a different root scope than IsAddressValid → no link
       const isAddressValid = result.nodes.find((n) => n.label === 'IsAddressValid');
-      expect(isAddressValid!.altNext).not.toBe('Another_Sub_Process_AddressInvalid');
+      const addressInvalid = result.nodes.find((n) => n.label === 'AddressInvalid');
+      // All nodes share the same root container "Place Order" → altNext link resolves
+      expect(isAddressValid!.altNext).toBe(addressInvalid!.id);
+    });
+
+    const crossRootXml = `<eventstorming>
+      <aggregate name="Order">
+        <container name="Order Lifecycle Container">
+          <note>Top-level group grouping placement and cancellation sub-flows.</note>
+          <container name="Place Order">
+            <actor name="Customer" />
+            <command name="PlaceOrder" />
+            <policy name="Is Payment Valid?" altNext="PaymentFailed" />
+            <event name="OrderPlaced" />
+          </container>
+          <container name="Cancel Order Container">
+            <actor name="Customer" next="PlaceOrder" altNext="CancelOrder" />
+            <command name="CancelOrder" />
+            <event name="OrderCancelled" />
+          </container>
+        </container>
+        <container name="Cancel Order 1 Container">
+          <actor name="Customer 1" next="Place Order" altNext="CancelOrder 1" />
+          <command name="CancelOrder 1" altNext="Exception!" />
+          <event name="OrderCancelled 1" />
+        </container>
+      </aggregate>
+    </eventstorming>`;
+
+    it('sibling sub-containers within same root share the same rootContainerId', () => {
+      const result = parseDSL(crossRootXml);
+      const placeOrderCmd = result.nodes.find((n) => n.label === 'PlaceOrder');
+      const cancelOrderCmd = result.nodes.find((n) => n.label === 'CancelOrder');
+
+      expect(placeOrderCmd!.rootContainerId).toBe(cancelOrderCmd!.rootContainerId);
+    });
+
+    it('nodes in different root containers have different rootContainerIds', () => {
+      const result = parseDSL(crossRootXml);
+      const placeOrderCmd = result.nodes.find((n) => n.label === 'PlaceOrder');
+      const customer1 = result.nodes.find((n) => n.label === 'Customer 1');
+
+      expect(placeOrderCmd!.rootContainerId).not.toBe(customer1!.rootContainerId);
+    });
+
+    it('Cancel Order Container customer next="PlaceOrder" resolves to PlaceOrder in sibling sub-container (same root)', () => {
+      const result = parseDSL(crossRootXml);
+      // The Customer node in Cancel Order Container has id containing that sub-container prefix
+      const cancelOrderCustomer = result.nodes.find(
+        (n) => n.label === 'Customer' && n.id.includes('Cancel_Order_Container')
+      );
+      const placeOrderCmd = result.nodes.find((n) => n.label === 'PlaceOrder');
+
+      expect(cancelOrderCustomer!.next).toBe(placeOrderCmd!.id);
+    });
+
+    it('Cancel Order Container customer altNext="CancelOrder" resolves within same root', () => {
+      const result = parseDSL(crossRootXml);
+      const cancelOrderCustomer = result.nodes.find(
+        (n) => n.label === 'Customer' && n.id.includes('Cancel_Order_Container')
+      );
+      const cancelOrderCmd = result.nodes.find((n) => n.label === 'CancelOrder');
+
+      expect(cancelOrderCustomer!.altNext).toBe(cancelOrderCmd!.id);
+    });
+
+    it('Customer 1 next="Place Order" is blocked across root containers and creates implicit error', () => {
+      const result = parseDSL(crossRootXml);
+      const customer1 = result.nodes.find((n) => n.label === 'Customer 1');
+      const placeOrderCmd = result.nodes.find((n) => n.label === 'PlaceOrder');
+
+      expect(customer1!.next).not.toBe(placeOrderCmd!.id);
+      const implicitError = result.nodes.find(
+        (n) => n.type === 'error' && n.label === 'Place Order' && n.rootContainerId === customer1!.rootContainerId
+      );
+      expect(implicitError).toBeTruthy();
+    });
+
+    it('Customer 1 altNext="CancelOrder 1" resolves within Cancel Order 1 Container (same root)', () => {
+      const result = parseDSL(crossRootXml);
+      const customer1 = result.nodes.find((n) => n.label === 'Customer 1');
+      const cancelOrder1 = result.nodes.find((n) => n.label === 'CancelOrder 1');
+
+      expect(customer1!.altNext).toBe(cancelOrder1!.id);
     });
 
     it('should allow linking between nodes in the SAME container (same rootContainerId)', () => {

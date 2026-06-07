@@ -682,24 +682,6 @@ const XML_NODE_TYPES: Record<string, NodeType> = {
   aggregate: 'aggregate',
 };
 
-function findOrCreateSubDSLContainer(childEl: Element, parentDslContainer: DSLContainer, model: DSLModel): DSLContainer {
-  const subName = childEl.getAttribute('name') || '';
-  const subId = normalizeId(subName);
-  // Check if a container with this id already exists (shouldn't normally happen)
-  let existing = model.containers.find((c) => c.id === parentDslContainer.id + '_' + subId);
-  if (existing) return existing;
-  const sub: DSLContainer = {
-    id: parentDslContainer.id + '_' + subId,
-    label: subName,
-    type: parentDslContainer.type,
-    color: parentDslContainer.color,
-    nodeIds: [],
-    processes: [],
-  };
-  model.containers.push(sub);
-  return sub;
-}
-
 function collectXMLChildren(
   containerEl: Element,
   dslContainer: DSLContainer,
@@ -716,13 +698,14 @@ function collectXMLChildren(
     const tagLower = child.tagName.toLowerCase();
 
     if (tagLower === 'container') {
-      const subDslContainer = findOrCreateSubDSLContainer(child, dslContainer, model);
-      const subPrefix = prefix + normalizeId(subDslContainer.label) + '_';
+      const subName = child.getAttribute('name') || '';
+      const subPrefix = prefix + normalizeId(subName) + '_';
       const subStepIds: string[] = [];
-      // Each container is its own scope boundary — nodes inside get the container's own id as rootScope
-      collectXMLChildren(child, subDslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending, allNodes, subDslContainer.id);
+      // Inherit parent root scope if already set; otherwise create a new scope boundary from parent + subName
+      const newRootScope = rootScope ?? (dslContainer.id + '_' + normalizeId(subName));
+      collectXMLChildren(child, dslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending, allNodes, newRootScope);
       for (const id of subStepIds) stepIds.push(id);
-      subGroups.push({ name: subDslContainer.label, nodeIds: subStepIds, notes: xmlAttrNotes(child) });
+      subGroups.push({ name: subName, nodeIds: subStepIds, notes: xmlAttrNotes(child) });
     } else {
       const nodeType = XML_NODE_TYPES[tagLower];
       if (!nodeType) continue;

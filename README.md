@@ -378,7 +378,7 @@ Rendered:
 ```xml
 <eventstorming>
   <aggregate name="Order">
-    <container name="Order Lifecycle">
+    <container name="Order Lifecycle Container">
       <note>Top-level group grouping placement and cancellation sub-flows.</note>
       <container name="Place Order">
         <actor name="Customer" />
@@ -386,17 +386,17 @@ Rendered:
         <policy name="Is Payment Valid?" altNext="PaymentFailed" />        
         <event name="OrderPlaced" />
       </container>
-      <container name="Cancel Order">
-        <actor name="Customer" next="PlaceOrder" />
+      <container name="Cancel Order Container">
+        <actor name="Customer" next="PlaceOrder" altNext="CancelOrder" />
         <command name="CancelOrder" />
         <event name="OrderCancelled" />
       </container>
     </container>
-    <container name="Cancel Order">
-        <actor name="Customer" next="PlaceOrder" />
-        <command name="CancelOrder" />
-        <event name="OrderCancelled" />
-      </container>
+    <container name="Cancel Order 1 Container">
+        <actor name="Customer 1" next="PlaceOrder" altNext="CancelOrder 1" />
+        <command name="CancelOrder 1" altNext="Exception!" />
+        <event name="OrderCancelled 1" />
+    </container>
   </aggregate>
 </eventstorming>
 ```
