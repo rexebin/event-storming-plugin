@@ -789,8 +789,8 @@ describe('renderEventStorming layout', () => {
     expect(tooltip).toBeTruthy();
     expect(tooltip!.innerHTML).toContain('Is Email Valid?');
     expect(tooltip!.innerHTML).toContain('UserRegistered'); // next target
-    // No implicit altNext error should be shown (auto-creation removed)
-    expect(tooltip!.innerHTML).not.toContain('✕ Invalid Email');
+    // Implicit error node IS shown when altNext has no explicit target
+    expect(tooltip!.innerHTML).toContain('✕ Invalid Email');
   });
 
   it('sizes SVG to fill container width even when diagram is narrower', () => {

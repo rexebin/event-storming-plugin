@@ -292,6 +292,58 @@ export function parseDSL(text: string): DSLModel {
    }
   }
 
+  // Second pass: create implicit error nodes for unmatched next/altNext references (text DSL)
+  for (const node of model.nodes) {
+    if (node.altNext && !model.nodes.find((n) => n.id === node.altNext)) {
+      const nid = normalizeId(node.altNext);
+      model.nodes.push({
+        id: nid,
+        label: node.altNext,
+        type: 'error',
+        containerId: node.containerId,
+        processIndex: -1,
+        color: COLOR_MAP.red,
+        noteTarget: null,
+        notes: [],
+      });
+    }
+    if (node.next && !model.nodes.find((n) => n.id === node.next)) {
+      const nid = normalizeId(node.next);
+      model.nodes.push({
+        id: nid,
+        label: node.next,
+        type: 'error',
+        containerId: node.containerId,
+        processIndex: -1,
+        color: COLOR_MAP.red,
+        noteTarget: null,
+        notes: [],
+      });
+    }
+  }
+
+  // Add implicit error nodes to their parent process stepIds so layout routes them through altNext
+  for (const container of model.containers) {
+    for (const node of model.nodes) {
+      if (node.containerId !== container.id || node.type !== 'error') continue;
+      // Check if this error node is targeted by altNext from any process node
+      const owner = container.processes.flatMap((p) => p.stepIds).some((sid) => {
+        const n = model.nodes.find((nn) => nn.id === sid);
+        return n && n.altNext === node.id;
+      });
+      if (!owner) continue;
+      // Add to the first process that references this implicit error node
+      for (const proc of container.processes) {
+        if (proc.stepIds.includes(node.id)) continue;
+        const referrer = model.nodes.find((n) => proc.stepIds.includes(n.id) && n.altNext === node.id);
+        if (referrer) {
+          proc.stepIds.push(node.id);
+          break;
+        }
+      }
+    }
+  }
+
  return model;
 }
 
@@ -519,8 +571,40 @@ function parseXMLDSL(text: string): DSLModel {
     };
 
     for (const containerEl of Array.from(diagramEl.children)) {
-      if (containerEl.tagName.toLowerCase() === 'container') {
+      const childTag = containerEl.tagName.toLowerCase();
+      if (childTag === 'container') {
         expandXMLContainer(containerEl, dslContainer, model, normalizeId(containerEl.getAttribute('name') || '') + '_');
+      } else if (cType === 'process') {
+        // Top-level process containers have flow nodes as direct children
+        const stepIds: string[] = [];
+        const subGroups: DSLSubGroup[] = [];
+        const aliases = new Map<string, string>();
+        const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
+        collectXMLChildren(diagramEl, dslContainer, model, containerId + '_', aliases, stepIds, subGroups, pending, model.nodes);
+
+        for (const { node, rawNext, rawNegativeNext } of pending) {
+          if (rawNext !== undefined && rawNext !== '') {
+            const nextId = resolveReference(rawNext, containerId + '_', model.nodes, node.containerId);
+            node.next = nextId;
+            if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
+          } else {
+            node.next = rawNext === '' ? null : undefined;
+          }
+          if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
+            const altNextId = resolveReference(rawNegativeNext, containerId + '_', model.nodes, node.containerId);
+            node.altNext = altNextId;
+            if (altNextId && !stepIds.includes(altNextId)) stepIds.push(altNextId);
+          } else {
+            node.altNext = rawNegativeNext === '' ? null : undefined;
+          }
+        }
+
+        dslContainer.processes.push({
+          name: containerEl.getAttribute('name') || '',
+          stepIds,
+          notes: xmlAttrNotes(containerEl),
+          subGroups: subGroups.length > 0 ? subGroups : undefined,
+        });
       }
     }
 
@@ -546,8 +630,20 @@ function expandXMLContainer(
 
   // Second pass: resolve references (after all aliases are registered)
   for (const { node, rawNext, rawNegativeNext } of pending) {
-    node.next = resolveReference(rawNext, prefix, model.nodes);
-    node.altNext = resolveReference(rawNegativeNext, prefix, model.nodes);
+    if (rawNext !== undefined && rawNext !== '') {
+      const nextId = resolveReference(rawNext, prefix, model.nodes, node.containerId);
+      node.next = nextId;
+      if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
+    } else {
+      node.next = rawNext === '' ? null : undefined;
+    }
+    if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
+      const altNextId = resolveReference(rawNegativeNext, prefix, model.nodes, node.containerId);
+      node.altNext = altNextId;
+      if (altNextId && !stepIds.includes(altNextId)) stepIds.push(altNextId);
+    } else {
+      node.altNext = rawNegativeNext === '' ? null : undefined;
+    }
   }
 
   fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
@@ -684,25 +780,41 @@ function canonicalizeReference(text: string): string {
 function resolveReference(
   reference: string | undefined,
   prefix: string,
-  allNodes: DSLNode[]
+  allNodes: DSLNode[],
+  parentContainerId: string | null = null
 ): string | null | undefined {
   if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
   const canon = canonicalizeReference(reference);
 
-  // 1) Direct ID / customId match — reference is an explicit id like "failed-exception-1"
-  const directMatch = allNodes.find(
-    (n) => n.id === reference || (!!n.customId && canonicalizeReference(n.customId!) === canon)
-  );
+  // 1) Direct ID / customId match — scoped to same container when possible
+  const directMatch = parentContainerId
+    ? allNodes.find((n) => n.containerId === parentContainerId && (n.id === reference || (!!n.customId && canonicalizeReference(n.customId!) === canon)))
+    : allNodes.find(
+        (n) => n.id === reference || (!!n.customId && canonicalizeReference(n.customId!) === canon)
+      );
   if (directMatch) return directMatch.id;
 
-  // 2) Name-based lookup — returns first match by insertion order for duplicate names
-  const matches = allNodes.filter(
-    (n) => !!n.label && n.containerId !== null && canonicalizeReference(n.label!) === canon
-  );
+  // 2) Name-based lookup — scoped to same container only
+  const matches = parentContainerId
+    ? allNodes.filter(
+        (n) => !!n.label && n.containerId === parentContainerId && canonicalizeReference(n.label!) === canon
+      )
+    : [];
   if (matches.length >= 1) return matches[0].id;
-  // Fallback: generate an ID from the reference text
-  return prefix + normalizeId(reference);
+  // Fallback: create implicit error node for unmatched references as sibling in parent container
+  const nodeId = prefix + normalizeId(reference);
+  allNodes.push({
+    id: nodeId,
+    label: reference,
+    type: 'error',
+    containerId: parentContainerId,
+    processIndex: -1,
+    color: COLOR_MAP.red,
+    noteTarget: null,
+    notes: [],
+  });
+  return nodeId;
 }
 
 function getColor(name: string): string {

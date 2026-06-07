@@ -681,16 +681,119 @@ describe('parseDSL', () => {
       expect(placeOrder!.next).toBe('Flow_NonExistent');
     });
 
-    it('should prefer name match over custom id match', () => {
+    it('should create implicit error node when altNext reference does not match any existing node', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
-        <command name="Place Order" id="PO_A" next="Target"/>
-        <event name="Target" id="T1"/>
-        <command name="Other Target" id="PO_B"/>
+        <command name="Place Order" id="PO_001" next="SomeTarget" altNext="NonExistent"/>
+        <event name="Something Else" id="SE_001"/>
       </container></aggregate></eventstorming>`;
       const result = parseDSL(xml);
-      const placeOrder = result.nodes.find((n) => n.id === 'PO_A');
-      // Should resolve to "Target" by name, not "Other Target" by fallback id matching
-      expect(placeOrder!.next).toBe('T1');
+
+      // The command's altNext should resolve to the implicit error node's ID
+      const placeOrder = result.nodes.find((n) => n.id === 'PO_001');
+      expect(placeOrder!.altNext).toBe('Flow_NonExistent');
+
+      // An actual error node should exist in the model, placed in the same container as the referencing node
+      const errorNode = result.nodes.find((n) => n.id === 'Flow_NonExistent');
+      expect(errorNode).toBeTruthy();
+      expect(errorNode!.type).toBe('error');
+      expect(errorNode!.label).toBe('NonExistent');
+      expect(errorNode!.containerId).toBe('Order');
+    });
+
+    it('should create implicit error node for unmatched altNext in text DSL policy branching', () => {
+      const dsl = `
+        aggregate: Order [green] {
+          process: Flow [blue] -> PlaceOrder [yellow]
+        }
+        readModel: ValidationSystem [purple] {
+          policy: Validate [yes: Success, no: FailTarget]
+        }
+      `;
+      const result = parseDSL(dsl);
+
+      // The policy's altNext should resolve to the implicit error node's ID
+      const policy = result.nodes.find((n) => n.id === 'Validate');
+      expect(policy).toBeTruthy();
+      expect(policy!.altNext).toBe('FailTarget');
+
+      // An actual error node should exist in the model, placed in the same container as the referencing node
+      const errorNode = result.nodes.find((n) => n.id === 'FailTarget');
+      expect(errorNode).toBeTruthy();
+      expect(errorNode!.type).toBe('error');
+      expect(errorNode!.label).toBe('FailTarget');
+      expect(errorNode!.containerId).toBe('ValidationSystem');
+    });
+
+    it('should create implicit error node for unmatched next in text DSL', () => {
+      const dsl = `
+        readModel: ValidationSystem [purple] {
+          policy: Validate [yes: MissingTarget, no: Success]
+        }
+      `;
+      const result = parseDSL(dsl);
+      const policy = result.nodes.find((n) => n.id === 'Validate');
+      expect(policy!.next).toBe('MissingTarget');
+      const errorNode = result.nodes.find((n) => n.id === 'MissingTarget');
+      expect(errorNode).toBeTruthy();
+      expect(errorNode!.type).toBe('error');
+      expect(errorNode!.label).toBe('MissingTarget');
+      expect(errorNode!.containerId).toBe('ValidationSystem');
+    });
+
+    it('should use COLOR_MAP.red (cyan) for implicit error node color', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="Place Order" id="PO_001" altNext="NonExistent"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const errorNode = result.nodes.find((n) => n.id === 'Flow_NonExistent');
+      expect(errorNode).toBeTruthy();
+      // Error nodes use COLOR_MAP.red which is cyan (#8DCFF9), not red
+      expect(errorNode!.color).toBe('#8DCFF9');
+    });
+
+    it('should NOT match altNext references across containers by id', () => {
+      const xml = `<eventstorming>
+        <aggregate name="Order">
+          <container name="Flow">
+            <command name="Place Order" id="PO_001"/>
+            <error name="OutOfStock" id="OutOfStock"/>
+          </container>
+        </aggregate>
+        <process name="Inventory Service">
+          <policy name="Has Stock?" id="HS_001" altNext="OutOfStock"/>
+        </process>
+      </eventstorming>`;
+      const result = parseDSL(xml);
+      expect(result.containers.length).toBeGreaterThanOrEqual(2);
+      const hasStock = result.nodes.find((n) => n.id === 'HS_001');
+      expect(hasStock).toBeTruthy();
+      // Has Stock? should create an implicit error node in its own container,
+      // NOT resolve to the explicit "OutOfStock" (id="OutOfStock") from Order container
+      expect(hasStock!.altNext).not.toBe('OutOfStock');
+    });
+
+    it('should NOT match altNext references across containers by name', () => {
+      const xml = `<eventstorming>
+        <aggregate name="Order">
+          <container name="Flow">
+            <command name="Place Order" id="PO_001"/>
+            <error name="OutOfStock" id="ES_FLOW"/>
+          </container>
+        </aggregate>
+        <process name="Inventory Service">
+          <policy name="Has Stock?" id="HS_001" altNext="OutOfStock"/>
+        </process>
+      </eventstorming>`;
+      const result = parseDSL(xml);
+
+      // Has Stock? should NOT resolve to the "OutOfStock" in Order container by name match.
+      // Instead it should create an implicit error node in Inventory Service container.
+      const hasStock = result.nodes.find((n) => n.id === 'HS_001');
+      const localImplicit = result.nodes.find(
+        (n) => n.type === 'error' && n.containerId === 'Inventory_Service',
+      );
+      expect(hasStock!.altNext).not.toBe('ES_FLOW');
+      expect(localImplicit).toBeTruthy();
     });
 
     it('should set next via custom id in text DSL process chain', () => {
