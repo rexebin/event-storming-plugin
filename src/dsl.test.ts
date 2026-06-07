@@ -569,17 +569,36 @@ describe('parseDSL', () => {
      expect(noteNode?.notes).toEqual(['This is a note attached to the event.']);
    });
 
-   it('should not assign implicit next when noNext is set (XML)', () => {
+   it('should not assign implicit next when next="" (XML)', () => {
      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
-       <command name="Place Order" noNext="true"/>
+       <command name="Place Order" next=""/>
        <event name="Order Placed"/>
      </container></aggregate></eventstorming>`;
      const result = parseDSL(xml);
      const placeOrder = result.nodes.find((n) => n.label === 'Place Order');
-     expect(placeOrder!.next).toBeUndefined();
-     expect(placeOrder!.noNext).toBe(true);
+     expect(placeOrder!.next).toBeNull();
    });
 
+   it('should auto-assign implicit next for nodes without explicit next (XML)', () => {
+     const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+       <command name="Place Order"/>
+       <event name="Order Placed"/>
+     </container></aggregate></eventstorming>`;
+     const result = parseDSL(xml);
+     const placeOrder = result.nodes.find((n) => n.label === 'Place Order');
+     expect(placeOrder!.next).toBe('Flow_Order_Placed');
+   });
+
+   it('should skip implicit linking for next="" but continue for later siblings (XML)', () => {
+     const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+       <command name="Place Order" next=""/>
+       <event name="Order Placed"/>
+       <command name="Ship Order"/>
+     </container></aggregate></eventstorming>`;
+     const result = parseDSL(xml);
+     expect(result.nodes.find((n) => n.label === 'Place Order')!.next).toBeNull();
+     expect(result.nodes.find((n) => n.label === 'Order Placed')!.next).toBe('Flow_Ship_Order');
+   });
 
    it('should keep the README eventstorming example parseable', async () => {
      const readme = (await import('../README.md?raw')).default;

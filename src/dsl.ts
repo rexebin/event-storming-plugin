@@ -8,9 +8,8 @@ export interface DSLNode {
   containerId: string | null; // parent container id (aggregate/readModel/process)
   processIndex: number; // index within a process chain (-1 if standalone)
   noteTarget: string | null; // if type='note', the node it's attached to
-  next?: string; // next node id (for explicit flow, especially policy yes-path)
-  noNext?: boolean; // explicitly terminates flow — suppresses implicit next assignment
-  altNext?: string; // negative next node id (for policy no-path, rendered below)
+  next?: string | null; // next node id; null = explicitly no next (from next="")
+  altNext?: string | null; // negative next node id (for policy no-path, rendered below)
   altNextText?: string; // original text of altNext (for auto-generated error node label)
   notes?: string[]; // attached notes for this node
   offset?: number; // additional column shift to avoid collisions (each unit = NODE_W + NODE_GAP_X)
@@ -553,7 +552,6 @@ function collectXMLChildren(
       const id = prefix + normalizeId(name);
       const rawNext = child.getAttribute('next') ?? undefined;
       const rawNegativeNext = child.getAttribute('altNext') ?? undefined;
-      const noNext = child.hasAttribute('noNext') || undefined;
       const offsetAttr = child.getAttribute('offset');
       const offset = offsetAttr !== null ? parseInt(offsetAttr, 10) : undefined;
 
@@ -566,7 +564,6 @@ function collectXMLChildren(
         processIndex: -1,
         noteTarget: null,
         next: undefined,
-        noNext,
         altNext: undefined,
         altNextText: rawNegativeNext,
         notes: xmlAttrNotes(child),
@@ -604,7 +601,7 @@ function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSu
 
   for (let i = 0; i < stepIds.length - 1; i++) {
     const node = nodeById.get(stepIds[i]);
-    if (node && node.next === undefined && !node.noNext) {
+    if (node && node.next === undefined) {
       if (subGroupLastIds.has(node.id)) continue;
       const candidateId = stepIds[i + 1];
       const candidate = nodeById.get(candidateId);
@@ -631,7 +628,8 @@ function resolveReference(
   prefix: string,
   aliases: Map<string, string>,
   parentAliases?: Map<string, string>
-): string | undefined {
+): string | null | undefined {
+  if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
   const key = canonicalizeReference(reference);
   const localMatch = aliases.get(key);

@@ -90,13 +90,13 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <command name="Call Service" altNext="Have reached max retries?" />
           <policy name="Call Succeeded?" altNext="Service didn't respond correctly" next="Record Call" />
           <command name="Record Call" />
-          <event name="Call Recorded" noNext="true" />
-          <error name="Service didn't respond correctly" altNext="Server Error?" noNext="true"></error>
+          <event name="Call Recorded" next="" />
+          <error name="Service didn't respond correctly" altNext="Server Error?" next=""></error>
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
           <error name="Status code is not 422" altNext="Another condition?" ></error>
           <command name="Reject Call" altNext="Rejected Exception?" />
-          <event name="Call Rejected" noNext="true" />
-          <policy name="Another condition?" noNext="true" altNext="Record Call" />
+          <event name="Call Rejected" next="" />
+          <policy name="Another condition?" next="" altNext="Record Call" />
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" />
@@ -108,7 +108,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
         <actor name="Customer1" />
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
-        <error name="Invalid Email" noNext="true"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
+        <error name="Invalid Email" next=""><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
         <event name="UserRegistered" />
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
      </container>
@@ -118,7 +118,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <actor name="Me"/>
           <command name="Wake Up" />
           <policy name="Is Alarm Ringing?" altNext="Sleep In" />
-          <error name="Sleep In" noNext="true"><note>You chose to sleep in instead of waking up.</note></error>
+          <error name="Sleep In" next=""><note>You chose to sleep in instead of waking up.</note></error>
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
@@ -126,7 +126,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <policy name="Is the shower running?" next="Have shower gel?" altNext="Switch on shower" />
           <externalSystem name="Switch on shower" />
           <policy name="Have shower gel?" altNext="Go Buy Shower Gel" />
-          <error name="Go Buy Shower Gel" noNext="true" />
+          <error name="Go Buy Shower Gel" next="" />
           <event name="Had Shower" />
       </container>
   </aggregate>
@@ -136,7 +136,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <actor name="Customer" />
           <command name="UpdateProfile" />
           <policy name="Is User Authenticated?" altNext="Authentication Required" />
-          <error name="Authentication Required" noNext="true"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
+          <error name="Authentication Required" next=""><note>You must be logged in to update your profile. Please log in and try again.</note></error>
           <event name="ProfileUpdated" />
       </container>
   </aggregate>
@@ -149,16 +149,16 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
                <container name="Another Sub Process">
                   <command name="Do Something" />
                   <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
-                  <error name="Something Is Invalid" noNext="true"><note>Something is invalid, please review and try again.</note></error>
+                  <error name="Something Is Invalid" next=""><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
           <externalSystem name="InventoryService" />
           <policy name="Do We Have Stock?" altNext="Out Of Stock" />
           <policy name="Is Order Detail Valid?" altNext="Invalid Order Detail" />
-          <error name="Invalid Order Detail" noNext="true"><note>Order details are invalid, please review your order and try again.</note></error>
+          <error name="Invalid Order Detail" next=""><note>Order details are invalid, please review your order and try again.</note></error>
           <externalSystem name="PaymentGateway" />
           <policy name="Is Payment Successful?" altNext="PaymentFailed" />
-          <error name="PaymentFailed" noNext="true"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
+          <error name="PaymentFailed" next=""><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>
   </aggregate>
@@ -200,16 +200,16 @@ Rendered:
           <command name="Call Service" altNext="Have reached max retries?" />
           <policy name="Call Succeeded?" altNext="Service didn't respond correctly" next="Record Call" />
           <command name="Record Call" />
-          <event name="Call Recorded" noNext="true" />
-          <error name="Service didn't respond correctly" altNext="Server Error?" noNext="true"></error>
+          <event name="Call Recorded" next="" />
+          <error name="Service didn't respond correctly" altNext="Server Error?" next=""></error>
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
           <error name="Status code is not 422" altNext="Another condition?" ></error>
           <command name="Reject Call" altNext="Rejected Exception?" />
-          <event name="Call Rejected" noNext="true" />
-          <policy name="Another condition?" noNext="true" altNext="Record Call" />
+          <event name="Call Rejected" next="" />
+          <policy name="Another condition?" next="" altNext="Record Call" />
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
-          <event name="Failed Attempt Recorded" />
+          <event name="Failed Attempt Recorded" next="" />
           <policy name="Failed Exception" next="Call Recorded"></policy>
       </container>
   </aggregate>
@@ -218,7 +218,7 @@ Rendered:
         <actor name="Customer1" />
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
-        <error name="Invalid Email" noNext="true"><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
+        <error name="Invalid Email" next=""><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
         <event name="UserRegistered" />
         <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
      </container>
@@ -228,7 +228,7 @@ Rendered:
           <actor name="Me"/>
           <command name="Wake Up" />
           <policy name="Is Alarm Ringing?" altNext="Sleep In" />
-          <error name="Sleep In" noNext="true"><note>You chose to sleep in instead of waking up.</note></error>
+          <error name="Sleep In" next=""><note>You chose to sleep in instead of waking up.</note></error>
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
@@ -236,7 +236,7 @@ Rendered:
           <policy name="Is the shower running?" next="Have shower gel?" altNext="Switch on shower" />
           <externalSystem name="Switch on shower" />
           <policy name="Have shower gel?" altNext="Go Buy Shower Gel" />
-          <error name="Go Buy Shower Gel" noNext="true" />
+          <error name="Go Buy Shower Gel" next="" />
           <event name="Had Shower" />
       </container>
   </aggregate>
@@ -246,8 +246,8 @@ Rendered:
           <actor name="Customer" />
           <command name="UpdateProfile" />
           <policy name="Is User Authenticated?" altNext="Authentication Required" />
-          <error name="Authentication Required" noNext="true"><note>You must be logged in to update your profile. Please log in and try again.</note></error>
-          <event name="ProfileUpdated" />
+          <error name="Authentication Required" next=""><note>You must be logged in to update your profile. Please log in and try again.</note></error>
+          <event name="ProfileUpdated" next="" />
       </container>
   </aggregate>
   <aggregate name="Order">
@@ -259,16 +259,16 @@ Rendered:
                <container name="Another Sub Process">
                   <command name="Do Something" />
                   <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
-                  <error name="Something Is Invalid" noNext="true"><note>Something is invalid, please review and try again.</note></error>
+                  <error name="Something Is Invalid" next=""><note>Something is invalid, please review and try again.</note></error>
                </container>
           </container>
           <externalSystem name="InventoryService" />
           <policy name="Do We Have Stock?" altNext="Out Of Stock" />
           <policy name="Is Order Detail Valid?" altNext="Invalid Order Detail" />
-          <error name="Invalid Order Detail" noNext="true"><note>Order details are invalid, please review your order and try again.</note></error>
+          <error name="Invalid Order Detail" next=""><note>Order details are invalid, please review your order and try again.</note></error>
           <externalSystem name="PaymentGateway" />
           <policy name="Is Payment Successful?" altNext="PaymentFailed" />
-          <error name="PaymentFailed" noNext="true"><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
+          <error name="PaymentFailed" next=""><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
           <event name="OrderPlaced" />
       </container>
   </aggregate>
@@ -329,7 +329,6 @@ Rendered:
 - `name` — the label shown on the node
 - `next` — links to another node in the same container and renders to the **right**. **`next` is optional** — if omitted, the node automatically connects to the immediately following sibling in the container, so you only need to set it when jumping non-sequentially.
 - `altNext` — used for policy failure paths and renders **below** the policy. When a policy has an `altNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
-- `noNext` — marks a node as the end of a chain (no outgoing link). Set to `true` e.g. `noNext="true"`.
 - `offset` — shifts a node horizontally to the right by the given number of units. Use when an `altNext` failure branch would visually collide with a sibling node, e.g. `offset="1"`. The entire subtree (including nested `<container>` and altNext children) shifts together.
 - `<note>...</note>` — child element to attach one or more notes to any node. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
 
