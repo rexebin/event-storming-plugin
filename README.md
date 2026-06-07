@@ -99,8 +99,9 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <policy name="Another condition?" next="" altNext="Record Call" />
           <policy name="Have reached max retries?" altNext="Failed Exception"  />
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
-          <event name="Failed Attempt Recorded" />
-          <policy name="Failed Exception" next="Call Recorded"></policy>
+          <event name="Failed Attempt Recorded" next="" altNext="failed-exception-1"/>
+          <policy name="Failed Exception" next="Call Recorded" ></policy>
+          <error id="failed-exception-1" name="Failed Exception"></error>       
       </container>
   </aggregate>
   <aggregate name="User">
@@ -211,7 +212,7 @@ Rendered:
           <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
           <event name="Failed Attempt Recorded" next="" altNext="failed-exception-1"/>
           <policy name="Failed Exception" next="Call Recorded" ></policy>
-          <error id="failed-exception-1" name="Failed Exception"></error>
+          <error id="failed-exception-1" name="Failed Exception"></error>       
       </container>
   </aggregate>
   <aggregate name="User">

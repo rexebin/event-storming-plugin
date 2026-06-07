@@ -546,8 +546,8 @@ function expandXMLContainer(
 
   // Second pass: resolve references (after all aliases are registered)
   for (const { node, rawNext, rawNegativeNext } of pending) {
-    node.next = resolveReference(rawNext, prefix, aliases, model.nodes, false);
-    node.altNext = resolveReference(rawNegativeNext, prefix, aliases, model.nodes, true);
+    node.next = resolveReference(rawNext, prefix, model.nodes);
+    node.altNext = resolveReference(rawNegativeNext, prefix, model.nodes);
   }
 
   fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
@@ -684,51 +684,25 @@ function canonicalizeReference(text: string): string {
 function resolveReference(
   reference: string | undefined,
   prefix: string,
-  aliases: Map<string, string>,
-  allNodes: DSLNode[],
-  isAltNext: boolean
+  allNodes: DSLNode[]
 ): string | null | undefined {
   if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
-  const key = canonicalizeReference(reference);
+  const canon = canonicalizeReference(reference);
 
-  // 1) Check alias name match
-  const localMatch = aliases.get(key);
-  // 2) Resolve to first match by type preference when multiple nodes share the name
-  const matches = allNodes.filter(
-    (n) => !!n.label && n.containerId !== null && canonicalizeReference(n.label!) === key
+  // 1) Direct ID / customId match — reference is an explicit id like "failed-exception-1"
+  const directMatch = allNodes.find(
+    (n) => n.id === reference || (!!n.customId && canonicalizeReference(n.customId!) === canon)
   );
-  if (matches.length > 0 && localMatch) {
-    return resolveWithPreference(matches, isAltNext);
-  }
-  if (matches.length === 1) return matches[0].id;
-  // 3) Parent alias fallback (name match only)
-  if (!localMatch && !matches.length) {
-    // 4) Explicit ID / customId match — reference directly matches a node's id or customId
-    const canon = canonicalizeReference(reference);
-    const directMatch = allNodes.find(
-      (n) => n.id === reference || (!!n.customId && canonicalizeReference(n.customId!) === canon)
-    );
-    if (directMatch) return directMatch.id;
-  }
+  if (directMatch) return directMatch.id;
+
+  // 2) Name-based lookup — returns first match by insertion order for duplicate names
+  const matches = allNodes.filter(
+    (n) => !!n.label && n.containerId !== null && canonicalizeReference(n.label!) === canon
+  );
+  if (matches.length >= 1) return matches[0].id;
   // Fallback: generate an ID from the reference text
   return prefix + normalizeId(reference);
-}
-
-function resolveWithPreference(matches: DSLNode[], isAltNext: boolean): string {
-  if (isAltNext) {
-    // altNext: prefer policy first, then error, then others (by insertion order)
-    const policy = matches.find((n) => n.type === 'policy');
-    if (policy) return policy.id;
-    const error = matches.find((n) => n.type === 'error');
-    if (error) return error.id;
-  } else {
-    // next: prefer non-error nodes first, then errors
-    const nonError = matches.find((n) => n.type !== 'error');
-    if (nonError) return nonError.id;
-  }
-  // Fallback to first match (insertion order)
-  return matches[0].id;
 }
 
 function getColor(name: string): string {
