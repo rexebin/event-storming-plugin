@@ -1,0 +1,1 @@
+1. always use /vsix-build to build the vsix file and reinstall the vsix file after each job.

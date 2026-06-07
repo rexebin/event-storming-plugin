@@ -772,6 +772,27 @@ describe('renderEventStorming layout', () => {
     expect(tooltip!.innerHTML).toContain('OrderCancelled');
   });
 
+  it('shows implicitly generated altNext error node in tooltip', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), wrapSample);
+
+    // "Is Email Valid?" policy has altNext="Invalid Email" but no explicit
+    // error target, so getOrCreateNegativeNode creates an implicit node.
+    const node = host.querySelector('[data-id="user_registration_is_email_valid_"]');
+    expect(node).toBeTruthy();
+
+    node!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const tooltip = document.body.querySelector<HTMLDivElement>('.es-tooltip');
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.innerHTML).toContain('Is Email Valid?');
+    expect(tooltip!.innerHTML).toContain('UserRegistered'); // next target
+    // implicit altNext error should be shown (altNextText "Invalid Email" used as label)
+    expect(tooltip!.innerHTML).toContain('✕ Invalid Email');
+  });
+
   it('sizes SVG to fill container width even when diagram is narrower', () => {
     const host = document.createElement('div');
     Object.defineProperty(host, 'getBoundingClientRect', {
