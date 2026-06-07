@@ -217,25 +217,27 @@ export function layoutFanInProcess(
 
     placeProcessNode(target, targetX, targetY, container.id, allNodes, processPositioned, positioned);
 
-    leftRoots.forEach((node, index) => {
-       placeProcessNode(node, leftX, processY + index * rowHeight, container.id, allNodes, processPositioned, positioned);
-       allLinks.push({
-       source: node.id,
-       target: target.id,
-       label: '',
-       type: 'default',
-        });
+    let twoSidedAltBottom = processY + (stackRows - 1) * rowHeight + NODE_H;
+    const layoutRoots = (rootList: DSLNode[], rootX: number) => {
+      rootList.forEach((node, index) => {
+        const rootY = processY + index * rowHeight;
+        placeProcessNode(node, rootX, rootY, container.id, allNodes, processPositioned, positioned);
+        allLinks.push({ source: node.id, target: target.id, label: '', type: 'default' });
+        if (node.altNext && processNodeMap.has(node.altNext)) {
+          const altNextNode = processNodeMap.get(node.altNext)!;
+          allLinks.push({ source: node.id, target: altNextNode.id, label: '', type: 'negative' });
+          if (!processPositioned.has(altNextNode.id)) {
+            const bottom = layoutAltBranch(
+              altNextNode, rootX, rootY + NODE_H + NODE_GAP_Y + 20,
+              container, model, processNodeMap, allNodes, allLinks, processPositioned, positioned, undefined
+            );
+            twoSidedAltBottom = Math.max(twoSidedAltBottom, bottom);
+          }
+        }
       });
-
-    rightRoots.forEach((node, index) => {
-       placeProcessNode(node, rightX, processY + index * rowHeight, container.id, allNodes, processPositioned, positioned);
-       allLinks.push({
-       source: node.id,
-       target: target.id,
-       label: '',
-       type: 'default',
-        });
-      });
+    };
+    layoutRoots(leftRoots, leftX);
+    layoutRoots(rightRoots, rightX);
 
     const chainBottom = layoutChainFrom(
        target,
@@ -250,7 +252,7 @@ export function layoutFanInProcess(
        positioned
      );
 
-    return Math.max(chainBottom, processY + (stackRows - 1) * rowHeight + NODE_H);
+    return Math.max(chainBottom, twoSidedAltBottom);
      }
 
   const targetX = innerX + NODE_W + NODE_GAP_X;
@@ -258,14 +260,27 @@ export function layoutFanInProcess(
 
   placeProcessNode(target, targetX, targetY, container.id, allNodes, processPositioned, positioned);
 
+  let altBottom = processY + (roots.length - 1) * rowHeight + NODE_H;
   roots.forEach((node, index) => {
-    placeProcessNode(node, innerX, processY + index * rowHeight, container.id, allNodes, processPositioned, positioned);
+    const rootY = processY + index * rowHeight;
+    placeProcessNode(node, innerX, rootY, container.id, allNodes, processPositioned, positioned);
     allLinks.push({
        source: node.id,
        target: target.id,
        label: '',
        type: 'default',
      });
+    if (node.altNext && processNodeMap.has(node.altNext)) {
+      const altNextNode = processNodeMap.get(node.altNext)!;
+      allLinks.push({ source: node.id, target: altNextNode.id, label: '', type: 'negative' });
+      if (!processPositioned.has(altNextNode.id)) {
+        const bottom = layoutAltBranch(
+          altNextNode, innerX, rootY + NODE_H + NODE_GAP_Y + 20,
+          container, model, processNodeMap, allNodes, allLinks, processPositioned, positioned, undefined
+        );
+        altBottom = Math.max(altBottom, bottom);
+      }
+    }
    });
 
   const chainBottom = layoutChainFrom(
@@ -281,7 +296,7 @@ export function layoutFanInProcess(
     positioned
    );
 
-  return Math.max(chainBottom, processY + (roots.length - 1) * rowHeight + NODE_H);
+  return Math.max(chainBottom, altBottom);
 }
 
 // ─── Column computation ──────────────────────────────────────

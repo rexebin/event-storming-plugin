@@ -880,6 +880,42 @@ describe('renderEventStorming layout', () => {
     expect(badge?.textContent).toBe('Aggregate');
   });
 
+  it('fan-in process: altNext branch on root node positions all nodes inside container', () => {
+    const model = parseDSL(`
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Order Lifecycle Container">
+      <container name="Place Order">
+        <actor name="CustomerA" />
+        <command name="PlaceOrder" />
+      </container>
+      <container name="Cancel Order Container">
+        <actor name="CustomerB" next="PlaceOrder" altNext="CancelOrder" />
+        <command name="CancelOrder" />
+        <event name="OrderCancelled" />
+      </container>
+    </container>
+  </aggregate>
+</eventstorming>
+`);
+    const layout = computeLayout(model);
+
+    const cancelOrder = layout.nodes.find(n => n.label === 'CancelOrder');
+    const orderCancelled = layout.nodes.find(n => n.label === 'OrderCancelled');
+
+    expect(cancelOrder).toBeTruthy();
+    expect(orderCancelled).toBeTruthy();
+
+    // CancelOrder and OrderCancelled must be positioned inside the process group
+    // (the "Order Lifecycle Container" group), not orphaned as non-process nodes below it.
+    const processGroup = layout.groups.find(g => g.label === 'Order Lifecycle Container');
+    expect(processGroup).toBeTruthy();
+
+    const groupBottom = processGroup!.y + processGroup!.height;
+    expect(cancelOrder!.y + NODE_H).toBeLessThanOrEqual(groupBottom + 1);
+    expect(orderCancelled!.y + NODE_H).toBeLessThanOrEqual(groupBottom + 1);
+  });
+
   it('shows correct type label text for readModel (projector) containers', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

@@ -393,7 +393,7 @@ Rendered:
       </container>
     </container>
     <container name="Cancel Order 1 Container">
-        <actor name="Customer 1" next="PlaceOrder" altNext="CancelOrder 1" />
+        <actor name="Customer 1" next="Place Order" altNext="CancelOrder 1" />
         <command name="CancelOrder 1" altNext="Exception!" />
         <event name="OrderCancelled 1" />
     </container>
