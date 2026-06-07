@@ -306,7 +306,7 @@ export function renderEventStorming(
     adjustedTarget,
     link.type,
     adjustedNodes,
-    link.label === 'no'
+    false
   );
   linksGroup
      .append('path')

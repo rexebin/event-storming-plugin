@@ -1,0 +1,2 @@
+1. currently, the node tooltip include next and altnext
+2. when altNext is set and implcitly generated i.e node doesn't exist in the array of children, the tooltip doesn't show altNext, update the tooltip to show altNext even if it's implicitly generated.

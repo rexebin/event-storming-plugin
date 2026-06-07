@@ -7,7 +7,7 @@ import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
 import { computeLayout } from './layout.js';
 import { NODE_H, NODE_W, CONTAINER_PADDING, GROUP_PADDING } from './constants.js';
-import { getPointOnPath, computeLinkPath } from './links.js';
+import { computeLinkPath } from './links.js';
 import { parseDSL } from './dsl.js';
 
 // We need to extract the helper functions from renderer.ts
@@ -518,23 +518,6 @@ describe('renderEventStorming layout', () => {
     expect(rejoinLink!.getAttribute('marker-end')).toBe('url(#arrowhead)');
   });
 
-  it('offsets the "no" label away from the negative link line', () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-
-    renderEventStorming(d3.select(host), showerSample);
-
-    const noLabel = Array.from(host.querySelectorAll<SVGTextElement>('g.links text'))
-      .find((label) => label.textContent === 'no');
-    const negativeLink = host.querySelector<SVGPathElement>('path.es-link-negative');
-    expect(noLabel).toBeTruthy();
-    expect(negativeLink).toBeTruthy();
-
-    const mid = getPointOnPath(negativeLink!.getAttribute('d') || '', 0.5);
-    expect(Number(noLabel!.getAttribute('x'))).toBe(mid.x + 14);
-    expect(Number(noLabel!.getAttribute('y'))).toBe(mid.y - 10);
-  });
-
   it('uses straight lines for non-event-to-readModel fan-in links', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -634,7 +617,7 @@ describe('renderEventStorming layout', () => {
     renderEventStorming(d3.select(host), showerSample);
 
     // The "Go Buy Shower Gel" error node: positioned below via altNext from a policy
-    // Its incoming link has type='negative' but label='' (not 'no')
+    // Its incoming negative link has an empty label
     const goBuyGel = host.querySelector('[data-id="Shower_Go_Buy_Shower_Gel"]');
     expect(goBuyGel).toBeTruthy();
 

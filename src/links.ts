@@ -253,15 +253,8 @@ export function getPointOnPath(d: string, t: number): { x: number; y: number } {
   return { x: 0, y: 0 };
 }
 
-export function getLinkLabelPosition(d: string, link: LayoutLink): { x: number; y: number } {
+export function getLinkLabelPosition(d: string, _link: LayoutLink): { x: number; y: number } {
   const mid = getPointOnPath(d, 0.5);
-
-  if (link.label === 'no') {
-    return {
-      x: mid.x + 14,
-      y: mid.y - 10,
-     };
-   }
 
   return {
     x: mid.x,

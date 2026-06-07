@@ -175,7 +175,7 @@ export function layoutChainFrom(
       node.type === 'policy'
          ? getOrCreateNegativeNode(node, container, model, processNodeMap)
          : processNodeMap.get(node.altNext!)!;
-    const linkLabel = node.type === 'policy' ? 'no' : '';
+    const linkLabel = '';
     const mainChainNextId = chainNodes[i + 1]?.node.id;
 
     allLinks.push({ source: node.id, target: negativeNode.id, label: linkLabel, type: 'negative' });
