@@ -1,2 +1,0 @@
-1. if altNext is specified on a node, but the altNext node is unmatched i.e. doesn't exist, implicitly create render an error node
-2. if altNext is specified on a node, and there is a matched node, do not implicitly create an error node.

@@ -276,9 +276,12 @@ Rendered:
   </aggregate>
   <externalSystem name="Inventory Service">
       <container name="Inventory Check">
-          <command name="Check Inventory" />
+          <command name="Should match the policy with id" next="this-is-a-id" />
+          <command name="Should match the policy without id" next="Has Stock?" />
+          <policy id="this-is-a-id" name="Has Stock?" next="Inventory Check Passed" altNext="Out of Stock" />
           <query name="Get Inventory" />
-          <policy name="Has Stock?" next="InventoryCheckPassed" altNext="Out of Stock" />
+          <command name="Check Inventory" />
+          <policy name="Has Stock?" next="Inventory Check Passed" altNext="Out of Stock" />
           <event name="Inventory Check Passed" />
       </container>
   </externalSystem>

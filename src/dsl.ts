@@ -156,19 +156,20 @@ export function parseDSL(text: string): DSLModel {
 
   // ─── Standalone aggregate / entity (no {) ───
   let lineForStandalone = line;
-  let standaloneCustomId: string | undefined;
+  let standaloneCustomIdPrefixed: string | undefined;
   const saIdMatch = line.match(/^(.+?)\s*\[id="([^"]*)"\]\s*$/i);
   if (saIdMatch) {
     lineForStandalone = saIdMatch[1];
     if (saIdMatch[2]) {
-      standaloneCustomId = saIdMatch[2];
+      // Prefix with "custom-" unless already prefixed to prevent ID conflicts
+      standaloneCustomIdPrefixed = saIdMatch[2].startsWith('custom-') ? saIdMatch[2] : 'custom-' + saIdMatch[2];
     }
   }
 
   const standaloneAggregateMatch = lineForStandalone.match(/^(?:aggregate|entity):\s*(.+?)\s*\[(\w+)\]\s*$/i);
   if (standaloneAggregateMatch && !currentContainer) {
    model.nodes.push({
-     id: standaloneCustomId ?? normalizeId(standaloneAggregateMatch[1]),
+     id: standaloneCustomIdPrefixed ?? normalizeId(standaloneAggregateMatch[1]),
      label: standaloneAggregateMatch[1].trim(),
      type: 'aggregate',
      color: getColor(standaloneAggregateMatch[2]),
@@ -176,7 +177,7 @@ export function parseDSL(text: string): DSLModel {
      rootContainerId: null,
      processIndex: -1,
      noteTarget: null,
-     customId: standaloneCustomId,
+     customId: saIdMatch && saIdMatch[2] ? saIdMatch[2] : undefined,
      });
    continue;
    }
@@ -185,7 +186,7 @@ export function parseDSL(text: string): DSLModel {
   const standaloneReadModelMatch = lineForStandalone.match(/^readModel:\s*(.+?)\s*\[(\w+)\]\s*$/i);
   if (standaloneReadModelMatch && !currentContainer) {
    model.nodes.push({
-     id: standaloneCustomId ?? normalizeId(standaloneReadModelMatch[1]),
+     id: standaloneCustomIdPrefixed ?? normalizeId(standaloneReadModelMatch[1]),
      label: standaloneReadModelMatch[1].trim(),
      type: 'readModel',
      color: getColor(standaloneReadModelMatch[2]),
@@ -193,7 +194,7 @@ export function parseDSL(text: string): DSLModel {
      rootContainerId: null,
      processIndex: -1,
      noteTarget: null,
-     customId: standaloneCustomId,
+     customId: saIdMatch && saIdMatch[2] ? saIdMatch[2] : undefined,
      });
    continue;
    }
@@ -233,9 +234,11 @@ export function parseDSL(text: string): DSLModel {
       if (stepIdMatch) {
         stepLabel = stepIdMatch[1].trim();
         if (stepIdMatch[2]) {
-          stepCustomId = stepIdMatch[2];
+          stepCustomId = stepIdMatch[2]; // ensureNode adds the prefix
         }
       }
+      // Strip trailing [color] suffix from label (e.g. "Customer [purple]" → "Customer")
+      stepLabel = stepLabel.replace(/\s+\[\w+\]\s*$/, '').trim();
       const node = ensureNode(model, stepLabel, inferProcessType(stepLabel, currentContainer.type), currentContainer.id, stepIds.length, stepCustomId);
       stepIds.push(node.id);
        }
@@ -355,6 +358,7 @@ function parseNodeLine(
   if (idMatch) {
     line = idMatch[1];
     if (idMatch[2]) {
+      // Store original without prefix; compute prefixed version for actual node id
       customId = idMatch[2];
     }
   }
@@ -397,8 +401,13 @@ function parseNodeLine(
   const label = policyBranchMatch[1].trim();
   const yesNode = policyBranchMatch[2].trim();
   const noNode = policyBranchMatch[3].trim();
+  // Compute actual node id with "custom-" prefix if customId is set
+  let policyNodeId = customId;
+  if (policyNodeId && !policyNodeId.startsWith('custom-')) {
+    policyNodeId = 'custom-' + policyNodeId;
+  }
   return {
-  id: normalizeId(label),
+  id: policyNodeId ?? normalizeId(label),
   label,
   type: 'policy',
   color: '#859EBF',
@@ -423,8 +432,13 @@ function parseNodeLine(
   const rawColor = genericMatch[3];
   const color = rawColor ? getColor(rawColor) : nodeDefaults[typeName].color;
 
+  // Compute actual node id with "custom-" prefix if customId is set
+  let nodeId = customId;
+  if (nodeId && !nodeId.startsWith('custom-')) {
+    nodeId = 'custom-' + nodeId;
+  }
   return {
-  id: customId ?? normalizeId(label),
+  id: nodeId ?? normalizeId(label),
   label,
   type: nodeDefaults[typeName].type,
   color,
@@ -452,7 +466,12 @@ function ensureNode(
   processIndex: number,
   customId?: string
 ): DSLNode {
-  const id = customId ?? normalizeId(label);
+  // Prefix with "custom-" unless already prefixed to prevent ID conflicts
+  let actualCustomId = customId;
+  if (actualCustomId && !actualCustomId.startsWith('custom-')) {
+    actualCustomId = 'custom-' + actualCustomId;
+  }
+  const id = actualCustomId ?? normalizeId(label);
   let node = model.nodes.find((n) => n.id === id && n.containerId === containerId);
   // Fallback to name-based resolution if exact id didn't match
   if (!node) {
@@ -728,18 +747,27 @@ function collectXMLChildren(
       const rawIdAttr = child.getAttribute('id');
       const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
       const autoId = prefix + normalizeId(name);
-      // Use id (actual node id) consistently for aliases and stepIds
-      const id = customIdAttr ?? autoId;
+
+      // Prefix customId with "custom-" unless already prefixed
+      let actualCustomId = customIdAttr;
+      if (actualCustomId && !actualCustomId.startsWith('custom-')) {
+        actualCustomId = 'custom-' + actualCustomId;
+      }
+      const actualId = actualCustomId ?? autoId;
 
       const offsetAttr = child.getAttribute('offset');
       const offset = offsetAttr !== null ? parseInt(offsetAttr, 10) : undefined;
 
-      aliases.set(canonicalizeReference(name), id);
-      dslContainer.nodeIds.push(id);
-      stepIds.push(id);
+      // Only register name aliases for nodes without a custom id — nodes with customIds
+      // should only be matched by their "custom-xxx" id to prevent collisions
+      if (!actualCustomId) {
+        aliases.set(canonicalizeReference(name), actualId);
+      }
+      dslContainer.nodeIds.push(actualId);
+      stepIds.push(actualId);
 
       const n: DSLNode = {
-        id,
+        id: actualId,
         label: name,
         type: nodeType,
         color: DEFAULT_COLORS[nodeType] || '#6a737d',
@@ -747,7 +775,7 @@ function collectXMLChildren(
         rootContainerId: rootScope ?? dslContainer.id,
         processIndex: -1,
         noteTarget: null,
-        customId: customIdAttr ?? undefined,
+        customId: customIdAttr ?? undefined, // original (non-prefixed) custom id
         next: undefined,
         altNext: undefined,
         altNextText: child.getAttribute('altNext') ?? undefined,
@@ -814,21 +842,25 @@ function resolveReference(
 ): string | null | undefined {
   if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
-  const canon = canonicalizeReference(reference);
 
-  // 1) Direct ID / customId match — scoped to same root container only (hard boundary)
+  // 1) Direct ID match — scoped to same root container only (hard boundary)
+  //    Try the raw reference first (non-custom node id), then with "custom-" prefix (custom-id node id)
   const directMatch = rootContainerId
-    ? allNodes.find((n) => n.rootContainerId === rootContainerId && (n.id === reference || (!!n.customId && canonicalizeReference(n.customId!) === canon)))
+    ? allNodes.find((n) => n.rootContainerId === rootContainerId && (n.id === reference || n.id === 'custom-' + reference))
     : null;
   if (directMatch) return directMatch.id;
 
-  // 2) Name-based lookup — scoped to same root container only
-  const matches = rootContainerId
-    ? allNodes.filter(
-        (n) => !!n.label && n.rootContainerId === rootContainerId && canonicalizeReference(n.label!) === canon
+  // 2) Auto-generated ID match — scoped to same root container only.
+  //    Auto-generated ids end with normalizeId(label) (with optional prefix before it).
+  //    Nodes with customIds have ids starting with "custom-" which won't end with normalizeId().
+  //    So check if id === normalizedRef OR ends with '_' + normalizedRef.
+  const normalizedRef = normalizeId(reference);
+  const directAutoMatch = rootContainerId
+    ? allNodes.find(
+        (n) => n.rootContainerId === rootContainerId && (n.id === normalizedRef || n.id.endsWith('_' + normalizedRef)),
       )
-    : [];
-  if (matches.length >= 1) return matches[0].id;
+    : undefined;
+  if (directAutoMatch) return directAutoMatch.id;
   if (!allowImplicit) return null;
   // Fallback: create implicit error node scoped to the current root container
   const nodeId = prefix + normalizeId(reference);
