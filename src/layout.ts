@@ -528,9 +528,14 @@ export function computeLayout(model: DSLModel): LayoutResult {
             }
             }
        const fanInTarget = detectSharedTargetFanIn(roots, processNodeMap);
+       // Suppress fan-in when roots come from different sub-containers: cross-subGroup
+       // "next" references are intentional flow links, not a fan-in pattern, and merging
+       // them causes subGroup bounding boxes to overlap.
+       const rootSubGroup0 = subGroupOf.get(roots[0]?.id ?? '') ?? '';
+       const allRootsInSameSubGroup = roots.every(r => (subGroupOf.get(r.id) ?? '') === rootSubGroup0);
        let processBottom = groupInnerY + NODE_H;
 
-       if (fanInTarget) {
+       if (fanInTarget && allRootsInSameSubGroup) {
        processBottom = layoutFanInProcess(
          roots,
          fanInTarget,

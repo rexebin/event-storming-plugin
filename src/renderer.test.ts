@@ -916,6 +916,40 @@ describe('renderEventStorming layout', () => {
     expect(orderCancelled!.y + NODE_H).toBeLessThanOrEqual(groupBottom + 1);
   });
 
+  it('sibling sub-containers with cross-container next reference do not overlap', () => {
+    const model = parseDSL(`
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Order Lifecycle Container">
+      <container name="Place Order">
+        <actor name="Customer" />
+        <command name="PlaceOrder" />
+        <policy name="Is Payment Valid?" altNext="PaymentFailed" />
+        <event name="OrderPlaced" />
+      </container>
+      <container name="Cancel Order Container">
+        <actor name="Customer" next="PlaceOrder" altNext="CancelOrder" />
+        <command name="CancelOrder" />
+        <event name="OrderCancelled" />
+      </container>
+    </container>
+  </aggregate>
+</eventstorming>
+`);
+    const layout = computeLayout(model);
+
+    const placeOrderSG = layout.subGroups.find(sg => sg.label === 'Place Order');
+    const cancelOrderSG = layout.subGroups.find(sg => sg.label === 'Cancel Order Container');
+
+    expect(placeOrderSG).toBeTruthy();
+    expect(cancelOrderSG).toBeTruthy();
+
+    const placeOrderBottom = placeOrderSG!.y + placeOrderSG!.height;
+    const cancelOrderTop = cancelOrderSG!.y;
+    // Sibling sub-containers must not overlap vertically
+    expect(cancelOrderTop).toBeGreaterThanOrEqual(placeOrderBottom);
+  });
+
   it('shows correct type label text for readModel (projector) containers', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
