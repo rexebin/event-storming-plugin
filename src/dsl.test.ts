@@ -66,6 +66,7 @@ describe('parseDSL', () => {
         type: 'actor',
         color: '#D4D3D3',
         containerId: null,
+        rootContainerId: null,
         processIndex: -1,
         noteTarget: null,
          notes: [],
@@ -90,6 +91,7 @@ describe('parseDSL', () => {
         type: 'command',
         color: '#91D49C',
         containerId: null,
+        rootContainerId: null,
         processIndex: -1,
         noteTarget: null,
          notes: [],
@@ -108,6 +110,7 @@ describe('parseDSL', () => {
          type: 'event',
          color: '#FFA500',
          containerId: null,
+         rootContainerId: null,
          processIndex: -1,
          noteTarget: null,
          notes: [],
@@ -535,14 +538,14 @@ describe('parseDSL', () => {
         <externalsystem name="InventoryService" next="DoWeHaveStock"/>
         <policy name="Do We Have Stock?" altNext="Out Of Stock"/>
       </container></aggregate></eventstorming>`;
-     const result = parseDSL(xml);
+     parseDSL(xml);
    });
 
    it('should preserve external system containers with pink container color', () => {
      const xml = `<externalsystem name="Inventory Service"><container name="Inventory Check">
         <command name="Check Inventory"/>
       </container></externalsystem>`;
-     const result = parseDSL(xml);
+     parseDSL(xml);
    });
 
    it('should parse Note nodes as note type with note color', () => {
@@ -550,7 +553,7 @@ describe('parseDSL', () => {
         <event name="UserRegistered" next="Some Note"/>
         <note name="Some Note"><note>Attached to the event</note></note>
       </container></aggregate></eventstorming>`;
-     const result = parseDSL(xml);
+     parseDSL(xml);
    });
 
    it('parses notes from child <note> element on a note flow node', () => {
@@ -697,7 +700,7 @@ describe('parseDSL', () => {
       expect(errorNode).toBeTruthy();
       expect(errorNode!.type).toBe('error');
       expect(errorNode!.label).toBe('NonExistent');
-      expect(errorNode!.containerId).toBe('Order');
+      expect(errorNode!.containerId).toBe('Order_Flow');
     });
 
     it('should create implicit error node for unmatched altNext in text DSL policy branching', () => {
@@ -969,6 +972,127 @@ describe('parseDSL', () => {
       const policy = result.nodes.find((n) => n.label === 'Check It');
       expect(policy!.next).toBe('Flow_Failed_Exception');
     });
+
+  describe('container boundary enforcement', () => {
+    it('should track rootContainerId as the container scoped id on nodes within explicit containers', () => {
+      const xml = `<eventstorming><process name="OrderFlow">
+        <container name="Checkout">
+          <command name="PlaceOrder" />
+          <event name="OrderPlaced" />
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
+      // rootContainerId is computed as parentDslContainer.id + '_' + normalized(name)
+      expect(placeOrder!.rootContainerId).toBe('OrderFlow_Checkout');
+    });
+
+    it('should block linking between nodes in sibling sub-containers (different roots)', () => {
+      // "Place Order" and "Inventory Check" are siblings under <aggregate> but each creates its own scope
+      const xml = `<eventstorming><aggregate name="Order">
+        <container name="Place Order">
+          <command name="PlaceOrder" next="CheckStock" />
+        </container>
+        <container name="Inventory Check">
+          <policy name="CheckStock" />
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
+      // PlaceOrder's rootContainerId differs from CheckStock's rootContainerId → name match blocked
+      expect(placeOrder!.next).not.toBe('Inventory_Check_CheckStock');
+    });
+
+    it('should block cross-root linking via direct ID reference', () => {
+      const xml = `<eventstorming>
+        <aggregate name="Order">
+          <container name="Place Order">
+            <command name="PlaceOrder" id="PO_001" />
+          </container>
+        </aggregate>
+        <process name="Payment Service">
+          <container name="Payment">
+            <event name="OrderPaid" id="PO_001" />
+          </container>
+        </process></eventstorming>`;
+      const result = parseDSL(xml);
+      // Two different nodes happen to share the same custom ID "PO_001" in different roots
+      // A reference to PO_001 should NOT cross root boundaries
+      expect(result.nodes.filter((n) => n.id === 'PO_001').length).toBe(2);
+    });
+
+    it('should block name-based linking across different root containers', () => {
+      const xml = `<eventstorming>
+        <aggregate name="Order">
+          <container name="Place Order">
+            <command name="PlaceOrder" altNext="OutOfStock" />
+          </container>
+        </aggregate>
+        <process name="Inventory Service">
+          <container name="Inventory Check">
+            <error name="OutOfStock" />
+          </container>
+        </process></eventstorming>`;
+      const result = parseDSL(xml);
+      // OutOfStock in Inventory Service should NOT be resolved by a node in Order container
+      const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
+      expect(placeOrder!.altNext).not.toBe('Inventory_Check_OutOfStock');
+      // Should create an implicit error node instead, scoped to PlaceOrder's root
+      const implicitError = result.nodes.find(
+        (n) => n.type === 'error' && n.containerId === 'Order_Place_Order' && n.label === 'OutOfStock'
+      );
+      expect(implicitError).toBeTruthy();
+    });
+
+    it('should create implicit error nodes with matching rootContainerId', () => {
+      const xml = `<eventstorming><aggregate name="Order">
+        <container name="Place Order">
+          <policy name="CheckStock" altNext="MissingItem" />
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const implicitError = result.nodes.find(
+        (n) => n.type === 'error' && n.label === 'MissingItem'
+      );
+      expect(implicitError).toBeTruthy();
+      // Should match the referencing node's rootContainerId
+      expect(implicitError!.rootContainerId).toBe('Order_Place_Order');
+    });
+
+    it('should block linking between nodes in different nested sub-containers', () => {
+      // IsAddressValid (PlaceOrder) and AddressInvalid (Another Sub Process) are in DIFFERENT scopes
+      const xml = `<eventstorming><aggregate name="Order">
+        <container name="Place Order">
+          <command name="PlaceOrder" next="DoSomething" />
+          <container name="PlaceOrder">
+            <policy name="IsAddressValid" altNext="AddressInvalid" />
+            <container name="Another Sub Process">
+              <command name="DoSomething" />
+              <error name="AddressInvalid" />
+            </container>
+          </container>
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      // AddressInvalid is in a different root scope than IsAddressValid → no link
+      const isAddressValid = result.nodes.find((n) => n.label === 'IsAddressValid');
+      expect(isAddressValid!.altNext).not.toBe('Another_Sub_Process_AddressInvalid');
+    });
+
+    it('should allow linking between nodes in the SAME container (same rootContainerId)', () => {
+      // Both nodes are direct children of <container name="Place Order">, no nested containers
+      const xml = `<eventstorming><aggregate name="Order">
+        <container name="Place Order">
+          <command name="PlaceOrder" next="InventoryService" />
+          <externalSystem name="InventoryService" />
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
+      // Both nodes share rootContainerId = "Order_Place_Order" → linking works
+      expect(placeOrder!.next).toBe('Place_Order_InventoryService');
+    });
+  });
 
     it('should resolve Complex Vertical Example altNext references correctly', () => {
       const xml = `<eventstorming><aggregate name="Complex Vertical Example">

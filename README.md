@@ -387,11 +387,16 @@ Rendered:
         <event name="OrderPlaced" />
       </container>
       <container name="Cancel Order">
-        <actor name="Customer" />
+        <actor name="Customer" next="PlaceOrder" />
         <command name="CancelOrder" />
         <event name="OrderCancelled" />
       </container>
     </container>
+    <container name="Cancel Order">
+        <actor name="Customer" next="PlaceOrder" />
+        <command name="CancelOrder" />
+        <event name="OrderCancelled" />
+      </container>
   </aggregate>
 </eventstorming>
 ```

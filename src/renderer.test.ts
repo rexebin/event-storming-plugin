@@ -946,7 +946,7 @@ describe('renderEventStorming layout', () => {
 
 describe('computeLinkPath obstacle avoidance', () => {
   function makeNode(id: string, x: number, y: number): import('./constants.js').LayoutNode {
-    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
+    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', rootContainerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
   }
 
   it('routes upward negative link around intermediate nodes by going down first', () => {
