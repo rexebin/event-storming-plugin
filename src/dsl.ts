@@ -1,4 +1,4 @@
-/**\n    * Event Storming DSL Parser\n    *\n    * Supports two input formats:\n    *   1. XML-based DSL (&lt;eventstorming&gt; ... &lt;/eventstorming&gt;)\n    *   2. Text-based DSL (e.g. "actor: Customer [purple]")\n    */
+/**\n    * Event Storming DSL Parser — XML format.\n    */
 
 export interface DSLNode {
   id: string;
@@ -94,423 +94,30 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 /**
- * Parse raw DSL text into a structured model.
- *
- * Supports two input formats:
- *  1. XML-based DSL (&lt;eventstorming&gt; ... &lt;/eventstorming&gt;)
- *  2. Text-based DSL (e.g. "actor: Customer [purple]")
+ * Parse raw XML-based DSL text into a structured model.
  */
 export function parseDSL(text: string): DSLModel {
-  // Try XML format first
-  if (isEventStormingXML(text)) {
-    return parseXMLDSL(text);
-  }
-
-  const model: DSLModel = {
-  title: 'Event Storming',
-  description: '',
-  containers: [],
-  nodes: [],
-  links: [],
-  };
-
-  const lines = text.split('\n');
-  let currentContainer: DSLContainer | null = null;
-
-  for (let i = 0; i < lines.length; i++) {
-  const line = lines[i].trim();
-  if (!line || line.startsWith('//') || line.startsWith('/*')) continue;
-
-  // Metadata
-  const titleMatch = line.match(/^# Title:\s*(.+)$/);
-  const descMatch = line.match(/^# Description:\s*(.+)$/);
-  if (titleMatch) {
-   model.title = titleMatch[1].trim();
-    continue;
-    }
-  if (descMatch) {
-   model.description = descMatch[1].trim();
-   continue;
-   }
-
-  // Close container block
-  if (line === '}') {
-   currentContainer = null;
-   continue;
-   }
-
-  // ─── Container definitions (aggregate / readModel / process / entity with {) ───
-  const containerMatch = line.match(/^(?:aggregate|readModel|process|entity):\s*(.+?)\s*\[(\w+)\]\s*\{/i);
-  if (containerMatch) {
-   const lineLower = line.toLowerCase();
-   currentContainer = {
-     id: normalizeId(containerMatch[1]),
-     label: containerMatch[1].trim(),
-     type: lineLower.startsWith('readmodel') ? 'readModel' : lineLower.startsWith('process') ? 'process' : 'aggregate',
-     color: getColor(containerMatch[2]),
-     nodeIds: [],
-     processes: [],
-     parentId: null,
-     subContainers: [],
-   };
-   model.containers.push(currentContainer);
-   continue;
-   }
-
-  // ─── Standalone aggregate / entity (no {) ───
-  let lineForStandalone = line;
-  let standaloneCustomIdPrefixed: string | undefined;
-  const saIdMatch = line.match(/^(.+?)\s*\[id="([^"]*)"\]\s*$/i);
-  if (saIdMatch) {
-    lineForStandalone = saIdMatch[1];
-    if (saIdMatch[2]) {
-      // Prefix with "custom-" unless already prefixed to prevent ID conflicts
-      standaloneCustomIdPrefixed = saIdMatch[2].startsWith('custom-') ? saIdMatch[2] : 'custom-' + saIdMatch[2];
-    }
-  }
-
-  const standaloneAggregateMatch = lineForStandalone.match(/^(?:aggregate|entity):\s*(.+?)\s*\[(\w+)\]\s*$/i);
-  if (standaloneAggregateMatch && !currentContainer) {
-   model.nodes.push({
-     id: standaloneCustomIdPrefixed ?? normalizeId(standaloneAggregateMatch[1]),
-     label: standaloneAggregateMatch[1].trim(),
-     type: 'aggregate',
-     color: getColor(standaloneAggregateMatch[2]),
-     containerId: null,
-     processIndex: -1,
-     noteTarget: null,
-     customId: saIdMatch && saIdMatch[2] ? saIdMatch[2] : undefined,
-     });
-   continue;
-   }
-
-  // ─── Standalone readModel (no {) ───
-  const standaloneReadModelMatch = lineForStandalone.match(/^readModel:\s*(.+?)\s*\[(\w+)\]\s*$/i);
-  if (standaloneReadModelMatch && !currentContainer) {
-   model.nodes.push({
-     id: standaloneCustomIdPrefixed ?? normalizeId(standaloneReadModelMatch[1]),
-     label: standaloneReadModelMatch[1].trim(),
-     type: 'readModel',
-     color: getColor(standaloneReadModelMatch[2]),
-     containerId: null,
-     processIndex: -1,
-     noteTarget: null,
-     customId: saIdMatch && saIdMatch[2] ? saIdMatch[2] : undefined,
-     });
-   continue;
-   }
-
-   // ─── Inside a container ───
-  if (currentContainer) {
-    // Named process group: process: "Name" { ... }
-   const namedProcessMatch = line.match(/^process:\s*(.+?)\s*\{/i);
-   if (namedProcessMatch) {
-     const groupName = namedProcessMatch[1].trim();
-     // Create a DSLProcess for this group
-     const proc: DSLProcess = {
-      name: groupName,
-      stepIds: [],
-      notes: [],
-      };
-     currentContainer.processes.push(proc);
-     // We'll track nodes in this group via a marker — for simplicity, add stepIds as nodes are parsed
-     // Store current process on the container (temporary)
-     (currentContainer as any)._currentProcess = proc;
-     continue;
-      }
-
-    // Process chain (flat): process: Actor -> Command -> Event
-   const processMatch = line.match(/^process:\s*(.+)$/i);
-   if (processMatch) {
-     const steps = processMatch[1]
-           .split('->')
-           .map((s) => s.trim().replace(/^\|(.+)\|$/, '$1'))
-           .filter(Boolean);
-     const stepIds: string[] = [];
-     for (const step of steps) {
-      // Extract optional [id="..."] from step label for custom id support
-      let stepCustomId: string | undefined;
-      let stepLabel = step;
-      const stepIdMatch = step.match(/^(.+?)\s*\[id="([^"]*)"\]\s*$/i);
-      if (stepIdMatch) {
-        stepLabel = stepIdMatch[1].trim();
-        if (stepIdMatch[2]) {
-          stepCustomId = stepIdMatch[2]; // ensureNode adds the prefix
-        }
-      }
-      // Strip trailing [color] suffix from label (e.g. "Customer [purple]" → "Customer")
-      stepLabel = stepLabel.replace(/\s+\[\w+\]\s*$/, '').trim();
-      const node = ensureNode(model, stepLabel, inferProcessType(stepLabel, currentContainer.type), currentContainer.id, stepIds.length, stepCustomId);
-      stepIds.push(node.id);
-       }
-     const proc: DSLProcess = {
-      name: steps.join(' -> '),
-      stepIds,
-      notes: [],
-      };
-     currentContainer.processes.push(proc);
-       // Also add links between consecutive steps, set next/altNext
-     for (let j = 0; j < stepIds.length - 1; j++) {
-      model.links.push({ source: stepIds[j], target: stepIds[j + 1], label: '', type: 'default' });
-      // Set next on the source node
-      const srcNode = model.nodes.find((n) => n.id === stepIds[j]);
-      if (srcNode) srcNode.next = stepIds[j + 1];
-       }
-     continue;
-      }
-
-    // Element inside container (with or without [color], with optional next/altNext)
-   const nodeInContainer = parseNodeLine(line, currentContainer.id, -1, null);
-   if (nodeInContainer) {
-     model.nodes.push(nodeInContainer);
-     currentContainer.nodeIds.push(nodeInContainer.id);
-     // If we're inside a named process group, add to that process
-     const curProc = (currentContainer as any)._currentProcess;
-     if (curProc) {
-      curProc.stepIds.push(nodeInContainer.id);
-      }
-     continue;
-      }
-
-   continue;
-   }
-
-  // ─── Standalone node definitions (outside containers) ───
-  const standalone = parseNodeLine(line, null, -1, null);
-  if (standalone) {
-   model.nodes.push(standalone);
-   continue;
-   }
-
-  // ─── Relationships / Links (standalone) ───
-  const linkMatch = line.match(/^#?(\S+)\s*->\s*(?:\|(.+?)\|)?\s*(\S+)\s*(?::\s*(\w+))?$/);
-  if (linkMatch) {
-   const sourceId = normalizeId(linkMatch[1]);
-   const label = linkMatch[2] || '';
-   const targetId = normalizeId(linkMatch[3]);
-   const linkType = (linkMatch[4] || 'default') as LinkType;
-
-   const sourceNode = model.nodes.find((n) => n.id === sourceId);
-   const targetNode = model.nodes.find((n) => n.id === targetId);
-
-   if (sourceNode && targetNode) {
-     model.links.push({ source: sourceId, target: targetId, label, type: linkType });
-      }
-   }
-  }
-
-  // Second pass: create implicit error nodes for unmatched next/altNext references (text DSL)
-  for (const node of model.nodes) {
-    if (node.altNext && !model.nodes.find((n) => n.id === node.altNext)) {
-      const nid = normalizeId(node.altNext);
-      model.nodes.push({
-        id: nid,
-        label: node.altNext,
-        type: 'error',
-        containerId: node.containerId,
-        processIndex: -1,
-        color: COLOR_MAP.red,
-        noteTarget: null,
-        notes: [],
-      });
-    }
-  }
-
-  // Add implicit error nodes to their parent process stepIds so layout routes them through altNext
-  for (const container of model.containers) {
-    for (const node of model.nodes) {
-      if (node.containerId !== container.id || node.type !== 'error') continue;
-      // Check if this error node is targeted by altNext from any process node
-      const owner = container.processes.flatMap((p) => p.stepIds).some((sid) => {
-        const n = model.nodes.find((nn) => nn.id === sid);
-        return n && n.altNext === node.id;
-      });
-      if (!owner) continue;
-      // Add to the first process that references this implicit error node
-      for (const proc of container.processes) {
-        if (proc.stepIds.includes(node.id)) continue;
-        const referrer = model.nodes.find((n) => proc.stepIds.includes(n.id) && n.altNext === node.id);
-        if (referrer) {
-          proc.stepIds.push(node.id);
-          break;
-        }
-      }
-    }
-  }
-
- return model;
+  if (!isEventStormingXML(text)) return { title: 'Event Storming', description: '', containers: [], nodes: [], links: [] };
+  return parseXMLDSL(text);
 }
 
-/**
- * Parse a single line into a node (actor, command, event, etc.).
- * Returns null if the line is not a node definition.
- * [color] is optional — uses default color when omitted.
- */
-function parseNodeLine(
-  line: string,
-  containerId: string | null,
-  processIndex: number,
-  _noteTarget: string | null
-): DSLNode | null {
-  // Extract optional [id="..."] attribute from the end of the line (non-greedy so other brackets are preserved)
-  let customId: string | undefined;
-  const idMatch = line.match(/^(.+?)\s*\[id="([^"]*)"\]\s*$/i);
-  if (idMatch) {
-    line = idMatch[1];
-    if (idMatch[2]) {
-      // Store original without prefix; compute prefixed version for actual node id
-      customId = idMatch[2];
-    }
-  }
+const XML_NODE_TYPES: Record<string, NodeType> = {
+  actor: 'actor',
+  command: 'command',
+  event: 'event',
+  policy: 'policy',
+  query: 'query',
+  externalsystem: 'externalSystem',
+  readmodel: 'readModel',
+  error: 'error',
+  note: 'note',
+  aggregate: 'aggregate',
+};
 
-  const nodeDefaults: Record<string, { type: NodeType; color: string }> = {
-  note: { type: 'note', color: '#FFF1AA' },
-  actor: { type: 'actor', color: '#D4D3D3' },
-  command: { type: 'command', color: '#91D49C' },
-  query: { type: 'query', color: '#5BAA62' },
-  event: { type: 'event', color: '#FFA500' },
-  policy: { type: 'policy', color: '#859EBF' },
-  externalsystem: { type: 'externalSystem', color: '#FB8597' },
-  tempobject: { type: 'tempObject', color: '#FFF1AA' },
-  readmodel: { type: 'readModel', color: '#5BAA62' },
-  aggregate: { type: 'aggregate', color: '#FEE254' },
-  entity: { type: 'aggregate', color: '#FEE254' },
-  view: { type: 'view', color: '#FEE254' },
-  error: { type: 'error', color: '#8DCFF9' },
-   };
-
-  // Note (attached to a nearby element)
-  const noteMatch = line.match(/^note:\s*["'](.+)["'](?:\s*->\s*(\S+))?/i);
-  if (noteMatch) {
-  return {
-  id: normalizeId(`note_${noteMatch[1]}_${containerId || ''}`),
-  label: noteMatch[1].trim(),
-  type: 'note',
-  color: '#FFF1AA',
-  containerId,
-  processIndex,
-  noteTarget: noteMatch[2] ? normalizeId(noteMatch[2]) : null,
-  customId,
-    };
-  }
-
-  // Policy with yes/no branching: policy: Name [yes: YesNode, no: NoNode]
-  const policyBranchMatch = line.match(/^policy:\s*(.+?)\s*\[\s*yes:\s*(.+?),\s*no:\s*(.+)\s*\]/i);
-  if (policyBranchMatch) {
-  const label = policyBranchMatch[1].trim();
-  const yesNode = policyBranchMatch[2].trim();
-  const noNode = policyBranchMatch[3].trim();
-  // Compute actual node id with "custom-" prefix if customId is set
-  let policyNodeId = customId;
-  if (policyNodeId && !policyNodeId.startsWith('custom-')) {
-    policyNodeId = 'custom-' + policyNodeId;
-  }
-  return {
-  id: policyNodeId ?? normalizeId(label),
-  label,
-  type: 'policy',
-  color: '#859EBF',
-  containerId,
-  processIndex,
-  noteTarget: null,
-  next: normalizeId(yesNode),
-  altNext: normalizeId(noNode),
-  notes: [],
-  customId,
-    };
-    }
-
-  // Generic parser: type: Name [color]   (color is optional)
-  const genericMatch = line.match(/^(\w+):\s*(.+?)(?:\s*\[(\w+)\])?\s*$/i);
-  if (genericMatch) {
-  const typeName = genericMatch[1].toLowerCase();
-  if (!nodeDefaults[typeName]) return null;
-
-  const label = genericMatch[2].trim();
-  const rawColor = genericMatch[3];
-  const color = rawColor ? getColor(rawColor) : nodeDefaults[typeName].color;
-
-  // Compute actual node id with "custom-" prefix if customId is set
-  let nodeId = customId;
-  if (nodeId && !nodeId.startsWith('custom-')) {
-    nodeId = 'custom-' + nodeId;
-  }
-  return {
-  id: nodeId ?? normalizeId(label),
-  label,
-  type: nodeDefaults[typeName].type,
-  color,
-  containerId,
-  processIndex,
-  noteTarget: null,
-  notes: [],
-  customId,
-    };
-  }
-
- return null;
+export function isEventStormingXML(text: string): boolean {
+  return text.includes('<eventstorming') && text.includes('</eventstorming>');
 }
 
-/**
- * Ensure a node exists in the model (creates it if not).
- * Used inside process chains where nodes are referenced by label.
- */
-function ensureNode(
-  model: DSLModel,
-  label: string,
-  type: NodeType,
-  containerId: string | null,
-  processIndex: number,
-  customId?: string
-): DSLNode {
-  // Prefix with "custom-" unless already prefixed to prevent ID conflicts
-  let actualCustomId = customId;
-  if (actualCustomId && !actualCustomId.startsWith('custom-')) {
-    actualCustomId = 'custom-' + actualCustomId;
-  }
-  const id = actualCustomId ?? normalizeId(label);
-  let node = model.nodes.find((n) => n.id === id && n.containerId === containerId);
-  // Fallback to name-based resolution if exact id didn't match
-  if (!node) {
-    const canon = canonicalizeReference(label);
-    node = model.nodes.find(
-      (n) => !!n.label && n.containerId === containerId && canonicalizeReference(n.label!) === canon
-    );
-  }
-  if (!node) {
-  node = {
-    id,
-    label: label.trim(),
-    type,
-    color: DEFAULT_COLORS[type] || '#6a737d',
-    containerId,
-    processIndex,
-    noteTarget: null,
-    ...(customId && { customId }),
-    };
-  model.nodes.push(node);
-  }
-  node.processIndex = processIndex;
-  return node;
-}
-
-/**
- * Infer node type from a process step label.
- * Defaults to: actor -> command -> event based on common naming conventions.
- */
-function inferProcessType(label: string, containerType: string): NodeType {
-  const l = label.toLowerCase();
-  if (l.endsWith('placed') || l.endsWith('received') || l.endsWith('sent') || l.endsWith('created') || l.endsWith('cancelled') || l.endsWith('updated') || l.endsWith('deleted')) {
-  return 'event';
-  }
-  // If we can match an existing node, use its type
-  // Otherwise default to 'command' for aggregates, 'event' for read models
-  return containerType === 'aggregate' ? 'command' : 'event';
-}
-
-/**
- * Default colors for each node type (used in process chains without explicit [color]).
- */
 const DEFAULT_COLORS: Record<NodeType, string> = {
   event: '#FFA500',
   command: '#91D49C',
@@ -525,10 +132,6 @@ const DEFAULT_COLORS: Record<NodeType, string> = {
   view: '#FEE254',
   error: '#8DCFF9',
 };
-
-export function isEventStormingXML(text: string): boolean {
-  return text.includes('<eventstorming') && text.includes('</eventstorming>');
-}
 
 // idPrefix must include any trailing separator (e.g. 'container_id_' or 'child_prefix_').
 // customId is stored raw (unprefixed); id is stored with 'custom-' prefix when customId is set.
@@ -942,19 +545,6 @@ function buildContainerTree(
   return pendingRefs;
 }
 
-const XML_NODE_TYPES: Record<string, NodeType> = {
-  actor: 'actor',
-  command: 'command',
-  event: 'event',
-  policy: 'policy',
-  query: 'query',
-  externalsystem: 'externalSystem',
-  readmodel: 'readModel',
-  error: 'error',
-  note: 'note',
-  aggregate: 'aggregate',
-};
-
 // ─── Collect direct process children (nodes + recurse into <container>) ──────
 
 function collectProcessChildren(
@@ -1084,10 +674,6 @@ export function normalizeId(text: string): string {
   return text.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
-function canonicalizeReference(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
 function resolveReference(
   reference: string | undefined,
   allNodes: DSLNode[],
@@ -1138,6 +724,4 @@ function resolveReference(
   return nodeId;
 }
 
-function getColor(name: string): string {
-  return COLOR_MAP[name.toLowerCase()] || '#6a737d';
-}
+
