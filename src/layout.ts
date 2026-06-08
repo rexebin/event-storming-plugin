@@ -83,12 +83,15 @@ export function layoutAltBranch(
   if (!processPositioned.has(node.id)) {
     placeProcessNode(node, x, y, container.id, allNodes, processPositioned, positioned);
    }
-  let maxBottom = y + NODE_H;
+  const nodeOffset = node.offset ?? 0;
+  const nodeOffsetY = nodeOffset < 0 ? Math.abs(nodeOffset) * (NODE_H + NODE_GAP_Y) : 0;
+  const actualY = y + nodeOffsetY;
+  let maxBottom = actualY + NODE_H;
 
     // altNext goes below (recursive)
   if (node.altNext && processNodeMap.has(node.altNext)) {
     const altNextNode = processNodeMap.get(node.altNext)!;
-    const altNextY = y + NODE_H + NODE_GAP_Y + 20;
+    const altNextY = actualY + NODE_H + NODE_GAP_Y + 20;
     allLinks.push({ source: node.id, target: altNextNode.id, label: '', type: 'negative' });
     if (!processPositioned.has(altNextNode.id)) {
       const altBottom = layoutAltBranch(
@@ -111,7 +114,7 @@ export function layoutAltBranch(
         (subGroupOf.get(node.id) ?? '') !== (subGroupOf.get(nextNode.id) ?? '');
       const nextX = x + NODE_W + NODE_GAP_X + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
       const chainBottom = layoutChainFrom(
-        nextNode, nextX, y, container, model, processNodeMap,
+        nextNode, nextX, actualY, container, model, processNodeMap,
         allNodes, allLinks, processPositioned, positioned, subGroupOf
        );
       maxBottom = Math.max(maxBottom, chainBottom);
@@ -136,7 +139,7 @@ export function layoutChainFrom(
 ): number {
   let current: DSLNode | undefined = startNode;
   let currentX = startX;
-  const currentY = startY;
+  let currentY = startY;
   let maxBottom = currentY + NODE_H;
   const visited = new Set<string>();
 
@@ -144,8 +147,10 @@ export function layoutChainFrom(
   const chainNodes: Array<{ node: DSLNode; x: number }> = [];
   while (current && !visited.has(current.id)) {
     visited.add(current.id);
+    const nodeOffset = current.offset ?? 0;
+    const nodeOffsetY = nodeOffset < 0 ? Math.abs(nodeOffset) * (NODE_H + NODE_GAP_Y) : 0;
     placeProcessNode(current, currentX, currentY, container.id, allNodes, processPositioned, positioned);
-    maxBottom = Math.max(maxBottom, currentY + NODE_H);
+    maxBottom = Math.max(maxBottom, currentY + nodeOffsetY + NODE_H);
     chainNodes.push({ node: current, x: currentX });
 
     if (!current.next || !processNodeMap.has(current.next)) break;
@@ -156,15 +161,19 @@ export function layoutChainFrom(
     const crossesSubGroup =
       !!subGroupOf &&
       (subGroupOf.get(current.id) ?? '') !== (subGroupOf.get(nextNode.id) ?? '');
-    // Shift chain advancement by each node's own offset so successors inherit the shift.
-    const ownOffset = (current.offset ?? 0) * (NODE_W + NODE_GAP_X);
-    currentX += NODE_W + NODE_GAP_X + ownOffset + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
+    if (nodeOffset > 0) {
+      // Positive offset: shift chain right so successors start after the widened gap.
+      currentX += NODE_W + NODE_GAP_X + nodeOffset * (NODE_W + NODE_GAP_X) + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
+    } else {
+      currentX += NODE_W + NODE_GAP_X + (crossesSubGroup ? SUB_GROUP_GAP_X : 0);
+      if (nodeOffset < 0) currentY += nodeOffsetY;
+    }
     current = nextNode;
    }
 
     // Pass 2: lay out alt branches right-to-left so fan-in targets land below the
     // rightmost node that references them, not below the first one encountered.
-  const negativeY = currentY + NODE_H + NODE_GAP_Y + 20;
+  const negativeY = maxBottom + NODE_GAP_Y + 20;
   for (let i = chainNodes.length - 1; i >= 0; i--) {
     const { node, x } = chainNodes[i];
     const hasAltBranch = !!node.altNext && processNodeMap.has(node.altNext);
@@ -175,8 +184,8 @@ export function layoutChainFrom(
     const mainChainNextId = chainNodes[i + 1]?.node.id;
 
     allLinks.push({ source: node.id, target: negativeNode.id, label: linkLabel, type: 'negative' });
-    // Use visual X (rawX + own offset) so altNext children align directly below the shifted parent.
-    const parentOwnOffset = (node.offset ?? 0) * (NODE_W + NODE_GAP_X);
+    // Positive offset shifts the node right; negative offset shifts down (no X change).
+    const parentOwnOffset = Math.max(0, node.offset ?? 0) * (NODE_W + NODE_GAP_X);
     const altBottom = layoutAltBranch(
       negativeNode, x + parentOwnOffset, negativeY, container, model, processNodeMap,
       allNodes, allLinks, processPositioned, positioned, mainChainNextId, subGroupOf
@@ -436,8 +445,15 @@ export function computeContainerHeight(container: DSLContainer, model: DSLModel)
   const processRows = container.processes.length;
   const nonProcess = model.nodes.filter((n) => n.containerId === container.id && !container.processes.some(p => p.stepIds.includes(n.id)));
   const nonProcessRows = Math.ceil(nonProcess.length / 4);
+  const negativeOffsetRows = container.processes.reduce((total, process) => {
+    const shift = process.stepIds
+      .map(id => model.nodes.find(n => n.id === id)?.offset ?? 0)
+      .filter(o => o < 0)
+      .reduce((sum, o) => sum + Math.abs(o), 0);
+    return total + shift;
+  }, 0);
   return CONTAINER_HEADER_H + CONTAINER_PADDING * 2 +
-     (processRows + nonProcessRows) * (NODE_H + NODE_GAP_Y) + 10;
+     (processRows + nonProcessRows + negativeOffsetRows) * (NODE_H + NODE_GAP_Y) + 10;
 }
 
 // ─── Standalone nodes ────────────────────────────────────────

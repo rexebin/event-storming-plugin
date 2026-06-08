@@ -5,7 +5,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
-import { computeLayout } from './layout.js';
+import { computeLayout, computeContainerHeight } from './layout.js';
 import { NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './constants.js';
 import { computeLinkPath } from './links.js';
 import { parseDSL } from './dsl.js';
@@ -728,6 +728,121 @@ describe('renderEventStorming layout', () => {
     for (const node of groupNodes) {
       expect(node.x + NODE_W).toBeLessThanOrEqual(rightBound + 1);
     }
+  });
+
+  describe('negative offset (vertical shift)', () => {
+    const negOffsetXml = `
+<eventstorming>
+  <aggregate name="Test">
+    <container name="Flow">
+      <command name="A" next="B"/>
+      <command name="B" offset="-1" next="C"/>
+      <command name="C"/>
+    </container>
+  </aggregate>
+</eventstorming>`;
+
+    it('node with negative offset is shifted down', () => {
+      const model = parseDSL(negOffsetXml);
+      const layout = computeLayout(model);
+      const nodeA = layout.nodes.find(n => n.label === 'A')!;
+      const nodeB = layout.nodes.find(n => n.label === 'B')!;
+      expect(nodeB.y).toBeGreaterThan(nodeA.y);
+      expect(nodeB.y - nodeA.y).toBe(NODE_H + NODE_GAP_Y);
+    });
+
+    it('negative offset does not shift node horizontally', () => {
+      const model = parseDSL(negOffsetXml);
+      const layout = computeLayout(model);
+      const nodeA = layout.nodes.find(n => n.label === 'A')!;
+      const nodeB = layout.nodes.find(n => n.label === 'B')!;
+      expect(nodeB.x - nodeA.x).toBe(NODE_W + NODE_GAP_X);
+    });
+
+    it('chain successor inherits downward shift', () => {
+      const model = parseDSL(negOffsetXml);
+      const layout = computeLayout(model);
+      const nodeB = layout.nodes.find(n => n.label === 'B')!;
+      const nodeC = layout.nodes.find(n => n.label === 'C')!;
+      expect(nodeC.y).toBe(nodeB.y);
+    });
+
+    it('process group height accounts for vertical shift', () => {
+      const model = parseDSL(negOffsetXml);
+      const layout = computeLayout(model);
+      const group = layout.groups[0]!;
+      const nodeC = layout.nodes.find(n => n.label === 'C')!;
+      expect(nodeC.y + NODE_H).toBeLessThanOrEqual(group.y + group.height);
+    });
+
+    it('computeContainerHeight includes extra rows for negative-offset nodes', () => {
+      const model = parseDSL(negOffsetXml);
+      const container = model.containers[0];
+      const height = computeContainerHeight(container, model);
+      // base = CONTAINER_HEADER_H + CONTAINER_PADDING*2 + 1*(NODE_H+NODE_GAP_Y) + 10 = 232
+      // with 1 node having offset=-1, should add at least one extra row
+      const baseOneProcess = CONTAINER_HEADER_H + CONTAINER_PADDING * 2 + (NODE_H + NODE_GAP_Y) + 10;
+      expect(height).toBeGreaterThan(baseOneProcess);
+    });
+
+    it('positive offset is still horizontal (unchanged)', () => {
+      const xml = `
+<eventstorming>
+  <aggregate name="Test">
+    <container name="Flow">
+      <command name="A" next="B"/>
+      <command name="B" offset="1" next="C"/>
+      <command name="C"/>
+    </container>
+  </aggregate>
+</eventstorming>`;
+      const model = parseDSL(xml);
+      const layout = computeLayout(model);
+      const nodeA = layout.nodes.find(n => n.label === 'A')!;
+      const nodeB = layout.nodes.find(n => n.label === 'B')!;
+      const nodeC = layout.nodes.find(n => n.label === 'C')!;
+      expect(nodeB.y).toBe(nodeA.y);
+      expect(nodeB.x - nodeA.x).toBe((NODE_W + NODE_GAP_X) * 2);
+      expect(nodeC.x - nodeB.x).toBe(NODE_W + NODE_GAP_X);
+    });
+  });
+
+  describe('negative offset on alt-branch node', () => {
+    it('altNext child of a negative-offset alt-branch node starts below the shifted node', () => {
+      const xml = `
+<eventstorming>
+  <aggregate name="Test">
+    <container name="Flow">
+      <command name="Root" altNext="AltNode"/>
+      <error name="AltNode" offset="-1" altNext="AltChild"/>
+      <error name="AltChild"/>
+    </container>
+  </aggregate>
+</eventstorming>`;
+      const model = parseDSL(xml);
+      const layout = computeLayout(model);
+      const altNode = layout.nodes.find(n => n.label === 'AltNode')!;
+      const altChild = layout.nodes.find(n => n.label === 'AltChild')!;
+      expect(altChild.y).toBeGreaterThan(altNode.y + NODE_H);
+    });
+
+    it('lateral next chain of a negative-offset alt-branch node aligns with the shifted node', () => {
+      const xml = `
+<eventstorming>
+  <aggregate name="Test">
+    <container name="Flow">
+      <command name="Root" altNext="AltNode"/>
+      <error name="AltNode" offset="-1" next="LateralNode"/>
+      <command name="LateralNode"/>
+    </container>
+  </aggregate>
+</eventstorming>`;
+      const model = parseDSL(xml);
+      const layout = computeLayout(model);
+      const altNode = layout.nodes.find(n => n.label === 'AltNode')!;
+      const lateralNode = layout.nodes.find(n => n.label === 'LateralNode')!;
+      expect(lateralNode.y).toBe(altNode.y);
+    });
   });
 
   it('shows next and altNext node labels in tooltip when present', () => {

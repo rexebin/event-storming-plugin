@@ -153,12 +153,14 @@ export function placeProcessNode(
 ): void {
   if (processPositioned.has(node.id)) return;
 
-  const offsetX = (node.offset ?? 0) * (NODE_W + NODE_GAP_X);
+  const offset = node.offset ?? 0;
+  const offsetX = offset > 0 ? offset * (NODE_W + NODE_GAP_X) : 0;
+  const offsetY = offset < 0 ? Math.abs(offset) * (NODE_H + NODE_GAP_Y) : 0;
 
   allNodes.push({
     ...node,
     x: x + offsetX,
-    y,
+    y: y + offsetY,
     containerId,
   });
   processPositioned.add(node.id);

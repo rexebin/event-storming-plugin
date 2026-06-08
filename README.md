@@ -202,7 +202,7 @@ Rendered:
           <policy name="Call Succeeded?" altNext="Service didn't respond correctly" next="Record Call" />
           <command name="Record Call" />
           <event name="Call Recorded" next="" offset="1"/>
-          <error name="Service didn't respond correctly" altNext="Server Error?" next=""></error>
+          <error name="Service didn't respond correctly" altNext="Server Error?" next="" offset="-1"></error>
           <policy name="Server Error?" altNext="Status code is not 422" next="Have reached max retries?"  />
           <error name="Status code is not 422" altNext="Another condition?" ></error>
           <command name="Reject Call" altNext="Rejected Exception?" />
