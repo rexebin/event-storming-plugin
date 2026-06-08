@@ -5,8 +5,7 @@ export interface DSLNode {
   label: string;
   type: NodeType;
   color: string;
-  containerId: string | null; // immediate parent container id
-  rootContainerId: string | null; // hard boundary scope (the containing <container>'s scope)
+  containerId: string | null; // immediate parent container id (scope boundary for reference resolution)
   processIndex: number; // index within a process chain (-1 if standalone)
   noteTarget: string | null; // if type='note', the node it's attached to
   customId?: string; // optional user-provided id (differs from auto-generated id when set)
@@ -29,9 +28,11 @@ export interface DSLContainer {
   label: string;
   type: 'aggregate' | 'readModel' | 'process' | 'externalSystem';
   color: string;
-  nodeIds: string[];         // ids of nodes inside this container
-  processes: DSLProcess[];    // groups/processes inside the container
-  notes?: string[];           // container-level notes
+  nodeIds: string[];           // ids of nodes inside this container
+  processes: DSLProcess[];     // groups/processes inside this container
+  parentId: string | null;     // parent container id (null for top-level)
+  subContainers: DSLContainer[];  // nested child containers
+  notes?: string[];            // container-level notes
 }
 
 export interface DSLSubGroup {
@@ -44,7 +45,7 @@ export interface DSLProcess {
   name: string;              // process group name
   stepIds: string[];        // ordered list of node ids in the flow
   notes?: string[];          // process-level notes
-  subGroups?: DSLSubGroup[];  // nested sub-containers rendered as inline boxes
+  subGroups?: Array<{ name: string; nodeIds: string[]; notes?: string[] }>;  // legacy: nested containers within a process
 }
 
 export interface DSLModel {
@@ -149,7 +150,9 @@ export function parseDSL(text: string): DSLModel {
      color: getColor(containerMatch[2]),
      nodeIds: [],
      processes: [],
-      };
+     parentId: null,
+     subContainers: [],
+   };
    model.containers.push(currentContainer);
    continue;
    }
@@ -174,7 +177,6 @@ export function parseDSL(text: string): DSLModel {
      type: 'aggregate',
      color: getColor(standaloneAggregateMatch[2]),
      containerId: null,
-     rootContainerId: null,
      processIndex: -1,
      noteTarget: null,
      customId: saIdMatch && saIdMatch[2] ? saIdMatch[2] : undefined,
@@ -191,7 +193,6 @@ export function parseDSL(text: string): DSLModel {
      type: 'readModel',
      color: getColor(standaloneReadModelMatch[2]),
      containerId: null,
-     rootContainerId: null,
      processIndex: -1,
      noteTarget: null,
      customId: saIdMatch && saIdMatch[2] ? saIdMatch[2] : undefined,
@@ -307,7 +308,6 @@ export function parseDSL(text: string): DSLModel {
         label: node.altNext,
         type: 'error',
         containerId: node.containerId,
-        rootContainerId: node.rootContainerId,
         processIndex: -1,
         color: COLOR_MAP.red,
         noteTarget: null,
@@ -388,7 +388,6 @@ function parseNodeLine(
   type: 'note',
   color: '#FFF1AA',
   containerId,
-  rootContainerId: containerId,
   processIndex,
   noteTarget: noteMatch[2] ? normalizeId(noteMatch[2]) : null,
   customId,
@@ -412,7 +411,6 @@ function parseNodeLine(
   type: 'policy',
   color: '#859EBF',
   containerId,
-  rootContainerId: containerId,
   processIndex,
   noteTarget: null,
   next: normalizeId(yesNode),
@@ -443,7 +441,6 @@ function parseNodeLine(
   type: nodeDefaults[typeName].type,
   color,
   containerId,
-  rootContainerId: containerId,
   processIndex,
   noteTarget: null,
   notes: [],
@@ -487,10 +484,9 @@ function ensureNode(
     type,
     color: DEFAULT_COLORS[type] || '#6a737d',
     containerId,
-    rootContainerId: containerId,
     processIndex,
     noteTarget: null,
-    customId: customId ?? undefined,
+    ...(customId && { customId }),
     };
   model.nodes.push(node);
   }
@@ -581,122 +577,355 @@ function parseXMLDSL(text: string): DSLModel {
       color: CONTAINER_COLORS[cType],
       nodeIds: [],
       processes: [],
+      parentId: null,
+      subContainers: [],
       notes: xmlAttrNotes(diagramEl),
     };
 
-    for (const containerEl of Array.from(diagramEl.children)) {
-      const childTag = containerEl.tagName.toLowerCase();
-      if (childTag === 'container') {
-        expandXMLContainer(containerEl, dslContainer, model, normalizeId(containerEl.getAttribute('name') || '') + '_');
-      } else if (cType === 'process') {
-        // Top-level process containers have flow nodes as direct children
-        const stepIds: string[] = [];
-        const subGroups: DSLSubGroup[] = [];
-        const aliases = new Map<string, string>();
-        const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
-        collectXMLChildren(diagramEl, dslContainer, model, containerId + '_', aliases, stepIds, subGroups, pending, model.nodes);
+    // Phase 1: Collect child containers and inline process data without resolving references.
+    const pendingChildren: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> = [];
+    const inlineStepIds: string[] = [];
 
-        const deferredErrorIds: string[] = [];
-        for (const { node, rawNext, rawNegativeNext } of pending) {
-          if (rawNext !== undefined && rawNext !== '') {
-            const nextId = resolveReference(rawNext, containerId + '_', model.nodes, node.rootContainerId, false);
-            node.next = nextId;
-            if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
-          } else {
-            node.next = rawNext === '' ? null : undefined;
-          }
-          if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-            const altNextId = resolveReference(rawNegativeNext, containerId + '_', model.nodes, node.rootContainerId);
-            node.altNext = altNextId;
-            if (altNextId && !stepIds.includes(altNextId)) {
-              const isError = model.nodes.find((n) => n.id === altNextId)?.type === 'error';
-              if (isError) {
-                deferredErrorIds.push(altNextId);
-              } else {
-                stepIds.push(altNextId);
-              }
-            }
-          } else {
-            node.altNext = rawNegativeNext === '' ? null : undefined;
-          }
+    for (const childEl of Array.from(diagramEl.children)) {
+      const tagLower = childEl.tagName.toLowerCase();
+      if (tagLower === 'container') {
+        // Will be processed below after all containers exist.
+        continue;
+      }
+      if (cType !== 'process') continue;
+
+      // Inline non-container children: create nodes but defer reference resolution.
+      const name = childEl.getAttribute('name') || '';
+      const rawIdAttr = childEl.getAttribute('id');
+      const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
+      const autoId = containerId + '_' + normalizeId(name);
+
+      // Prefix customId with "custom-" unless already prefixed
+      let actualCustomId = customIdAttr;
+      if (actualCustomId && !actualCustomId.startsWith('custom-')) {
+        actualCustomId = 'custom-' + actualCustomId;
+      }
+      const actualId = actualCustomId ?? autoId;
+
+      const nodeType = XML_NODE_TYPES[tagLower];
+      if (!nodeType) continue;
+      if (tagLower === 'note' && !name) continue;
+
+      const n: DSLNode = {
+        id: actualId,
+        label: name,
+        type: nodeType,
+        color: DEFAULT_COLORS[nodeType] || '#6a737d',
+        containerId: dslContainer.id,
+        processIndex: -1,
+        noteTarget: null,
+        ...(customIdAttr && { customId: customIdAttr }),
+        notes: xmlAttrNotes(childEl),
+      };
+      model.nodes.push(n);
+      inlineStepIds.push(actualId);
+      pendingChildren.push({ node: n, rawNext: childEl.getAttribute('next') ?? undefined, rawNegativeNext: childEl.getAttribute('altNext') ?? undefined });
+    }
+
+    // Phase 1b: Create ALL nested containers as a batch (no reference resolution yet).
+    const allChildContainers: Array<{ el: Element; prefix: string }> = [];
+    for (const childEl of Array.from(diagramEl.children)) {
+      if (childEl.tagName.toLowerCase() === 'container') {
+        const childPrefix = normalizeId(childEl.getAttribute('name') || '') + '_';
+        allChildContainers.push({ el: childEl, prefix: childPrefix });
+      }
+    }
+
+    // Phase 1b-i: Build the entire container hierarchy tree first (all siblings visible).
+    let pendingRefs: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> = [];
+    for (const { el, prefix } of allChildContainers) {
+      const result = buildContainerTree(el, dslContainer, model, prefix);
+      pendingRefs = pendingRefs.concat(result);
+    }
+
+    // Phase 1b-ii: Now resolve references across ALL sibling containers at once.
+    if (pendingRefs.length > 0) {
+      const scopeBoundary = dslContainer.id;
+      // Collect all descendant nodeIds from the root container's subtree.
+      const boundaryNodeIds: Set<string> = new Set();
+      const seenC = new Set<string>();
+      const q: string[] = [scopeBoundary];
+      while (q.length > 0) {
+        const cid = q.shift()!;
+        if (seenC.has(cid)) continue;
+        seenC.add(cid);
+        for (const n of model.nodes) { if (n.containerId === cid) boundaryNodeIds.add(n.id); }
+        for (const c of model.containers) { if (c.parentId === cid) q.push(c.id); }
+      }
+
+      for (const { node, rawNext, rawNegativeNext } of pendingRefs) {
+        const cId = node.containerId || scopeBoundary;
+        if (rawNext !== undefined && rawNext !== '') {
+          const nextId = resolveReference(rawNext, model.nodes, cId, false, scopeBoundary, boundaryNodeIds);
+          node.next = nextId;
+        } else if (rawNext === '') {
+          node.next = null;
         }
-
-        fillImplicitNext(pending.map((p) => p.node), stepIds);
-        for (const errId of deferredErrorIds) {
-          if (!stepIds.includes(errId)) stepIds.push(errId);
+        if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
+          const altNextId = resolveReference(rawNegativeNext, model.nodes, cId, true, scopeBoundary, boundaryNodeIds);
+          node.altNext = altNextId;
+        } else if (rawNegativeNext === '') {
+          node.altNext = null;
         }
+      }
 
-        dslContainer.processes.push({
-          name: containerEl.getAttribute('name') || '',
-          stepIds,
-          notes: xmlAttrNotes(containerEl),
-          subGroups: subGroups.length > 0 ? subGroups : undefined,
-        });
+      // Apply implicit next linking within each container's flow.
+      const nodesByContainer = new Map<string, DSLNode[]>();
+      for (const p of pendingRefs) {
+        const cid = p.node.containerId || scopeBoundary;
+        if (!nodesByContainer.has(cid)) nodesByContainer.set(cid, []);
+        nodesByContainer.get(cid)!.push(p.node);
+      }
+      for (const [, nodes] of nodesByContainer) {
+        if (nodes.length > 1) {
+          const stepIds = nodes.map(n => n.id);
+          fillImplicitNext(nodes, stepIds);
+        }
+      }
+    }
+
+    // Phase 2: Resolve references for inline process nodes with boundary scope.
+    const inlineBoundaryNodeIds: Set<string> = new Set();
+    for (const n of model.nodes) {
+      if (n.containerId === dslContainer.id || (inlineStepIds.length > 0 && n.containerId === dslContainer.id)) {
+        inlineBoundaryNodeIds.add(n.id);
+      }
+    }
+    // Also collect from child containers created in Phase 1b.
+    for (const c of model.containers) {
+      if (c.parentId === dslContainer.id) {
+        let queue: string[] = [c.id];
+        const seen = new Set<string>();
+        while (queue.length > 0) {
+          const cid = queue.shift()!;
+          if (seen.has(cid)) continue;
+          seen.add(cid);
+          for (const n of model.nodes) { if (n.containerId === cid) inlineBoundaryNodeIds.add(n.id); }
+          for (const child of model.containers) { if (child.parentId === cid) queue.push(child.id); }
+        }
+      }
+    }
+
+    for (const { node, rawNext, rawNegativeNext } of pendingChildren) {
+      if (rawNext !== undefined && rawNext !== '') {
+        const nextId = resolveReference(rawNext, model.nodes, dslContainer.id, false, dslContainer.id, inlineBoundaryNodeIds);
+        node.next = nextId;
+        if (nextId && !inlineStepIds.includes(nextId)) inlineStepIds.push(nextId);
+      } else {
+        node.next = rawNext === '' ? null : undefined;
+      }
+      if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
+        const altNextId = resolveReference(rawNegativeNext, model.nodes, dslContainer.id, true, dslContainer.id, inlineBoundaryNodeIds);
+        node.altNext = altNextId;
+        if (altNextId && !inlineStepIds.includes(altNextId)) inlineStepIds.push(altNextId);
+      } else {
+        node.altNext = rawNegativeNext === '' ? null : undefined;
+      }
+    }
+
+    // Handle implicit next for inline nodes.
+    if (pendingChildren.length > 0) {
+      fillImplicitNext(pendingChildren.map((p) => p.node), inlineStepIds);
+    }
+
+    // Build process from inline children if any exist.
+    if (inlineStepIds.length > 0) {
+      dslContainer.processes.push({
+        name: containerId,
+        stepIds: inlineStepIds,
+        notes: [],
+      });
+    }
+
+    // Create a synthetic process from child container's descendant nodeIds when no inline nodes exist.
+    // This maintains compatibility with layout code that expects container.processes[].stepIds.
+    // Note: For containers with subContainers, skip here — ensureSyntheticProcesses (post-loop) handles it
+    // with correct timing (children already have processes by then).
+    if (dslContainer.processes.length === 0 && dslContainer.subContainers.length === 0) {
+      const allNodeIds: string[] = [];
+      if (dslContainer.nodeIds.length > 0) {
+        allNodeIds.push(...dslContainer.nodeIds);
+      }
+      if (allNodeIds.length > 0) {
+        dslContainer.processes.push({ name: containerName, stepIds: allNodeIds, notes: dslContainer.notes || [] });
       }
     }
 
     model.containers.push(dslContainer);
   }
 
+  // Post-process: create synthetic processes for containers missing them.
+  // Skip parent containers that have any descendant with a process — those children
+  // already frame their content independently and the parent would duplicate positioning.
+  function ensureSyntheticProcesses(container: DSLContainer) {
+    if (container.processes.length > 0) return;
+
+    const hasDesc = (root: DSLContainer): boolean => {
+      const walk = (c: DSLContainer): boolean => {
+        if (c !== root && c.processes.length > 0) return true;
+        for (const child of c.subContainers) {
+          if (walk(child)) return true;
+        }
+        return false;
+      };
+      return walk(root);
+    };
+    const collectDesc = (root: DSLContainer): string[] => {
+      const ids: string[] = [];
+      const w = (c: DSLContainer) => {
+        for (const nid of c.nodeIds) ids.push(nid);
+        for (const child of c.subContainers) w(child);
+      };
+      w(root);
+      return ids;
+    };
+
+    if (!hasDesc(container)) {
+      const allNodeIds: string[] = container.subContainers.length > 0
+        ? collectDesc(container)
+        : model.nodes.filter(n => n.containerId === container.id).map(n => n.id);
+      if (allNodeIds.length > 0) {
+        container.processes.push({ name: container.label, stepIds: allNodeIds, notes: container.notes || [] });
+      }
+    }
+  }
+  for (const c of model.containers) ensureSyntheticProcesses(c);
+
   return model;
 }
 
-function expandXMLContainer(
-  containerEl: Element,
-  dslContainer: DSLContainer,
+// ─── Child container creation (batch: no reference resolution) ─────────────
+
+function createChildContainerBatch(
+  childEl: Element,
+  parentContainer: DSLContainer,
   model: DSLModel,
-  prefix: string,
-  _parentAliases?: Map<string, string>
+  containerPrefix = '',
+  scopeBoundary?: string
 ): void {
+  const childName = childEl.getAttribute('name') || '';
+  const childId = normalizeId(childName);
+  const childContainer: DSLContainer = {
+    id: childId,
+    label: childName,
+    type: parentContainer.type,
+    color: parentContainer.color,
+    nodeIds: [],
+    processes: [],
+    parentId: parentContainer.id,
+    subContainers: [],
+    notes: xmlAttrNotes(childEl),
+  };
+
   const stepIds: string[] = [];
-  const subGroups: DSLSubGroup[] = [];
-  const aliases = new Map<string, string>();
-  const pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }> = [];
 
-  // Compute the local scope id for this container so nodes inside get the right rootContainerId
-  const subName = containerEl.getAttribute('name') || '';
-  const localScopeId = dslContainer.id + '_' + normalizeId(subName);
-
-  collectXMLChildren(containerEl, dslContainer, model, prefix, aliases, stepIds, subGroups, pending, model.nodes, localScopeId);
-
-  // Second pass: resolve references (after all aliases are registered)
-  const deferredErrorIds: string[] = [];
-  for (const { node, rawNext, rawNegativeNext } of pending) {
-    if (rawNext !== undefined && rawNext !== '') {
-      const nextId = resolveReference(rawNext, prefix, model.nodes, node.rootContainerId, false);
-      node.next = nextId;
-      if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
-    } else {
-      node.next = rawNext === '' ? null : undefined;
+  // Compute scope boundary for reference resolution within this container.
+  // Use explicit boundary if provided, otherwise walk up to find the top-level (root) container.
+  let effectiveScope = scopeBoundary;
+  if (!effectiveScope && parentContainer.parentId !== null) {
+    const allContainers = model.containers;
+    let current = parentContainer.id;
+    while (current !== null) {
+      const c = allContainers.find((x) => x.id === current);
+      if (!c || c.parentId === null) { effectiveScope = current; break; }
+      current = c.parentId;
     }
-    if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-      const altNextId = resolveReference(rawNegativeNext, prefix, model.nodes, node.rootContainerId);
-      node.altNext = altNextId;
-      if (altNextId && !stepIds.includes(altNextId)) {
-        const isError = model.nodes.find((n) => n.id === altNextId)?.type === 'error';
-        if (isError) {
-          deferredErrorIds.push(altNextId);
-        } else {
-          stepIds.push(altNextId);
-        }
-      }
-    } else {
-      node.altNext = rawNegativeNext === '' ? null : undefined;
-    }
+  } else if (!effectiveScope) {
+    effectiveScope = parentContainer.id;
   }
 
-  fillImplicitNext(pending.map((p) => p.node), stepIds, subGroups);
+  // Nodes inside this container get scoped with the incoming prefix (matching original expandXMLContainer)
+  collectProcessChildren(childEl, childId, model, containerPrefix, stepIds, [], childContainer, effectiveScope);
 
-  for (const errId of deferredErrorIds) {
-    if (!stepIds.includes(errId)) stepIds.push(errId);
+  childContainer.nodeIds.push(...stepIds);
+
+  // Add to parent's subContainers and top-level containers list
+  parentContainer.subContainers.push(childContainer);
+  model.containers.push(childContainer);
+}
+
+// ─── Build container hierarchy tree (no reference resolution) ──────────────
+
+function buildContainerTree(
+  childEl: Element,
+  parentContainer: DSLContainer,
+  model: DSLModel,
+  containerPrefix = ''
+): Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> {
+  const childName = childEl.getAttribute('name') || '';
+  const childId = normalizeId(childName);
+  const childContainer: DSLContainer = {
+    id: childId,
+    label: childName,
+    type: parentContainer.type,
+    color: parentContainer.color,
+    nodeIds: [],
+    processes: [],
+    parentId: parentContainer.id,
+    subContainers: [],
+    notes: xmlAttrNotes(childEl),
+  };
+
+  const stepIds: string[] = [];
+  const pendingRefs: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> = [];
+
+  for (const child of Array.from(childEl.children)) {
+    const tagLower = child.tagName.toLowerCase();
+
+    if (tagLower === 'container') {
+      const subPrefix = containerPrefix + normalizeId(child.getAttribute('name') || '') + '_';
+      pendingRefs.push(...buildContainerTree(child, childContainer, model, subPrefix));
+      continue;
+    }
+
+    const nodeType = XML_NODE_TYPES[tagLower];
+    if (!nodeType) continue;
+    if (tagLower === 'note' && !child.getAttribute('name')) continue;
+
+    const name = child.getAttribute('name') || '';
+    const rawIdAttr = child.getAttribute('id');
+    const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
+    const autoId = containerPrefix + normalizeId(name);
+
+    let actualCustomId = customIdAttr;
+    if (actualCustomId && !actualCustomId.startsWith('custom-')) {
+      actualCustomId = 'custom-' + actualCustomId;
+    }
+    const actualId = actualCustomId ?? autoId;
+
+    const n: DSLNode = {
+      id: actualId,
+      label: name,
+      type: nodeType,
+      color: DEFAULT_COLORS[nodeType] || '#6a737d',
+      containerId: childId,
+      processIndex: -1,
+      noteTarget: null,
+      ...(customIdAttr && { customId: customIdAttr }),
+      notes: xmlAttrNotes(child),
+    };
+    model.nodes.push(n);
+    stepIds.push(actualId);
+
+    // Store raw reference strings on the node for later resolution.
+    pendingRefs.push({
+      node: n,
+      rawNext: child.getAttribute('next') ?? undefined,
+      rawNegativeNext: child.getAttribute('altNext') ?? undefined,
+    });
   }
 
-  dslContainer.processes.push({
-    name: containerEl.getAttribute('name') || '',
-    stepIds,
-    notes: xmlAttrNotes(containerEl),
-    subGroups: subGroups.length > 0 ? subGroups : undefined,
-  });
+  childContainer.nodeIds.push(...stepIds);
+
+  parentContainer.subContainers.push(childContainer);
+  model.containers.push(childContainer);
+
+  return pendingRefs;
 }
 
 const XML_NODE_TYPES: Record<string, NodeType> = {
@@ -712,79 +941,111 @@ const XML_NODE_TYPES: Record<string, NodeType> = {
   aggregate: 'aggregate',
 };
 
-function collectXMLChildren(
+// ─── Collect direct process children (nodes + recurse into <container>) ──────
+
+function collectProcessChildren(
   containerEl: Element,
-  dslContainer: DSLContainer,
+  hostContainerId: string,
   model: DSLModel,
   prefix: string,
-  aliases: Map<string, string>,
   stepIds: string[],
-  subGroups: DSLSubGroup[],
-  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string; nodePrefix: string }>,
-  allNodes?: DSLNode[],
-  rootScope?: string
+  _pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> | undefined,
+  parentContainer: DSLContainer,
+  resolveScopeBoundary?: string
 ): void {
+  // Determine the resolution scope: if an explicit boundary is provided use it,
+  // otherwise fall back to the current container. This allows nodes at any nesting
+  // level to cross-reference siblings' children within the same scope boundary.
+  const effectiveScope = resolveScopeBoundary ?? hostContainerId;
+
+  // Collect all nodeIds under the effective scope for cross-sibling matching.
+  const boundaryNodeIds: Set<string> = new Set();
+  if (effectiveScope) {
+    const seenContainers = new Set<string>();
+    const queue: string[] = [effectiveScope];
+    while (queue.length > 0) {
+      const cid = queue.shift()!;
+      if (seenContainers.has(cid)) continue;
+      seenContainers.add(cid);
+      for (const n of model.nodes) {
+        if (n.containerId === cid) boundaryNodeIds.add(n.id);
+      }
+      for (const c of model.containers) {
+        if (c.parentId === cid) queue.push(c.id);
+      }
+    }
+  }
+
+  // Separate child containers from inline nodes for two-phase processing.
+  const childContainers: Array<{ el: Element; subPrefix: string }> = [];
+  const inlineNodes: Array<{ n: DSLNode; rawNext?: string; rawNegativeNext?: string }> = [];
+
   for (const child of Array.from(containerEl.children)) {
     const tagLower = child.tagName.toLowerCase();
 
     if (tagLower === 'container') {
-      const subName = child.getAttribute('name') || '';
-      const subPrefix = prefix + normalizeId(subName) + '_';
-      const subStepIds: string[] = [];
-      // Inherit parent root scope if already set; otherwise create a new scope boundary from parent + subName
-      const newRootScope = rootScope ?? (dslContainer.id + '_' + normalizeId(subName));
-      collectXMLChildren(child, dslContainer, model, subPrefix, aliases, subStepIds, subGroups, pending, allNodes, newRootScope);
-      for (const id of subStepIds) stepIds.push(id);
-      subGroups.push({ name: subName, nodeIds: subStepIds, notes: xmlAttrNotes(child) });
-    } else {
-      const nodeType = XML_NODE_TYPES[tagLower];
-      if (!nodeType) continue;
-
-      // <note> without a name attribute is notes text, not a flow node
-      if (tagLower === 'note' && !child.getAttribute('name')) continue;
-
-      const name = child.getAttribute('name') || '';
-      const rawIdAttr = child.getAttribute('id');
-      const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
-      const autoId = prefix + normalizeId(name);
-
-      // Prefix customId with "custom-" unless already prefixed
-      let actualCustomId = customIdAttr;
-      if (actualCustomId && !actualCustomId.startsWith('custom-')) {
-        actualCustomId = 'custom-' + actualCustomId;
-      }
-      const actualId = actualCustomId ?? autoId;
-
-      const offsetAttr = child.getAttribute('offset');
-      const offset = offsetAttr !== null ? parseInt(offsetAttr, 10) : undefined;
-
-      // Only register name aliases for nodes without a custom id — nodes with customIds
-      // should only be matched by their "custom-xxx" id to prevent collisions
-      if (!actualCustomId) {
-        aliases.set(canonicalizeReference(name), actualId);
-      }
-      dslContainer.nodeIds.push(actualId);
-      stepIds.push(actualId);
-
-      const n: DSLNode = {
-        id: actualId,
-        label: name,
-        type: nodeType,
-        color: DEFAULT_COLORS[nodeType] || '#6a737d',
-        containerId: dslContainer.id,
-        rootContainerId: rootScope ?? dslContainer.id,
-        processIndex: -1,
-        noteTarget: null,
-        customId: customIdAttr ?? undefined, // original (non-prefixed) custom id
-        next: undefined,
-        altNext: undefined,
-        altNextText: child.getAttribute('altNext') ?? undefined,
-        notes: xmlAttrNotes(child),
-        offset,
-      };
-      model.nodes.push(n);
-      pending.push({ node: n, rawNext: child.getAttribute('next') ?? undefined, rawNegativeNext: child.getAttribute('altNext') ?? undefined, nodePrefix: prefix });
+      const subPrefix = prefix + normalizeId(child.getAttribute('name') || '') + '_';
+      childContainers.push({ el: child, subPrefix });
+      continue;
     }
+
+    const nodeType = XML_NODE_TYPES[tagLower];
+    if (!nodeType) continue;
+    if (tagLower === 'note' && !child.getAttribute('name')) continue;
+
+    const name = child.getAttribute('name') || '';
+    const rawIdAttr = child.getAttribute('id');
+    const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
+    const autoId = prefix + normalizeId(name);
+
+    let actualCustomId = customIdAttr;
+    if (actualCustomId && !actualCustomId.startsWith('custom-')) {
+      actualCustomId = 'custom-' + actualCustomId;
+    }
+    const actualId = actualCustomId ?? autoId;
+
+    const n: DSLNode = {
+      id: actualId,
+      label: name,
+      type: nodeType,
+      color: DEFAULT_COLORS[nodeType] || '#6a737d',
+      containerId: hostContainerId,
+      processIndex: -1,
+      noteTarget: null,
+      ...(customIdAttr && { customId: customIdAttr }),
+      notes: xmlAttrNotes(child),
+    };
+    model.nodes.push(n);
+    stepIds.push(actualId);
+    inlineNodes.push({ n, rawNext: child.getAttribute('next') ?? undefined, rawNegativeNext: child.getAttribute('altNext') ?? undefined });
+  }
+
+  // Phase 1: Create ALL child containers (recursively) before resolving any references.
+  for (const { el, subPrefix } of childContainers) {
+    createChildContainerBatch(el, parentContainer, model, subPrefix);
+  }
+
+  // Phase 2: Resolve inline node references with proper scope boundary.
+  for (const { n, rawNext, rawNegativeNext } of inlineNodes) {
+    if (rawNext !== undefined && rawNext !== '') {
+      const nextId = resolveReference(rawNext, model.nodes, hostContainerId, false, effectiveScope, boundaryNodeIds);
+      n.next = nextId;
+      if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
+    } else {
+      n.next = rawNext === '' ? null : undefined;
+    }
+    if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
+      const altNextId = resolveReference(rawNegativeNext, model.nodes, hostContainerId, true, effectiveScope, boundaryNodeIds);
+      n.altNext = altNextId;
+      if (altNextId && !stepIds.includes(altNextId)) stepIds.push(altNextId);
+    } else {
+      n.altNext = rawNegativeNext === '' ? null : undefined;
+    }
+  }
+
+  // Phase 3: Auto-link sequential nodes without explicit next.
+  if (inlineNodes.length > 1) {
+    fillImplicitNext(inlineNodes.map((i) => i.n), stepIds);
   }
 }
 
@@ -825,6 +1086,7 @@ function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSu
     }
   }
 }
+
 export function normalizeId(text: string): string {
   return text.replace(/[^a-zA-Z0-9]/g, '_');
 }
@@ -835,41 +1097,46 @@ function canonicalizeReference(text: string): string {
 
 function resolveReference(
   reference: string | undefined,
-  prefix: string,
   allNodes: DSLNode[],
-  rootContainerId: string | null = null,
-  allowImplicit: boolean = true
+  scopeContainerId: string,
+  createOnError: boolean = true,
+  _scopeBoundary?: string,        // broader scope (e.g. parent or aggregate container id)
+  boundaryNodeIds?: Set<string>   // pre-collected nodeIds under scopeBoundary for sibling matching
 ): string | null | undefined {
   if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
 
-  // 1) Direct ID match — scoped to same root container only (hard boundary)
-  //    Try the raw reference first (non-custom node id), then with "custom-" prefix (custom-id node id)
-  const directMatch = rootContainerId
-    ? allNodes.find((n) => n.rootContainerId === rootContainerId && (n.id === reference || n.id === 'custom-' + reference))
-    : null;
+  const normalizedRef = normalizeId(reference);
+
+  // Build set of in-scope node IDs: immediate container + boundary subtree nodes.
+  const scopeIds = new Set<string>();
+  for (const n of allNodes) {
+    if (n.containerId === scopeContainerId || (boundaryNodeIds && boundaryNodeIds.has(n.id))) {
+      scopeIds.add(n.id);
+    }
+  }
+
+  // 1) Direct ID match — scoped.
+  const directMatch = allNodes.find(
+    (n) => scopeIds.has(n.id) && (n.id === reference || n.id === 'custom-' + reference),
+  );
   if (directMatch) return directMatch.id;
 
-  // 2) Auto-generated ID match — scoped to same root container only.
-  //    Auto-generated ids end with normalizeId(label) (with optional prefix before it).
-  //    Nodes with customIds have ids starting with "custom-" which won't end with normalizeId().
-  //    So check if id === normalizedRef OR ends with '_' + normalizedRef.
-  const normalizedRef = normalizeId(reference);
-  const directAutoMatch = rootContainerId
-    ? allNodes.find(
-        (n) => n.rootContainerId === rootContainerId && (n.id === normalizedRef || n.id.endsWith('_' + normalizedRef)),
-      )
-    : undefined;
-  if (directAutoMatch) return directAutoMatch.id;
-  if (!allowImplicit) return null;
-  // Fallback: create implicit error node scoped to the current root container
-  const nodeId = prefix + normalizeId(reference);
+  // 2) Auto-generated ID match — scoped.
+  const autoMatch = allNodes.find(
+    (n) => scopeIds.has(n.id) && (n.id === normalizedRef || n.id.endsWith('_' + normalizedRef)),
+  );
+  if (autoMatch) return autoMatch.id;
+
+  if (!createOnError) return null;
+
+  // Fallback: create implicit error node scoped to the current container
+  const nodeId = scopeContainerId + '_' + normalizedRef;
   allNodes.push({
     id: nodeId,
     label: reference,
     type: 'error',
-    containerId: rootContainerId,
-    rootContainerId: rootContainerId,
+    containerId: scopeContainerId,
     processIndex: -1,
     color: COLOR_MAP.red,
     noteTarget: null,

@@ -66,7 +66,6 @@ describe('parseDSL', () => {
         type: 'actor',
         color: '#D4D3D3',
         containerId: null,
-        rootContainerId: null,
         processIndex: -1,
         noteTarget: null,
          notes: [],
@@ -91,7 +90,6 @@ describe('parseDSL', () => {
         type: 'command',
         color: '#91D49C',
         containerId: null,
-        rootContainerId: null,
         processIndex: -1,
         noteTarget: null,
          notes: [],
@@ -110,7 +108,6 @@ describe('parseDSL', () => {
          type: 'event',
          color: '#FFA500',
          containerId: null,
-         rootContainerId: null,
          processIndex: -1,
          noteTarget: null,
          notes: [],
@@ -702,7 +699,7 @@ describe('parseDSL', () => {
       expect(errorNode).toBeTruthy();
       expect(errorNode!.type).toBe('error');
       expect(errorNode!.label).toBe('NonExistent');
-      expect(errorNode!.containerId).toBe('Order_Flow');
+      expect(errorNode!.containerId).toBe('Flow');
     });
 
     it('should create implicit error node for unmatched altNext in text DSL policy branching', () => {
@@ -777,7 +774,7 @@ describe('parseDSL', () => {
       expect(orderCancelled!.next).toBeUndefined();
     });
 
-    it('should use COLOR_MAP.red (cyan) for implicit error node color', () => {
+    it('should use COLOR_MAP.red (cyan) for implicit error node color in process container', () => {
       const xml = `<eventstorming><process name="Cancel Order">
         <container name="Flow">
           <command name="CancelOrder" altNext="Exception!"/>
@@ -790,11 +787,11 @@ describe('parseDSL', () => {
       expect(orderCancelled).toBeTruthy();
       expect(orderCancelled!.next).toBeUndefined();
 
-      // The error node should exist and be in the process stepIds for layout purposes
+      // The error node should exist and be in the child container's process stepIds for layout purposes
       const errorNode = result.nodes.find((n) => n.label === 'Exception!' && n.type === 'error');
       expect(errorNode).toBeTruthy();
-      const proc = result.containers.find((c) => c.label === 'Cancel Order')?.processes[0];
-      expect(proc?.stepIds).toContain(errorNode!.id);
+      const flowContainer = result.containers.find((c) => c.label === 'Flow');
+      expect(flowContainer?.processes[0]?.stepIds).toContain(errorNode!.id);
     });
 
     it('should use COLOR_MAP.red (cyan) for implicit error node color', () => {
@@ -1122,7 +1119,7 @@ describe('parseDSL', () => {
     });
 
   describe('container boundary enforcement', () => {
-    it('should track rootContainerId as the container scoped id on nodes within explicit containers', () => {
+    it('should track parentId/subContainers on containers and containerId on nodes', () => {
       const xml = `<eventstorming><process name="OrderFlow">
         <container name="Checkout">
           <command name="PlaceOrder" />
@@ -1131,12 +1128,17 @@ describe('parseDSL', () => {
       </process></eventstorming>`;
       const result = parseDSL(xml);
       const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
-      // rootContainerId is computed as parentDslContainer.id + '_' + normalized(name)
-      expect(placeOrder!.rootContainerId).toBe('OrderFlow_Checkout');
+      // Node's containerId = immediate parent container
+      expect(placeOrder!.containerId).toBe('Checkout');
+      // Parent container has correct parentId and subContainers
+      const checkout = result.containers.find((c) => c.id === 'Checkout');
+      expect(checkout?.parentId).toBe('OrderFlow');
+      const orderFlow = result.containers.find((c) => c.id === 'OrderFlow');
+      expect(orderFlow?.subContainers.map((c) => c.id)).toEqual(['Checkout']);
     });
 
-    it('should block linking between nodes in sibling sub-containers (different roots)', () => {
-      // "Place Order" and "Inventory Check" are siblings under <aggregate> but each creates its own scope
+    it('should allow linking between nodes in sibling sub-containers under same parent', () => {
+      // "Place Order" and "Inventory Check" are siblings under <aggregate>, scopeBoundary = aggregate id
       const xml = `<eventstorming><aggregate name="Order">
         <container name="Place Order">
           <command name="PlaceOrder" next="CheckStock" />
@@ -1147,8 +1149,8 @@ describe('parseDSL', () => {
       </aggregate></eventstorming>`;
       const result = parseDSL(xml);
       const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
-      // PlaceOrder's rootContainerId differs from CheckStock's rootContainerId → name match blocked
-      expect(placeOrder!.next).not.toBe('Inventory_Check_CheckStock');
+      // Sibling containers share parent → scopeBoundary allows name match
+      expect(placeOrder!.next).toBe('Inventory_Check_CheckStock');
     });
 
     it('should block cross-root linking via direct ID reference', () => {
@@ -1165,7 +1167,6 @@ describe('parseDSL', () => {
         </process></eventstorming>`;
       const result = parseDSL(xml);
       // Two different nodes happen to share the same custom ID "PO_001" in different roots (now "custom-PO_001")
-      // A reference to PO_001 should NOT cross root boundaries
       expect(result.nodes.filter((n) => n.id === 'custom-PO_001').length).toBe(2);
     });
 
@@ -1182,17 +1183,17 @@ describe('parseDSL', () => {
           </container>
         </process></eventstorming>`;
       const result = parseDSL(xml);
-      // OutOfStock in Inventory Service should NOT be resolved by a node in Order container
       const placeOrder = result.nodes.find((n) => n.label === 'PlaceOrder');
+      // OutOfStock in Inventory Service should NOT be resolved by a node in Order container
       expect(placeOrder!.altNext).not.toBe('Inventory_Check_OutOfStock');
-      // Should create an implicit error node instead, scoped to PlaceOrder's root
+      // Should create an implicit error node, scoped to PlaceOrder's root
       const implicitError = result.nodes.find(
-        (n) => n.type === 'error' && n.containerId === 'Order_Place_Order' && n.label === 'OutOfStock'
+        (n) => n.type === 'error' && n.containerId === 'Place_Order' && n.label === 'OutOfStock'
       );
       expect(implicitError).toBeTruthy();
     });
 
-    it('should create implicit error nodes with matching rootContainerId', () => {
+    it('should create implicit error nodes scoped to the referencing node container', () => {
       const xml = `<eventstorming><aggregate name="Order">
         <container name="Place Order">
           <policy name="CheckStock" altNext="MissingItem" />
@@ -1203,12 +1204,11 @@ describe('parseDSL', () => {
         (n) => n.type === 'error' && n.label === 'MissingItem'
       );
       expect(implicitError).toBeTruthy();
-      // Should match the referencing node's rootContainerId
-      expect(implicitError!.rootContainerId).toBe('Order_Place_Order');
+      // Error node containerId = referencing node's immediate parent container
+      expect(implicitError!.containerId).toBe('Place_Order');
     });
 
     it('should allow linking between nodes in nested sub-containers sharing same root container', () => {
-      // IsAddressValid and AddressInvalid are both inside root container "Place Order" → should link
       const xml = `<eventstorming><aggregate name="Order">
         <container name="Place Order">
           <command name="PlaceOrder" next="DoSomething" />
@@ -1224,7 +1224,7 @@ describe('parseDSL', () => {
       const result = parseDSL(xml);
       const isAddressValid = result.nodes.find((n) => n.label === 'IsAddressValid');
       const addressInvalid = result.nodes.find((n) => n.label === 'AddressInvalid');
-      // All nodes share the same root container "Place Order" → altNext link resolves
+      // Nested sub-containers share parent container scope → altNext link resolves
       expect(isAddressValid!.altNext).toBe(addressInvalid!.id);
     });
 
@@ -1252,20 +1252,20 @@ describe('parseDSL', () => {
       </aggregate>
     </eventstorming>`;
 
-    it('sibling sub-containers within same root share the same rootContainerId', () => {
+    it('sibling sub-containers within same root share the same parent container', () => {
       const result = parseDSL(crossRootXml);
-      const placeOrderCmd = result.nodes.find((n) => n.label === 'PlaceOrder');
-      const cancelOrderCmd = result.nodes.find((n) => n.label === 'CancelOrder');
-
-      expect(placeOrderCmd!.rootContainerId).toBe(cancelOrderCmd!.rootContainerId);
+      const placeOrderContainer = result.containers.find((c) => c.id === 'Place_Order');
+      const cancelOrderContainer = result.containers.find((c) => c.id === 'Cancel_Order_Container');
+      // Both are subContainers of the same parent (Order Lifecycle Container)
+      expect(placeOrderContainer?.parentId).toBe(cancelOrderContainer?.parentId);
     });
 
-    it('nodes in different root containers have different rootContainerIds', () => {
+    it('nodes in different root containers have different parent containers', () => {
       const result = parseDSL(crossRootXml);
       const placeOrderCmd = result.nodes.find((n) => n.label === 'PlaceOrder');
       const customer1 = result.nodes.find((n) => n.label === 'Customer 1');
 
-      expect(placeOrderCmd!.rootContainerId).not.toBe(customer1!.rootContainerId);
+      expect(placeOrderCmd!.containerId).not.toBe(customer1!.containerId);
     });
 
     it('Cancel Order Container customer next="PlaceOrder" resolves to PlaceOrder in sibling sub-container (same root)', () => {
@@ -1297,8 +1297,9 @@ describe('parseDSL', () => {
       expect(customer1!.next).not.toBe(placeOrderCmd!.id);
       expect(customer1!.next).toBeNull();
 
+      // No implicit error node created for next (only altNext creates them)
       const implicitError = result.nodes.find(
-        (n) => n.type === 'error' && n.label === 'Place Order' && n.rootContainerId === customer1!.rootContainerId
+        (n) => n.type === 'error' && n.label === 'Place Order' && n.containerId === customer1!.containerId
       );
       expect(implicitError).toBeUndefined();
     });

@@ -436,16 +436,24 @@ describe('renderEventStorming layout', () => {
 
   it('sizes branched containers to the horizontal flow instead of total node count', () => {
     const host = document.createElement('div');
+    Object.defineProperty(host, 'getBoundingClientRect', {
+      value: () => ({ width: 800 }),
+      writable: true,
+      configurable: true,
+    });
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), showerSample);
 
-    const container = host.querySelector('g.containers g[data-name="Order"]');
+    // "Shower" container should be sized for the horizontal flow (6 nodes wide)
+    const container = host.querySelector('g.containers g[data-name="Shower"]');
     expect(container).toBeTruthy();
 
     const containerRect = container!.querySelector('rect');
     expect(containerRect).toBeTruthy();
-    expect(Number(containerRect!.getAttribute('width'))).toBe(708);
+    const width = Number(containerRect!.getAttribute('width'));
+    // The Shower container should be sized for its horizontal flow (6 nodes wide), not total node count with branches.
+    expect(width).toBe(708);
   });
 
   it('wraps later containers onto the next row without overlapping the first row', () => {
@@ -906,14 +914,14 @@ describe('renderEventStorming layout', () => {
     expect(cancelOrder).toBeTruthy();
     expect(orderCancelled).toBeTruthy();
 
-    // CancelOrder and OrderCancelled must be positioned inside the process group
-    // (the "Order Lifecycle Container" group), not orphaned as non-process nodes below it.
-    const processGroup = layout.groups.find(g => g.label === 'Order Lifecycle Container');
-    expect(processGroup).toBeTruthy();
+    // CancelOrder and OrderCancelled must be positioned inside the "Cancel Order Container"
+    // layout container, not orphaned below it.
+    const cancelContainer = layout.containers.find(c => c.label === 'Cancel Order Container');
+    expect(cancelContainer).toBeTruthy();
 
-    const groupBottom = processGroup!.y + processGroup!.height;
-    expect(cancelOrder!.y + NODE_H).toBeLessThanOrEqual(groupBottom + 1);
-    expect(orderCancelled!.y + NODE_H).toBeLessThanOrEqual(groupBottom + 1);
+    const containerBottom = cancelContainer!.y + cancelContainer!.height;
+    expect(cancelOrder!.y + NODE_H).toBeLessThanOrEqual(containerBottom + 1);
+    expect(orderCancelled!.y + NODE_H).toBeLessThanOrEqual(containerBottom + 1);
   });
 
   it('sibling sub-containers with cross-container next reference do not overlap', () => {
@@ -938,16 +946,24 @@ describe('renderEventStorming layout', () => {
 `);
     const layout = computeLayout(model);
 
-    const placeOrderSG = layout.subGroups.find(sg => sg.label === 'Place Order');
-    const cancelOrderSG = layout.subGroups.find(sg => sg.label === 'Cancel Order Container');
+    // Nested containers are now real LayoutContainers, not subGroups
+    const placeOrderC = layout.containers.find(c => c.label === 'Place Order');
+    const cancelOrderC = layout.containers.find(c => c.label === 'Cancel Order Container');
 
-    expect(placeOrderSG).toBeTruthy();
-    expect(cancelOrderSG).toBeTruthy();
+    expect(placeOrderC).toBeTruthy();
+    expect(cancelOrderC).toBeTruthy();
 
-    const placeOrderBottom = placeOrderSG!.y + placeOrderSG!.height;
-    const cancelOrderTop = cancelOrderSG!.y;
-    // Sibling sub-containers must not overlap vertically
-    expect(cancelOrderTop).toBeGreaterThanOrEqual(placeOrderBottom);
+    // Sibling sub-containers must not overlap — either horizontally or vertically
+    const placeOrderRight = placeOrderC!.x + placeOrderC!.width;
+    const sameRow = placeOrderC!.y === cancelOrderC!.y;
+    if (sameRow) {
+      // Side by side on the same row must not overlap horizontally
+      expect(cancelOrderC!.x).toBeGreaterThanOrEqual(placeOrderRight);
+    } else {
+      // Different rows: neither should have negative gap
+      const minGap = 0;
+      expect(cancelOrderC!.y - (placeOrderC!.y + placeOrderC!.height)).toBeGreaterThanOrEqual(minGap);
+    }
   });
 
   it('shows correct type label text for readModel (projector) containers', () => {
@@ -1016,7 +1032,7 @@ describe('renderEventStorming layout', () => {
 
 describe('computeLinkPath obstacle avoidance', () => {
   function makeNode(id: string, x: number, y: number): import('./constants.js').LayoutNode {
-    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', rootContainerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
+    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
   }
 
   it('routes upward negative link around intermediate nodes by going down first', () => {
