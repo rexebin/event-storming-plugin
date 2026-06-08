@@ -1431,4 +1431,30 @@ describe('parseDSL', () => {
       expect(placeOrderSG!.nodeIds.length).toBeGreaterThan(anotherSG!.nodeIds.length);
     });
   });
+
+  describe('offset attribute parsing', () => {
+    it('parses offset from XML inline process node', () => {
+      const xml = `<eventstorming><process name="Test">
+        <command name="A" offset="1" next="B"/>
+        <command name="B"/>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      const nodeA = result.nodes.find(n => n.label === 'A');
+      expect(nodeA!.offset).toBe(1);
+      const nodeB = result.nodes.find(n => n.label === 'B');
+      expect(nodeB!.offset).toBeUndefined();
+    });
+
+    it('parses offset from XML nested container node', () => {
+      const xml = `<eventstorming><aggregate name="Test">
+        <container name="Flow">
+          <command name="Record Failed Attempt" altNext="Failed Exception" offset="1"/>
+          <policy name="Failed Exception" next="Call Recorded"/>
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const cmd = result.nodes.find(n => n.label === 'Record Failed Attempt');
+      expect(cmd!.offset).toBe(1);
+    });
+  });
 });

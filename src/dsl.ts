@@ -611,6 +611,7 @@ function parseXMLDSL(text: string): DSLModel {
       if (!nodeType) continue;
       if (tagLower === 'note' && !name) continue;
 
+      const offsetAttr = parseInt(childEl.getAttribute('offset') ?? '0', 10);
       const n: DSLNode = {
         id: actualId,
         label: name,
@@ -620,6 +621,7 @@ function parseXMLDSL(text: string): DSLModel {
         processIndex: -1,
         noteTarget: null,
         ...(customIdAttr && { customId: customIdAttr }),
+        ...(offsetAttr && { offset: offsetAttr }),
         notes: xmlAttrNotes(childEl),
       };
       model.nodes.push(n);
@@ -927,6 +929,7 @@ function buildContainerTree(
     }
     const actualId = actualCustomId ?? autoId;
 
+    const offsetAttr = parseInt(child.getAttribute('offset') ?? '0', 10);
     const n: DSLNode = {
       id: actualId,
       label: name,
@@ -936,6 +939,7 @@ function buildContainerTree(
       processIndex: -1,
       noteTarget: null,
       ...(customIdAttr && { customId: customIdAttr }),
+      ...(offsetAttr && { offset: offsetAttr }),
       notes: xmlAttrNotes(child),
     };
     model.nodes.push(n);
@@ -1033,6 +1037,7 @@ function collectProcessChildren(
     }
     const actualId = actualCustomId ?? autoId;
 
+    const offsetAttr = parseInt(child.getAttribute('offset') ?? '0', 10);
     const n: DSLNode = {
       id: actualId,
       label: name,
@@ -1042,6 +1047,7 @@ function collectProcessChildren(
       processIndex: -1,
       noteTarget: null,
       ...(customIdAttr && { customId: customIdAttr }),
+      ...(offsetAttr && { offset: offsetAttr }),
       notes: xmlAttrNotes(child),
     };
     model.nodes.push(n);
