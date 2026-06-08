@@ -530,6 +530,33 @@ export function isEventStormingXML(text: string): boolean {
   return text.includes('<eventstorming') && text.includes('</eventstorming>');
 }
 
+// idPrefix must include any trailing separator (e.g. 'container_id_' or 'child_prefix_').
+// customId is stored raw (unprefixed); id is stored with 'custom-' prefix when customId is set.
+function makeXmlNode(el: Element, nodeType: NodeType, containerId: string, idPrefix: string): DSLNode {
+  const name = el.getAttribute('name') || '';
+  const rawIdAttr = el.getAttribute('id');
+  const customIdAttr = rawIdAttr && rawIdAttr.length > 0 ? rawIdAttr : undefined;
+  const autoId = idPrefix + normalizeId(name);
+  let actualCustomId = customIdAttr;
+  if (actualCustomId && !actualCustomId.startsWith('custom-')) {
+    actualCustomId = 'custom-' + actualCustomId;
+  }
+  const actualId = actualCustomId ?? autoId;
+  const offsetAttr = parseInt(el.getAttribute('offset') ?? '0', 10);
+  return {
+    id: actualId,
+    label: name,
+    type: nodeType,
+    color: DEFAULT_COLORS[nodeType] || '#6a737d',
+    containerId,
+    processIndex: -1,
+    noteTarget: null,
+    ...(customIdAttr && { customId: customIdAttr }),
+    ...(offsetAttr && { offset: offsetAttr }),
+    notes: xmlAttrNotes(el),
+  };
+}
+
 function parseXMLDSL(text: string): DSLModel {
   const model: DSLModel = {
     title: 'Event Storming',
@@ -596,36 +623,13 @@ function parseXMLDSL(text: string): DSLModel {
 
       // Inline non-container children: create nodes but defer reference resolution.
       const name = childEl.getAttribute('name') || '';
-      const rawIdAttr = childEl.getAttribute('id');
-      const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
-      const autoId = containerId + '_' + normalizeId(name);
-
-      // Prefix customId with "custom-" unless already prefixed
-      let actualCustomId = customIdAttr;
-      if (actualCustomId && !actualCustomId.startsWith('custom-')) {
-        actualCustomId = 'custom-' + actualCustomId;
-      }
-      const actualId = actualCustomId ?? autoId;
-
       const nodeType = XML_NODE_TYPES[tagLower];
       if (!nodeType) continue;
       if (tagLower === 'note' && !name) continue;
 
-      const offsetAttr = parseInt(childEl.getAttribute('offset') ?? '0', 10);
-      const n: DSLNode = {
-        id: actualId,
-        label: name,
-        type: nodeType,
-        color: DEFAULT_COLORS[nodeType] || '#6a737d',
-        containerId: dslContainer.id,
-        processIndex: -1,
-        noteTarget: null,
-        ...(customIdAttr && { customId: customIdAttr }),
-        ...(offsetAttr && { offset: offsetAttr }),
-        notes: xmlAttrNotes(childEl),
-      };
+      const n = makeXmlNode(childEl, nodeType, dslContainer.id, containerId + '_');
       model.nodes.push(n);
-      inlineStepIds.push(actualId);
+      inlineStepIds.push(n.id);
       pendingChildren.push({ node: n, rawNext: childEl.getAttribute('next') ?? undefined, rawNegativeNext: childEl.getAttribute('altNext') ?? undefined });
     }
 
@@ -918,32 +922,9 @@ function buildContainerTree(
     if (!nodeType) continue;
     if (tagLower === 'note' && !child.getAttribute('name')) continue;
 
-    const name = child.getAttribute('name') || '';
-    const rawIdAttr = child.getAttribute('id');
-    const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
-    const autoId = containerPrefix + normalizeId(name);
-
-    let actualCustomId = customIdAttr;
-    if (actualCustomId && !actualCustomId.startsWith('custom-')) {
-      actualCustomId = 'custom-' + actualCustomId;
-    }
-    const actualId = actualCustomId ?? autoId;
-
-    const offsetAttr = parseInt(child.getAttribute('offset') ?? '0', 10);
-    const n: DSLNode = {
-      id: actualId,
-      label: name,
-      type: nodeType,
-      color: DEFAULT_COLORS[nodeType] || '#6a737d',
-      containerId: childId,
-      processIndex: -1,
-      noteTarget: null,
-      ...(customIdAttr && { customId: customIdAttr }),
-      ...(offsetAttr && { offset: offsetAttr }),
-      notes: xmlAttrNotes(child),
-    };
+    const n = makeXmlNode(child, nodeType, childId, containerPrefix);
     model.nodes.push(n);
-    stepIds.push(actualId);
+    stepIds.push(n.id);
 
     // Store raw reference strings on the node for later resolution.
     pendingRefs.push({
@@ -1026,32 +1007,9 @@ function collectProcessChildren(
     if (!nodeType) continue;
     if (tagLower === 'note' && !child.getAttribute('name')) continue;
 
-    const name = child.getAttribute('name') || '';
-    const rawIdAttr = child.getAttribute('id');
-    const customIdAttr = (rawIdAttr && rawIdAttr.length > 0) ? rawIdAttr : undefined;
-    const autoId = prefix + normalizeId(name);
-
-    let actualCustomId = customIdAttr;
-    if (actualCustomId && !actualCustomId.startsWith('custom-')) {
-      actualCustomId = 'custom-' + actualCustomId;
-    }
-    const actualId = actualCustomId ?? autoId;
-
-    const offsetAttr = parseInt(child.getAttribute('offset') ?? '0', 10);
-    const n: DSLNode = {
-      id: actualId,
-      label: name,
-      type: nodeType,
-      color: DEFAULT_COLORS[nodeType] || '#6a737d',
-      containerId: hostContainerId,
-      processIndex: -1,
-      noteTarget: null,
-      ...(customIdAttr && { customId: customIdAttr }),
-      ...(offsetAttr && { offset: offsetAttr }),
-      notes: xmlAttrNotes(child),
-    };
+    const n = makeXmlNode(child, nodeType, hostContainerId, prefix);
     model.nodes.push(n);
-    stepIds.push(actualId);
+    stepIds.push(n.id);
     inlineNodes.push({ n, rawNext: child.getAttribute('next') ?? undefined, rawNegativeNext: child.getAttribute('altNext') ?? undefined });
   }
 
