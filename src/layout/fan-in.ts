@@ -5,7 +5,7 @@
 import { DSLModel, DSLNode } from '../parser/';
 import type { LayoutNode, LayoutLink } from './models.js';
 import { placeProcessNode } from './helpers.js';
-import { NODE_H, NODE_GAP_Y, NODE_W, NODE_GAP_X } from './constants.js';
+import { NODE_H, NODE_GAP_Y, NODE_W, NODE_GAP_X, ALT_BRANCH_GAP } from './constants.js';
 import { layoutAltBranch, layoutChainFrom } from './chains.js';
 
 export function layoutFanInProcess(
@@ -48,8 +48,8 @@ export function layoutFanInProcess(
           allLinks.push({ source: node.id, target: altNextNode.id, label: '', type: 'negative' });
           if (!processPositioned.has(altNextNode.id)) {
             const bottom = layoutAltBranch(
-              altNextNode, rootX, rootY + NODE_H + NODE_GAP_Y + 20,
-              container, model, processNodeMap, allNodes, allLinks, processPositioned, positioned, undefined
+              altNextNode, rootX, rootY + NODE_H + NODE_GAP_Y + ALT_BRANCH_GAP,
+              container, model, processNodeMap, allNodes, allLinks, processPositioned, positioned, undefined,
             );
             twoSidedAltBottom = Math.max(twoSidedAltBottom, bottom);
           }
@@ -95,7 +95,7 @@ export function layoutFanInProcess(
       allLinks.push({ source: node.id, target: altNextNode.id, label: '', type: 'negative' });
       if (!processPositioned.has(altNextNode.id)) {
         const bottom = layoutAltBranch(
-          altNextNode, innerX, rootY + NODE_H + NODE_GAP_Y + 20,
+          altNextNode, innerX, rootY + NODE_H + NODE_GAP_Y + ALT_BRANCH_GAP,
           container, model, processNodeMap, allNodes, allLinks, processPositioned, positioned, undefined
         );
         altBottom = Math.max(altBottom, bottom);

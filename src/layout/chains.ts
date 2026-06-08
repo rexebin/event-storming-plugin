@@ -5,7 +5,7 @@
 import { DSLModel, DSLNode } from '../parser/';
 import type { LayoutNode, LayoutLink } from './models.js';
 import { placeProcessNode } from './helpers.js';
-import { NODE_H, NODE_GAP_Y, NODE_W, NODE_GAP_X, SUB_GROUP_GAP_X } from './constants.js';
+import { NODE_H, NODE_GAP_Y, NODE_W, NODE_GAP_X, SUB_GROUP_GAP_X, ALT_BRANCH_GAP } from './constants.js';
 
 // ─── Sub-group depth computation ─────────────────────────────
 
@@ -62,7 +62,7 @@ export function layoutAltBranch(
     // altNext goes below (recursive)
   if (node.altNext && processNodeMap.has(node.altNext)) {
     const altNextNode = processNodeMap.get(node.altNext)!;
-    const altNextY = actualY + NODE_H + NODE_GAP_Y + 20;
+    const altNextY = actualY + NODE_H + NODE_GAP_Y + ALT_BRANCH_GAP;
     allLinks.push({ source: node.id, target: altNextNode.id, label: '', type: 'negative' });
     if (!processPositioned.has(altNextNode.id)) {
       const altBottom = layoutAltBranch(
@@ -144,7 +144,7 @@ export function layoutChainFrom(
 
     // Pass 2: lay out alt branches right-to-left so fan-in targets land below the
     // rightmost node that references them, not below the first one encountered.
-  const negativeY = maxBottom + NODE_GAP_Y + 20;
+  const negativeY = maxBottom + NODE_GAP_Y + ALT_BRANCH_GAP;
   for (let i = chainNodes.length - 1; i >= 0; i--) {
     const { node, x } = chainNodes[i];
     const hasAltBranch = !!node.altNext && processNodeMap.has(node.altNext);

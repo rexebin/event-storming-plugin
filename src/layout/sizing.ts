@@ -7,9 +7,8 @@ import type { DSLContainer } from '../parser/';
 import { DSLNode } from '../parser/';
 import { getProcessNodes, getProcessRoots, detectSharedTargetFanIn } from './helpers.js';
 import { computeProcessColumns, computeFanInProcessColumns } from './fan-in.js';
-import { NODE_W, NODE_GAP_X, CONTAINER_PADDING, GROUP_PADDING, SUB_GROUP_GAP_X, NODE_H, NODE_GAP_Y, CONTAINER_HEADER_H } from './constants.js';
-
-const NESTED_GAP = 14;
+import { computeMaxSubGroupDepth } from './chains.js';
+import { NODE_W, NODE_GAP_X, CONTAINER_PADDING, GROUP_PADDING, SUB_GROUP_GAP_X, NODE_H, NODE_GAP_Y, CONTAINER_HEADER_H, NESTED_GAP } from './constants.js';
 
 export function computeContainerWidth(container: DSLContainer, model: DSLModel): number {
   let maxW = 0;
@@ -53,28 +52,7 @@ export function computeContainerWidth(container: DSLContainer, model: DSLModel):
       if (firstInSubGroup) w += SUB_GROUP_GAP_X;
       if (lastInSubGroup) w += SUB_GROUP_GAP_X;
 
-          // Reserve room for nested sub-group padding (the outermost sub-group's bbox extends
-          // beyond its inner nodes by depth * NESTED_GAP on each side).
-      const sgSets = proc.subGroups.map((sg) => new Set(sg.nodeIds));
-      const isStrictSubset = (a: Set<string>, b: Set<string>): boolean => {
-        if (a.size >= b.size) return false;
-        for (const id of a) if (!b.has(id)) return false;
-        return true;
-         };
-      let maxDepth = 0;
-      const depthBelow = new Array<number>(sgSets.length).fill(0);
-      const order = sgSets.map((_, i) => i).sort((a, b) => sgSets[a].size - sgSets[b].size);
-      for (const i of order) {
-        let childMax = -1;
-        for (const j of order) {
-          if (i !== j && isStrictSubset(sgSets[j], sgSets[i])) {
-            childMax = Math.max(childMax, depthBelow[j]);
-            }
-            }
-        depthBelow[i] = childMax + 1;
-        maxDepth = Math.max(maxDepth, depthBelow[i]);
-          }
-      w += maxDepth * NESTED_GAP * 2;
+      w += computeMaxSubGroupDepth(proc.subGroups) * NESTED_GAP * 2;
          }
 
     maxW = Math.max(maxW, w);

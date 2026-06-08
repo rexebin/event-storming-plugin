@@ -35,13 +35,6 @@ export function getProcessRoots(process: import('../parser/').DSLProcess, proces
     .filter((node): node is DSLNode => !!node && (incomingCounts.get(node.id) || 0) === 0);
 }
 
-export const CONTAINER_TYPE_LABELS: Record<string, string> = {
-  aggregate: 'Aggregate',
-  readModel: 'Projector',
-  process: 'Process',
-  externalSystem: 'External System',
-};
-
 export function detectSharedTargetFanIn(roots: DSLNode[], processNodeMap: Map<string, DSLNode>): DSLNode | null {
   if (roots.length <= 1) return null;
 

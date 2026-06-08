@@ -19,6 +19,11 @@ export const GROUP_GAP_Y = 18;
 
 export const SUB_GROUP_GAP_X = 24;
 
+export const SUB_PAD_BASE = 8;
+export const NESTED_GAP = 14;
+export const ALT_BRANCH_GAP = 20;
+export const CONTAINER_BOTTOM_EXTRA = 20;
+
 export const LINK_COLOR = '#6a737d';
 
 export const CONTAINER_TYPE_LABELS: Record<string, string> = {
