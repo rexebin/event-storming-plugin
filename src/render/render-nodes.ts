@@ -5,7 +5,7 @@ import { DSLModel } from '../parser/';
 import { getNodeNotes } from '../notes.js';
 import { wrapText } from '../text.js';
 import { isLight } from '../utils.js';
-import { computeLinkPath, getLinkLabelPosition } from '../links.js';
+import { computeLinkPath, getLinkLabelPosition } from '../links/index.js';
 
 export function renderNodes(
   g: GSelection,

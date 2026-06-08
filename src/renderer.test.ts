@@ -6,7 +6,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './render/index.js';
 import { computeLayout, computeContainerHeight, NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './layout/index.js';
-import { computeLinkPath } from './links.js';
+import { computeLinkPath } from './links/index.js';
 import { parseDSL } from './parser/';
 
 // Test helper utilities used across suites below.

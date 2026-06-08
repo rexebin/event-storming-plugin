@@ -1,8 +1,8 @@
 
 
 import { describe, it, expect } from 'vitest';
-import { computeLinkPath } from './links.js';
-import { NODE_H, NODE_GAP_X, NODE_GAP_Y } from './layout/index.js';
+import { computeLinkPath } from './links/index.js';
+import { NODE_GAP_X, NODE_GAP_Y } from './layout/index.js';
 
 function makeNode(id: string, x: number, y: number, type: string) {
   return { id, x, y, label: '', type, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] } as any;
