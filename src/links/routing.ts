@@ -44,10 +44,6 @@ export function computeLinkPath(
   const sourceX = sourceIsLeft ? source.x + NODE_W : source.x;
   const targetX = sourceIsLeft ? target.x : target.x + NODE_W;
 
-  if (type === 'next') {
-    return `M ${sourceX} ${source.y + NODE_H / 2} L ${targetX} ${target.y + NODE_H / 2}`;
-  }
-
   const sourceY = source.y + NODE_H / 2;
   const targetY = target.y + NODE_H / 2;
 

@@ -3,22 +3,7 @@
  */
 
 import type { DSLModel, DSLNode, DSLContainer, DSLSubGroup, NodeType } from './models.js';
-import { normalizeId } from './models.js';
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-const XML_NODE_TYPES: Record<string, NodeType> = {
-  actor: 'actor',
-  command: 'command',
-  event: 'event',
-  policy: 'policy',
-  query: 'query',
-  externalsystem: 'externalSystem',
-  readmodel: 'readModel',
-  error: 'error',
-  note: 'note',
-  aggregate: 'aggregate',
-};
+import { normalizeId, XML_NODE_TYPES } from './models.js';
 
 const DEFAULT_COLORS: Record<NodeType, string> = {
   event: '#FFA500',
@@ -209,7 +194,7 @@ export function resolveNodeRefs(
 export function applyImplicitLinking(pending: PendingRef[]): void {
   const nodesByContainer = new Map<string, DSLNode[]>();
   for (const p of pending) {
-    const cid = p.node.containerId || (pending[0].node.containerId || '');
+    const cid = p.node.containerId ?? '';
     if (!nodesByContainer.has(cid)) nodesByContainer.set(cid, []);
     nodesByContainer.get(cid)!.push(p.node);
   }

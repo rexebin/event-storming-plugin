@@ -166,6 +166,16 @@ describe('parseDSL', () => {
       expect(errorNode!.containerId).toBe('Flow');
     });
 
+    it('should not create duplicate error nodes when multiple nodes share the same unresolved altNext', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="Place Order" altNext="NonExistent"/>
+        <command name="Cancel Order" altNext="NonExistent"/>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const errorNodes = result.nodes.filter((n) => n.id === 'Flow_NonExistent');
+      expect(errorNodes).toHaveLength(1);
+    });
+
     it('should NOT create implicit error node for unresolved next reference in XML DSL', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
         <command name="Place Order" id="PO_001" next="CrossContainerTarget"/>

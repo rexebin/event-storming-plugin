@@ -1,3 +1,4 @@
+import * as d3 from 'd3';
 import { GSelection } from './models.js';
 import { NODE_W, NODE_H, NODE_FOLD } from '../layout/constants.js';
 import type { LayoutNode } from '../layout/models.js';
@@ -81,9 +82,10 @@ export function renderLinks(
   nodes: LayoutNode[],
   offsetX: number,
 ): void {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   for (const link of links) {
-    const source = nodes.find((n) => n.id === link.source);
-    const target = nodes.find((n) => n.id === link.target);
+    const source = nodeMap.get(link.source);
+    const target = nodeMap.get(link.target);
     if (!source || !target) continue;
 
     const adjustedSource = { ...source, x: source.x + offsetX };

@@ -24,6 +24,8 @@ export const NESTED_GAP = 14;
 export const ALT_BRANCH_GAP = 20;
 export const CONTAINER_BOTTOM_EXTRA = 20;
 
+export const MAX_ROW_WIDTH = 1200;
+
 export const LINK_COLOR = '#6a737d';
 
 export const CONTAINER_TYPE_LABELS: Record<string, string> = {

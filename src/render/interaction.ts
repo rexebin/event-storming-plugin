@@ -27,8 +27,9 @@ export function setupTooltips(
   model: DSLModel,
   tooltip: any,
 ): void {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   function buildNodeTooltip(nodeId: string) {
-    const node = nodes.find((n) => n.id === nodeId);
+    const node = nodeMap.get(nodeId);
     if (!node) return '';
 
     const nodeNotes = getNodeNotes(node, model);

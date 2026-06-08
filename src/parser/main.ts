@@ -5,9 +5,9 @@
  * → synthetic process generation.
  */
 
-import type { DSLModel } from './models.js';
+import type { DSLModel, DSLContainer, DSLNode } from './models.js';
 import type { PendingRef } from './parsing.js';
-import { normalizeId } from './models.js';
+import { normalizeId, XML_NODE_TYPES } from './models.js';
 import {
   xmlAttrNotes,
   makeXmlNode,
@@ -69,7 +69,7 @@ function parseXMLDSL(text: string): DSLModel {
 
     const containerName = diagramEl.getAttribute('name') || diagramEl.tagName;
     const containerId = normalizeId(containerName);
-    const dslContainer: import('./models.js').DSLContainer = {
+    const dslContainer: DSLContainer = {
       id: containerId,
       label: containerName,
       type: cType,
@@ -141,26 +141,12 @@ function parseXMLDSL(text: string): DSLModel {
   return model;
 }
 
-// Helper to create a node from a tag — reuses makeXmlNode but checks XML_NODE_TYPES inline.
-function makeXmlNodeForTag(el: Element, tagLower: string, containerId: string, idPrefix: string): import('./models.js').DSLNode | null {
+function makeXmlNodeForTag(el: Element, tagLower: string, containerId: string, idPrefix: string): DSLNode | null {
   const nodeType = XML_NODE_TYPES[tagLower];
   if (!nodeType) return null;
   if (tagLower === 'note' && !el.getAttribute('name')) return null;
   return makeXmlNode(el, nodeType, containerId, idPrefix);
 }
-
-const XML_NODE_TYPES: Record<string, import('./models.js').NodeType> = {
-  actor: 'actor',
-  command: 'command',
-  event: 'event',
-  policy: 'policy',
-  query: 'query',
-  externalsystem: 'externalSystem',
-  readmodel: 'readModel',
-  error: 'error',
-  note: 'note',
-  aggregate: 'aggregate',
-};
 
 export function parseDSL(text: string): DSLModel {
   if (!isEventStormingXML(text)) return { title: 'Event Storming', description: '', containers: [], nodes: [], links: [] };

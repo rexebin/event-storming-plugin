@@ -13,7 +13,7 @@ import {
   NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y,
   CONTAINER_PADDING, CONTAINER_HEADER_H, CONTAINER_GAP_X, CONTAINER_GAP_Y,
   GROUP_PADDING, GROUP_HEADER_H, GROUP_GAP_Y,
-  SUB_PAD_BASE, NESTED_GAP, CONTAINER_BOTTOM_EXTRA,
+  SUB_PAD_BASE, NESTED_GAP, CONTAINER_BOTTOM_EXTRA, MAX_ROW_WIDTH,
 } from './constants.js';
 
 // ─── Private helpers ─────────────────────────────────────────
@@ -46,11 +46,7 @@ function buildSubGroupBBoxes(
     const subNodes = allNodes.filter((n) => sgSetsList[sgIdx].has(n.id));
     if (subNodes.length === 0) continue;
 
-    const negIds = new Set<string>();
-    for (const n of subNodes) {
-      if (n.altNext) negIds.add(n.altNext);
-      negIds.add(`error_default_${n.id}`);
-    }
+    const negIds = new Set<string>(subNodes.map((n) => n.altNext).filter((id): id is string => !!id));
     const allSub = [...subNodes, ...allNodes.filter((n) => negIds.has(n.id))];
     const pad = SUB_PAD_BASE + sgDepths[sgIdx] * NESTED_GAP;
     const minX = Math.min(...allSub.map((n) => n.x)) - pad;
@@ -264,7 +260,7 @@ export function computeLayout(model: DSLModel): LayoutResult {
     const containerW = computeContainerWidth(container, model);
     const containerH = computeContainerHeight(container, model);
 
-    if (x > 0 && x + containerW > (60 * 2 + 1200)) {
+    if (x > 0 && x + containerW > (CONTAINER_GAP_X * 2 + MAX_ROW_WIDTH)) {
       x = 0;
       y = rowBottom + CONTAINER_GAP_Y;
     }

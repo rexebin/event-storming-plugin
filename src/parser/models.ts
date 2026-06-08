@@ -87,3 +87,16 @@ export type LinkType =
 export function normalizeId(text: string): string {
   return text.replace(/[^a-zA-Z0-9]/g, '_');
 }
+
+export const XML_NODE_TYPES: Record<string, NodeType> = {
+  actor: 'actor',
+  command: 'command',
+  event: 'event',
+  policy: 'policy',
+  query: 'query',
+  externalsystem: 'externalSystem',
+  readmodel: 'readModel',
+  error: 'error',
+  note: 'note',
+  aggregate: 'aggregate',
+};
