@@ -81,18 +81,6 @@ export type LinkType =
   | 'sends'
   | 'triggers';
 
-const COLOR_MAP: Record<string, string> = {
-  orange: '#FFA500',   // Domain Events (orange)
-  blue: '#91D49C',     // Commands (light green)
-  green: '#FEE254',    // Aggregates (yellow)
-  purple: '#D4D3D3',   // Actors (gray)
-  yellow: '#859EBF',   // Policies (blue)
-  cyan: '#5BAA62',     // Read Models (dark green)
-  pink: '#FB8597',     // External Systems (pink)
-  lightgray: '#FFF1AA', // Temporary Objects / Notes (light yellow)
-  red: '#8DCFF9',      // Errors (cyan)
-};
-
 /**
  * Parse raw XML-based DSL text into a structured model.
  */
@@ -270,13 +258,13 @@ function parseXMLDSL(text: string): DSLModel {
       for (const { node, rawNext, rawNegativeNext } of pendingRefs) {
         const cId = node.containerId || scopeBoundary;
         if (rawNext !== undefined && rawNext !== '') {
-          const nextId = resolveReference(rawNext, model.nodes, cId, false, scopeBoundary, boundaryNodeIds);
+          const nextId = resolveReference(rawNext, model.nodes, cId, false, boundaryNodeIds);
           node.next = nextId;
         } else if (rawNext === '') {
           node.next = null;
         }
         if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-          const altNextId = resolveReference(rawNegativeNext, model.nodes, cId, true, scopeBoundary, boundaryNodeIds);
+          const altNextId = resolveReference(rawNegativeNext, model.nodes, cId, true, boundaryNodeIds);
           node.altNext = altNextId;
         } else if (rawNegativeNext === '') {
           node.altNext = null;
@@ -301,7 +289,7 @@ function parseXMLDSL(text: string): DSLModel {
     // Phase 2: Resolve references for inline process nodes with boundary scope.
     const inlineBoundaryNodeIds: Set<string> = new Set();
     for (const n of model.nodes) {
-      if (n.containerId === dslContainer.id || (inlineStepIds.length > 0 && n.containerId === dslContainer.id)) {
+      if (n.containerId === dslContainer.id) {
         inlineBoundaryNodeIds.add(n.id);
       }
     }
@@ -322,14 +310,14 @@ function parseXMLDSL(text: string): DSLModel {
 
     for (const { node, rawNext, rawNegativeNext } of pendingChildren) {
       if (rawNext !== undefined && rawNext !== '') {
-        const nextId = resolveReference(rawNext, model.nodes, dslContainer.id, false, dslContainer.id, inlineBoundaryNodeIds);
+        const nextId = resolveReference(rawNext, model.nodes, dslContainer.id, false, inlineBoundaryNodeIds);
         node.next = nextId;
         if (nextId && !inlineStepIds.includes(nextId)) inlineStepIds.push(nextId);
       } else {
         node.next = rawNext === '' ? null : undefined;
       }
       if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-        const altNextId = resolveReference(rawNegativeNext, model.nodes, dslContainer.id, true, dslContainer.id, inlineBoundaryNodeIds);
+        const altNextId = resolveReference(rawNegativeNext, model.nodes, dslContainer.id, true, inlineBoundaryNodeIds);
         node.altNext = altNextId;
         if (altNextId && !inlineStepIds.includes(altNextId)) inlineStepIds.push(altNextId);
       } else {
@@ -437,56 +425,6 @@ function parseXMLDSL(text: string): DSLModel {
   return model;
 }
 
-// ─── Child container creation (batch: no reference resolution) ─────────────
-
-function createChildContainerBatch(
-  childEl: Element,
-  parentContainer: DSLContainer,
-  model: DSLModel,
-  containerPrefix = '',
-  scopeBoundary?: string
-): void {
-  const childName = childEl.getAttribute('name') || '';
-  const childId = normalizeId(childName);
-  const childContainer: DSLContainer = {
-    id: childId,
-    label: childName,
-    type: parentContainer.type,
-    color: parentContainer.color,
-    nodeIds: [],
-    processes: [],
-    parentId: parentContainer.id,
-    subContainers: [],
-    notes: xmlAttrNotes(childEl),
-  };
-
-  const stepIds: string[] = [];
-
-  // Compute scope boundary for reference resolution within this container.
-  // Use explicit boundary if provided, otherwise walk up to find the top-level (root) container.
-  let effectiveScope = scopeBoundary;
-  if (!effectiveScope && parentContainer.parentId !== null) {
-    const allContainers = model.containers;
-    let current = parentContainer.id;
-    while (current !== null) {
-      const c = allContainers.find((x) => x.id === current);
-      if (!c || c.parentId === null) { effectiveScope = current; break; }
-      current = c.parentId;
-    }
-  } else if (!effectiveScope) {
-    effectiveScope = parentContainer.id;
-  }
-
-  // Nodes inside this container get scoped with the incoming prefix (matching original expandXMLContainer)
-  collectProcessChildren(childEl, childId, model, containerPrefix, stepIds, [], childContainer, effectiveScope);
-
-  childContainer.nodeIds.push(...stepIds);
-
-  // Add to parent's subContainers and top-level containers list
-  parentContainer.subContainers.push(childContainer);
-  model.containers.push(childContainer);
-}
-
 // ─── Build container hierarchy tree (no reference resolution) ──────────────
 
 function buildContainerTree(
@@ -543,96 +481,7 @@ function buildContainerTree(
   model.containers.push(childContainer);
 
   return pendingRefs;
-}
-
-// ─── Collect direct process children (nodes + recurse into <container>) ──────
-
-function collectProcessChildren(
-  containerEl: Element,
-  hostContainerId: string,
-  model: DSLModel,
-  prefix: string,
-  stepIds: string[],
-  _pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> | undefined,
-  parentContainer: DSLContainer,
-  resolveScopeBoundary?: string
-): void {
-  // Determine the resolution scope: if an explicit boundary is provided use it,
-  // otherwise fall back to the current container. This allows nodes at any nesting
-  // level to cross-reference siblings' children within the same scope boundary.
-  const effectiveScope = resolveScopeBoundary ?? hostContainerId;
-
-  // Collect all nodeIds under the effective scope for cross-sibling matching.
-  const boundaryNodeIds: Set<string> = new Set();
-  if (effectiveScope) {
-    const seenContainers = new Set<string>();
-    const queue: string[] = [effectiveScope];
-    while (queue.length > 0) {
-      const cid = queue.shift()!;
-      if (seenContainers.has(cid)) continue;
-      seenContainers.add(cid);
-      for (const n of model.nodes) {
-        if (n.containerId === cid) boundaryNodeIds.add(n.id);
-      }
-      for (const c of model.containers) {
-        if (c.parentId === cid) queue.push(c.id);
-      }
-    }
-  }
-
-  // Separate child containers from inline nodes for two-phase processing.
-  const childContainers: Array<{ el: Element; subPrefix: string }> = [];
-  const inlineNodes: Array<{ n: DSLNode; rawNext?: string; rawNegativeNext?: string }> = [];
-
-  for (const child of Array.from(containerEl.children)) {
-    const tagLower = child.tagName.toLowerCase();
-
-    if (tagLower === 'container') {
-      const subPrefix = prefix + normalizeId(child.getAttribute('name') || '') + '_';
-      childContainers.push({ el: child, subPrefix });
-      continue;
-    }
-
-    const nodeType = XML_NODE_TYPES[tagLower];
-    if (!nodeType) continue;
-    if (tagLower === 'note' && !child.getAttribute('name')) continue;
-
-    const n = makeXmlNode(child, nodeType, hostContainerId, prefix);
-    model.nodes.push(n);
-    stepIds.push(n.id);
-    inlineNodes.push({ n, rawNext: child.getAttribute('next') ?? undefined, rawNegativeNext: child.getAttribute('altNext') ?? undefined });
-  }
-
-  // Phase 1: Create ALL child containers (recursively) before resolving any references.
-  for (const { el, subPrefix } of childContainers) {
-    createChildContainerBatch(el, parentContainer, model, subPrefix);
-  }
-
-  // Phase 2: Resolve inline node references with proper scope boundary.
-  for (const { n, rawNext, rawNegativeNext } of inlineNodes) {
-    if (rawNext !== undefined && rawNext !== '') {
-      const nextId = resolveReference(rawNext, model.nodes, hostContainerId, false, effectiveScope, boundaryNodeIds);
-      n.next = nextId;
-      if (nextId && !stepIds.includes(nextId)) stepIds.push(nextId);
-    } else {
-      n.next = rawNext === '' ? null : undefined;
-    }
-    if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-      const altNextId = resolveReference(rawNegativeNext, model.nodes, hostContainerId, true, effectiveScope, boundaryNodeIds);
-      n.altNext = altNextId;
-      if (altNextId && !stepIds.includes(altNextId)) stepIds.push(altNextId);
-    } else {
-      n.altNext = rawNegativeNext === '' ? null : undefined;
-    }
-  }
-
-  // Phase 3: Auto-link sequential nodes without explicit next.
-  if (inlineNodes.length > 1) {
-    fillImplicitNext(inlineNodes.map((i) => i.n), stepIds);
-  }
-}
-
-function xmlAttrNotes(el: Element): string[] {
+}function xmlAttrNotes(el: Element): string[] {
   const attr = el.getAttribute('notes');
   const childNotes = Array.from(el.children)
     .filter(c => ['note', 'notes'].includes(c.tagName.toLowerCase()) && !c.getAttribute('name'))
@@ -641,14 +490,8 @@ function xmlAttrNotes(el: Element): string[] {
   return attr ? [attr, ...childNotes] : childNotes;
 }
 
-function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSubGroup[]): void {
+function fillImplicitNext(nodes: DSLNode[], stepIds: string[]): void {
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  const subGroupLastIds = new Set<string>();
-  if (subGroups) {
-    for (const sg of subGroups) {
-      if (sg.nodeIds.length > 0) subGroupLastIds.add(sg.nodeIds[sg.nodeIds.length - 1]);
-    }
-  }
 
   // Nodes already reachable via altNext belong to an alt branch, not the sibling chain.
   const altNextTargets = new Set(nodes.map((n) => n.altNext).filter((id): id is string => !!id));
@@ -656,7 +499,6 @@ function fillImplicitNext(nodes: DSLNode[], stepIds: string[], subGroups?: DSLSu
   for (let i = 0; i < stepIds.length - 1; i++) {
     const node = nodeById.get(stepIds[i]);
     if (node && node.next === undefined) {
-      if (subGroupLastIds.has(node.id)) continue;
       const candidateId = stepIds[i + 1];
       const candidate = nodeById.get(candidateId);
       if (node.type === 'policy' && candidate?.type === 'error' && candidate.id === node.altNext) {
@@ -679,8 +521,7 @@ function resolveReference(
   allNodes: DSLNode[],
   scopeContainerId: string,
   createOnError: boolean = true,
-  _scopeBoundary?: string,        // broader scope (e.g. parent or aggregate container id)
-  boundaryNodeIds?: Set<string>   // pre-collected nodeIds under scopeBoundary for sibling matching
+  boundaryNodeIds?: Set<string>   // pre-collected nodeIds for cross-sibling matching within scope
 ): string | null | undefined {
   if (reference === '') return null; // explicitly no next
   if (!reference) return undefined;
@@ -717,7 +558,7 @@ function resolveReference(
     type: 'error',
     containerId: scopeContainerId,
     processIndex: -1,
-    color: COLOR_MAP.red,
+    color: DEFAULT_COLORS.error,
     noteTarget: null,
     notes: [],
   });
