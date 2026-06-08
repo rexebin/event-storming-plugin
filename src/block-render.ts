@@ -1,5 +1,5 @@
 import { parseDSL } from './parser/';
-import { renderEventStorming } from './renderer.js';
+import { renderEventStorming } from './render/index.js';
 import * as d3 from 'd3';
 
 export interface RenderedBlockInstance {

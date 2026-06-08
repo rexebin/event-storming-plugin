@@ -4,15 +4,13 @@
 
 import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
-import { renderEventStorming } from './renderer.js';
+import { renderEventStorming } from './render/index.js';
 import { computeLayout, computeContainerHeight } from './layout.js';
 import { NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './constants.js';
 import { computeLinkPath } from './links.js';
 import { parseDSL } from './parser/';
 
-// We need to extract the helper functions from renderer.ts
-// Since renderer.ts uses D3 heavily, we test the pure functions in isolation
-// by re-implementing the logic here and verifying against known outputs.
+// Test helper utilities used across suites below.
 
 function isLight(hex: string): boolean {
   const r = parseInt(hex.slice(1, 3), 16);
