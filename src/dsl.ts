@@ -760,37 +760,66 @@ function parseXMLDSL(text: string): DSLModel {
   }
 
   // Post-process: create synthetic processes for containers missing them.
-  // Skip parent containers that have any descendant with a process — those children
-  // already frame their content independently and the parent would duplicate positioning.
+  // Collect all descendant nodeIds for a container's subtree. Uses model.nodes filtered by
+  // containerId to catch auto-created error nodes that are not stored in container.nodeIds.
+  const collectDesc = (c: DSLContainer): string[] => {
+    const ids: string[] = [];
+    for (const n of model.nodes) {
+      if (n.containerId === c.id && !ids.includes(n.id)) ids.push(n.id);
+    }
+    for (const p of c.processes) {
+      for (const sid of p.stepIds) {
+        if (!ids.includes(sid)) ids.push(sid);
+      }
+    }
+    for (const child of c.subContainers) {
+      for (const nid of collectDesc(child)) {
+        if (!ids.includes(nid)) ids.push(nid);
+      }
+    }
+    return ids;
+  };
+
+  // Build subGroups from nested containers so they render as visual dashed bboxes.
+  const buildSubGroups = (children: DSLContainer[]): Array<{ name: string; nodeIds: string[]; notes?: string[] }> => {
+    const result: Array<{ name: string; nodeIds: string[]; notes?: string[] }> = [];
+    function add(c: DSLContainer) {
+      const nodeIds = collectDesc(c);
+      if (nodeIds.length > 0) result.push({ name: c.label, nodeIds, notes: c.notes });
+      for (const child of c.subContainers) add(child);
+    }
+    for (const c of children) add(c);
+    return result;
+  };
+
+  // Create synthetic processes for containers that have none yet (e.g. nested containers
+  // built by buildContainerTree which defers process creation).
   function ensureSyntheticProcesses(container: DSLContainer) {
     if (container.processes.length > 0) return;
 
-    const hasDesc = (root: DSLContainer): boolean => {
-      const walk = (c: DSLContainer): boolean => {
-        if (c !== root && c.processes.length > 0) return true;
-        for (const child of c.subContainers) {
-          if (walk(child)) return true;
+    if (container.subContainers.length > 0) {
+      // One process per direct sub-container — each renders as a labelled group box.
+      for (const child of container.subContainers) {
+        const stepIds = collectDesc(child);
+        if (stepIds.length > 0) {
+          const subGroups = buildSubGroups(child.subContainers);
+          container.processes.push({
+            name: child.label,
+            stepIds,
+            notes: child.notes,
+            subGroups: subGroups.length > 0 ? subGroups : undefined,
+          });
         }
-        return false;
-      };
-      return walk(root);
-    };
-    const collectDesc = (root: DSLContainer): string[] => {
-      const ids: string[] = [];
-      const w = (c: DSLContainer) => {
-        for (const nid of c.nodeIds) ids.push(nid);
-        for (const child of c.subContainers) w(child);
-      };
-      w(root);
-      return ids;
-    };
-
-    if (!hasDesc(container)) {
-      const allNodeIds: string[] = container.subContainers.length > 0
-        ? collectDesc(container)
-        : model.nodes.filter(n => n.containerId === container.id).map(n => n.id);
+      }
+      // Also include own direct inline nodes not belonging to any sub-container.
+      const ownNodes = model.nodes.filter(n => n.containerId === container.id);
+      if (ownNodes.length > 0) {
+        container.processes.push({ name: container.label, stepIds: ownNodes.map(n => n.id), notes: container.notes ?? [] });
+      }
+    } else {
+      const allNodeIds = model.nodes.filter(n => n.containerId === container.id).map(n => n.id);
       if (allNodeIds.length > 0) {
-        container.processes.push({ name: container.label, stepIds: allNodeIds, notes: container.notes || [] });
+        container.processes.push({ name: container.label, stepIds: allNodeIds, notes: container.notes ?? [] });
       }
     }
   }

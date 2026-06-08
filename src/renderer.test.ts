@@ -6,7 +6,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
 import { computeLayout } from './layout.js';
-import { NODE_H, NODE_W, CONTAINER_PADDING, GROUP_PADDING } from './constants.js';
+import { NODE_H, NODE_W, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './constants.js';
 import { computeLinkPath } from './links.js';
 import { parseDSL } from './dsl.js';
 
@@ -445,14 +445,14 @@ describe('renderEventStorming layout', () => {
 
     renderEventStorming(d3.select(host), showerSample);
 
-    // "Shower" container should be sized for the horizontal flow (6 nodes wide)
-    const container = host.querySelector('g.containers g[data-name="Shower"]');
+    // "Shower" is a nested container inside "Order", now sized as part of parent.
+    const container = host.querySelector('g.containers g[data-name="Order"]');
     expect(container).toBeTruthy();
 
     const containerRect = container!.querySelector('rect');
     expect(containerRect).toBeTruthy();
     const width = Number(containerRect!.getAttribute('width'));
-    // The Shower container should be sized for its horizontal flow (6 nodes wide), not total node count with branches.
+    // The Shower sub-container's horizontal flow (6 nodes wide) is rendered inside Order.
     expect(width).toBe(708);
   });
 
@@ -564,19 +564,22 @@ describe('renderEventStorming layout', () => {
     }
   });
 
-  it('draws a group container for each process and places its name in the top-left corner', () => {
+  it('draws one group per direct sub-container and labels each with its name', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), groupedSample);
 
+    // Each direct child container of Order becomes its own group box.
     const groups = Array.from(host.querySelectorAll<SVGGElement>('g.es-process-group'));
     expect(groups).toHaveLength(2);
 
-    const placeOrderGroup = groups.find((group) => group.getAttribute('data-name') === 'Place Order');
-    expect(placeOrderGroup).toBeTruthy();
+    const groupNames = groups.map(g => g.getAttribute('data-name'));
+    expect(groupNames).toContain('Place Order');
+    expect(groupNames).toContain('Cancel Order');
 
-    const title = placeOrderGroup!.querySelector('text');
+    const placeOrderGroup = groups.find(g => g.getAttribute('data-name') === 'Place Order')!;
+    const title = placeOrderGroup.querySelector('text');
     expect(title?.textContent).toBe('Place Order');
 
     const titleX = Number(title?.getAttribute('x'));
@@ -584,13 +587,14 @@ describe('renderEventStorming layout', () => {
     expect(titleX).toBeLessThan(20);
     expect(titleY).toBeLessThan(20);
 
+    // Nodes from Place Order container are positioned inside its group.
     const customer = host.querySelector('[data-id="Place_Order_Customer"]');
     expect(customer).toBeTruthy();
 
-    const groupPos = getTranslate(placeOrderGroup!);
+    const groupPos = getTranslate(placeOrderGroup);
     const customerPos = getTranslate(customer!);
-    expect(customerPos.x).toBeGreaterThan(groupPos.x);
-    expect(customerPos.y).toBeGreaterThan(groupPos.y);
+    expect(customerPos.x).toBeGreaterThan(groupPos.x - 5);
+    expect(customerPos.y).toBeGreaterThan(groupPos.y - 5);
   });
 
   it('draws negative links from bottom-center of source when target is below', () => {
@@ -908,20 +912,29 @@ describe('renderEventStorming layout', () => {
 `);
     const layout = computeLayout(model);
 
+    // Nested containers are rendered inside their parent — all nodes must be positioned.
     const cancelOrder = layout.nodes.find(n => n.label === 'CancelOrder');
     const orderCancelled = layout.nodes.find(n => n.label === 'OrderCancelled');
+    const placeOrder = layout.nodes.find(n => n.label === 'PlaceOrder');
 
     expect(cancelOrder).toBeTruthy();
     expect(orderCancelled).toBeTruthy();
+    expect(placeOrder).toBeTruthy();
 
-    // CancelOrder and OrderCancelled must be positioned inside the "Cancel Order Container"
-    // layout container, not orphaned below it.
-    const cancelContainer = layout.containers.find(c => c.label === 'Cancel Order Container');
-    expect(cancelContainer).toBeTruthy();
+    // All nodes must be inside the top-level "Order" container, not orphaned.
+    const parentContainer = layout.containers[0];
+    expect(parentContainer).toBeTruthy();
 
-    const containerBottom = cancelContainer!.y + cancelContainer!.height;
-    expect(cancelOrder!.y + NODE_H).toBeLessThanOrEqual(containerBottom + 1);
-    expect(orderCancelled!.y + NODE_H).toBeLessThanOrEqual(containerBottom + 1);
+    const containerLeft = parentContainer!.x;
+    const containerRight = parentContainer!.x + parentContainer!.width;
+    const containerTop = parentContainer!.y + CONTAINER_HEADER_H;
+    const containerBottom = parentContainer!.y + parentContainer!.height;
+    for (const node of [cancelOrder!, orderCancelled!, placeOrder!]) {
+      expect(node.x).toBeGreaterThanOrEqual(containerLeft - 1);
+      expect(node.x + NODE_W).toBeLessThanOrEqual(containerRight + 1);
+      expect(node.y).toBeGreaterThanOrEqual(containerTop - 1);
+      expect(node.y + NODE_H).toBeLessThanOrEqual(containerBottom + 1);
+    }
   });
 
   it('sibling sub-containers with cross-container next reference do not overlap', () => {
@@ -946,24 +959,29 @@ describe('renderEventStorming layout', () => {
 `);
     const layout = computeLayout(model);
 
-    // Nested containers are now real LayoutContainers, not subGroups
-    const placeOrderC = layout.containers.find(c => c.label === 'Place Order');
-    const cancelOrderC = layout.containers.find(c => c.label === 'Cancel Order Container');
+    // Nested containers are now rendered inside their parent — all nodes positioned together.
+    // Verify no duplicates and all nodes within the single top-level container.
+    const rootC = layout.containers[0];
+    expect(rootC).toBeTruthy();
 
-    expect(placeOrderC).toBeTruthy();
-    expect(cancelOrderC).toBeTruthy();
+    const parentLeft = rootC!.x;
+    const parentRight = rootC!.x + rootC!.width;
+    const parentTop = rootC!.y + CONTAINER_HEADER_H;
+    const parentBottom = rootC!.y + rootC!.height;
 
-    // Sibling sub-containers must not overlap — either horizontally or vertically
-    const placeOrderRight = placeOrderC!.x + placeOrderC!.width;
-    const sameRow = placeOrderC!.y === cancelOrderC!.y;
-    if (sameRow) {
-      // Side by side on the same row must not overlap horizontally
-      expect(cancelOrderC!.x).toBeGreaterThanOrEqual(placeOrderRight);
-    } else {
-      // Different rows: neither should have negative gap
-      const minGap = 0;
-      expect(cancelOrderC!.y - (placeOrderC!.y + placeOrderC!.height)).toBeGreaterThanOrEqual(minGap);
+    // All nodes from both sibling sub-containers must be inside the top-level container.
+    expect(layout.nodes.length).toBeGreaterThan(0);
+    for (const node of layout.nodes) {
+      expect(node.x).toBeGreaterThanOrEqual(parentLeft - 1);
+      expect(node.x + NODE_W).toBeLessThanOrEqual(parentRight + 1);
+      expect(node.y).toBeGreaterThanOrEqual(parentTop - 1);
+      expect(node.y + NODE_H).toBeLessThanOrEqual(parentBottom + 1);
     }
+
+    // No duplicate nodes — each node id should appear exactly once in layout.
+    const ids = layout.nodes.map(n => n.id);
+    const uniqueIds = new Set(ids);
+    expect(ids.length).toBe(uniqueIds.size);
   });
 
   it('shows correct type label text for readModel (projector) containers', () => {

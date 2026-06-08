@@ -5,54 +5,6 @@
 
 import { DSLModel, DSLNode, DSLContainer, normalizeId } from './dsl.js';
 
-// ─── Container tree helpers (replaces subGroups) ──────────────
-
-/** Recursively collect all descendant nodeIds from a container and its nested children. */
-function collectAllDescendantNodeIds(container: DSLContainer): string[] {
-  const ids: string[] = [];
-  const traverse = (c: DSLContainer) => {
-    for (const nid of c.nodeIds) ids.push(nid);
-    for (const child of c.subContainers) traverse(child);
-  };
-  traverse(container);
-  return ids;
-}
-
-/** Build subGroups-like structure from container hierarchy for layout compatibility. */
-function buildSubGroupsFromTree(container: DSLContainer): Array<{ name: string; nodeIds: string[] }> {
-  const groups: Array<{ name: string; nodeIds: string[] }> = [];
-  const collect = (c: DSLContainer) => {
-    // Only create subGroup entries for containers that have their own nodeIds
-    // and are children of the current container's processes' scope.
-    if (c !== container && c.nodeIds.length > 0) {
-      groups.push({ name: c.label, nodeIds: [...c.nodeIds] });
-    }
-    for (const child of c.subContainers) collect(child);
-  };
-  for (const child of container.subContainers) collect(child);
-  return groups;
-}
-
-/** Recursively collect all descendant nodes from a container tree. */
-function collectAllDescendantNodes(container: DSLContainer, model: DSLModel): DSLNode[] {
-  const nodes: DSLNode[] = [];
-  const traverse = (c: DSLContainer) => {
-    for (const nid of c.nodeIds) {
-      const n = model.nodes.find(x => x.id === nid);
-      if (n) nodes.push(n);
-    }
-    for (const child of c.subContainers) traverse(child);
-  };
-  traverse(container);
-  return nodes;
-}
-
-/** Count total nodes recursively in a container tree. */
-function countAllNodes(container: DSLContainer): number {
-  let count = container.nodeIds.length;
-  for (const child of container.subContainers) count += countAllNodes(child);
-  return count;
-}
 import {
   LayoutNode,
   LayoutContainer,
@@ -518,8 +470,10 @@ export function computeLayout(model: DSLModel): LayoutResult {
   let y = 0;
   let rowBottom = 0;
 
-    // 1. Render containers (aggregates + readModels + processes)
+    // 1. Render top-level containers only — skip nested child containers (parentId !== null).
+    // Nested containers are rendered inside their parent's synthetic process instead.
   for (const container of model.containers) {
+    if (container.parentId !== null) continue;
     const containerW = computeContainerWidth(container, model);
     const containerH = computeContainerHeight(container, model);
 
@@ -567,14 +521,7 @@ export function computeLayout(model: DSLModel): LayoutResult {
        const groupInnerX = groupX + GROUP_PADDING;
        const groupInnerY = groupY + GROUP_HEADER_H + topPad;
        const processNodes = getProcessNodes(process, model);
-
-       // Filter out nodes that belong to direct subContainers — they're positioned in their own containers.
-       // This prevents duplicate positioning when parent synthetic processes include descendant nodeIds.
-       const subContainerIds = new Set(container.subContainers.map((sc) => sc.id));
-       const filteredProcessNodes = processNodes.filter(
-         (n: DSLNode) => n.containerId && (n.containerId === container.id || !subContainerIds.has(n.containerId)),
-       );
-       const processNodeMap = new Map<string, DSLNode>(filteredProcessNodes.map((node) => [node.id, node]));
+       const processNodeMap = new Map<string, DSLNode>(processNodes.map((node) => [node.id, node]));
        const processPositioned = new Set<string>();
        const roots = getProcessRoots(process, processNodeMap);
        const subGroupOf = new Map<string, string>();

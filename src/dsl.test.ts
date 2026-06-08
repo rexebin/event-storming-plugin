@@ -1360,4 +1360,75 @@ describe('parseDSL', () => {
       expect(failedRecorded!.altNext).toBe('custom-failed-exception-1');
     });
   });
+
+  describe('nested container synthetic process creation', () => {
+    const xml = `<eventstorming>
+      <aggregate name="Order">
+        <container name="Place Order">
+          <command name="PlaceOrder" next="IsAddressValid" />
+          <container name="PlaceOrder">
+            <policy name="IsAddressValid" altNext="AddressIsInValid" />
+            <policy name="IsEmailValid" next="Do Something" altNext="Email is invalid" />
+            <container name="Another Sub Process">
+              <command name="Do Something" />
+              <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
+              <error name="Something Is Invalid" next=""></error>
+            </container>
+          </container>
+          <externalSystem name="InventoryService" />
+          <policy name="Do We Have Stock?" altNext="Out Of Stock" />
+          <event name="OrderPlaced" />
+        </container>
+      </aggregate>
+    </eventstorming>`;
+
+    it('top-level aggregate has one process named after its direct child container', () => {
+      const result = parseDSL(xml);
+      const order = result.containers.find(c => c.label === 'Order');
+      expect(order).toBeDefined();
+      expect(order!.processes).toHaveLength(1);
+      expect(order!.processes[0].name).toBe('Place Order');
+    });
+
+    it('aggregate process includes all nodes from all nesting levels', () => {
+      const result = parseDSL(xml);
+      const order = result.containers.find(c => c.label === 'Order');
+      const stepIds = order!.processes[0].stepIds;
+      const labels = stepIds.map(id => result.nodes.find(n => n.id === id)?.label);
+      expect(labels).toContain('PlaceOrder');
+      expect(labels).toContain('IsAddressValid');
+      expect(labels).toContain('IsEmailValid');
+      expect(labels).toContain('Do Something');
+      expect(labels).toContain('Is Something Valid?');
+      expect(labels).toContain('Something Is Invalid');
+      expect(labels).toContain('InventoryService');
+      expect(labels).toContain('Do We Have Stock?');
+      expect(labels).toContain('OrderPlaced');
+    });
+
+    it('aggregate process has subGroups for nested containers', () => {
+      const result = parseDSL(xml);
+      const order = result.containers.find(c => c.label === 'Order');
+      const subGroups = order!.processes[0].subGroups ?? [];
+      const sgNames = subGroups.map(sg => sg.name);
+      expect(sgNames).toContain('PlaceOrder');
+      expect(sgNames).toContain('Another Sub Process');
+    });
+
+    it('PlaceOrder subGroup contains nodes from both PlaceOrder and Another Sub Process', () => {
+      const result = parseDSL(xml);
+      const order = result.containers.find(c => c.label === 'Order');
+      const subGroups = order!.processes[0].subGroups ?? [];
+      const placeOrderSG = subGroups.find(sg => sg.name === 'PlaceOrder');
+      const anotherSG = subGroups.find(sg => sg.name === 'Another Sub Process');
+      expect(placeOrderSG).toBeDefined();
+      expect(anotherSG).toBeDefined();
+      // PlaceOrder subGroup should contain all nested nodes (superset of Another Sub Process)
+      for (const id of anotherSG!.nodeIds) {
+        expect(placeOrderSG!.nodeIds).toContain(id);
+      }
+      // PlaceOrder subGroup should have more nodes than Another Sub Process
+      expect(placeOrderSG!.nodeIds.length).toBeGreaterThan(anotherSG!.nodeIds.length);
+    });
+  });
 });
