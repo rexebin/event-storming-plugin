@@ -3,7 +3,7 @@
  * Renders a parsed DSL model as an interactive SVG diagram.
  */
 
-import { parseDSL, DSLModel } from './dsl.js';
+import { parseDSL, DSLModel } from './parser/';
 import * as d3 from 'd3';
 
 // Module imports

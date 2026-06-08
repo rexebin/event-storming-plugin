@@ -2,7 +2,7 @@
  * Event Storming — Layout constants and types.
  */
 
-import { DSLModel, DSLNode, DSLProcess } from './dsl.js';
+import { DSLModel, DSLNode, DSLProcess } from './parser/';
 
 // ─── Node dimensions ─────────────────────────────────────────
 

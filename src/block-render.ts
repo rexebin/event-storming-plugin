@@ -1,4 +1,4 @@
-import { parseDSL } from './dsl.js';
+import { parseDSL } from './parser/';
 import { renderEventStorming } from './renderer.js';
 import * as d3 from 'd3';
 

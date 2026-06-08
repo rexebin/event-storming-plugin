@@ -3,7 +3,7 @@
  * Orchestrates positioning of nodes, containers, groups, and sub-groups.
  */
 
-import { DSLModel, DSLNode, DSLContainer, normalizeId } from './dsl.js';
+import { DSLModel, DSLNode, DSLContainer, normalizeId } from './parser/';
 
 import {
   LayoutNode,

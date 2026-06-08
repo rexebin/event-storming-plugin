@@ -2,7 +2,7 @@
  * Event Storming — Notes badges and tooltip rendering.
  */
 
-import { DSLModel, DSLNode, normalizeId } from './dsl.js';
+import { DSLModel, DSLNode, normalizeId } from './parser/';
 import { escapeHtml } from './utils.js';
 
 export function appendNotesBadge(

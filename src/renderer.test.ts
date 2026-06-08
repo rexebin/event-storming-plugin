@@ -8,7 +8,7 @@ import { renderEventStorming } from './renderer.js';
 import { computeLayout, computeContainerHeight } from './layout.js';
 import { NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './constants.js';
 import { computeLinkPath } from './links.js';
-import { parseDSL } from './dsl.js';
+import { parseDSL } from './parser/';
 
 // We need to extract the helper functions from renderer.ts
 // Since renderer.ts uses D3 heavily, we test the pure functions in isolation

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseDSL, normalizeId } from '../src/dsl';
+import { parseDSL, normalizeId } from './index';
 
 describe('normalizeId', () => {
   it('should convert spaces to underscores', () => {
@@ -99,7 +99,7 @@ describe('parseDSL', () => {
     });
 
     it('should keep the README eventstorming example parseable', async () => {
-      const readme = (await import('../README.md?raw')).default;
+      const readme = (await import('../../README.md?raw')).default;
       const match = readme.match(/```(?:eventstorming|xml)\n([\s\S]*?)\n```/);
 
       expect(match).toBeTruthy();

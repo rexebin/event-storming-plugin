@@ -1,4 +1,4 @@
-import { isEventStormingXML } from './dsl.js';
+import { isEventStormingXML } from './parser/';
 
 export function normalizeBlockText(text: string): string {
   return text.replace(/^\`\`\`.*\n?/, '').replace(/\n?\`\`\`.*$/, '').trim();
