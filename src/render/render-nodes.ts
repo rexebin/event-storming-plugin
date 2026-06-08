@@ -88,8 +88,7 @@ export function renderLinks(
 
     const adjustedSource = { ...source, x: source.x + offsetX };
     const adjustedTarget = { ...target, x: target.x + offsetX };
-    const adjustedNodes = nodes.map((n) => ({ ...n, x: n.x + offsetX }));
-    const pathD = computeLinkPath(adjustedSource, adjustedTarget, link.type, adjustedNodes, false);
+    const pathD = computeLinkPath(adjustedSource, adjustedTarget, link.type);
 
     g.append('path')
       .attr('class', `es-link es-link-${link.type}`)
@@ -101,7 +100,7 @@ export function renderLinks(
       .attr('marker-end', 'url(#arrowhead)');
 
     if (link.label) {
-      const labelPosition = getLinkLabelPosition(pathD, link);
+      const labelPosition = getLinkLabelPosition(pathD);
       g.append('text')
         .attr('x', labelPosition.x)
         .attr('y', labelPosition.y)

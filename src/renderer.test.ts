@@ -1194,7 +1194,7 @@ describe('computeLinkPath same-column routing', () => {
     const source = makeNode('src', 0, 0);
     const target = makeNode('tgt', 0, STEP_Y); // immediately adjacent below
 
-    const pathD = computeLinkPath(source, target, 'negative', undefined, true);
+    const pathD = computeLinkPath(source, target, 'negative', true);
 
     // Should be a direct two-point vertical line
     expect(pathD).toMatch(/^M \S+ \S+ L \S+ \S+$/);
@@ -1204,7 +1204,7 @@ describe('computeLinkPath same-column routing', () => {
     const source = makeNode('src', 0, 0);
     const target = makeNode('tgt', 0, STEP_Y * 2); // two rows below, same column
 
-    const pathD = computeLinkPath(source, target, 'negative', undefined, true);
+    const pathD = computeLinkPath(source, target, 'negative', true);
 
     // Must have multiple segments (orthogonal routing)
     const segments = (pathD.match(/\bL\b/g) ?? []).length;
@@ -1215,7 +1215,7 @@ describe('computeLinkPath same-column routing', () => {
     const source = makeNode('src', 0, STEP_Y);
     const target = makeNode('tgt', 0, 0); // same column, above
 
-    const pathD = computeLinkPath(source, target, 'negative', undefined, true);
+    const pathD = computeLinkPath(source, target, 'negative', true);
 
     // Must NOT be a simple two-point line
     expect(pathD).not.toMatch(/^M \S+ \S+ L \S+ \S+$/);
@@ -1239,11 +1239,10 @@ describe('computeLinkPath obstacle avoidance', () => {
     //                      ┌─────▼─────┐
     //                      │ Obstacle  │
 
-    const source = makeNode('src', 130 + 36, 0);        // x=166 (C1), y=0
-    const target = makeNode('tgt', 0, -80);                // x=0 (C0), y=-80 (above)
-    const obstacle = makeNode('obs', 130 + 36, 40);          // x=166 (same col, BELOW source bottom)
+    const source = makeNode('src', 130 + 36, 0);
+    const target = makeNode('tgt', 0, -80);
 
-    const pathD = computeLinkPath(source, target, 'negative', [target, obstacle], true);
+    const pathD = computeLinkPath(source, target, 'negative', true);
 
     // Path should NOT go directly upward through the obstacle
     expect(pathD).not.toMatch(/^M \d+ \d+ L \d+ \d+$/);
@@ -1264,12 +1263,10 @@ describe('computeLinkPath obstacle avoidance', () => {
     //            ┌─────▼─────┐
     //            │  ObsM     │
 
-    const source = makeNode('src', 130 + 36, 0);        // x=166 (C1), y=0
-    const target = makeNode('tgt', 2 * (130 + 36), -80); // x=332 (C2), y=-80 (above)
-    const obsL = makeNode('obsL', 0, -40);                // C0, blocking left gap at source level
-    const obsM = makeNode('obsM', 130 + 36, -40);         // same col as source
+    const source = makeNode('src', 130 + 36, 0);
+    const target = makeNode('tgt', 2 * (130 + 36), -80);
 
-    const pathD = computeLinkPath(source, target, 'negative', [target, obsL, obsM], true);
+    const pathD = computeLinkPath(source, target, 'negative', true);
 
     // Path should start from bottom of source and go down
     const mMatch = pathD.match(/^M (\d+) (\d+)/);
@@ -1287,12 +1284,10 @@ describe('computeLinkPath obstacle avoidance', () => {
     //            ┌─────▼─────┐
     //            │  ObsM     │
 
-    const source = makeNode('src', 130 + 36, 0);        // C1
-    const target = makeNode('tgt', 0, -80);                // C0 (above)
-    const obsL = makeNode('obsL', 0, -40);                  // same col as target, blocks direct approach
-    const obsM = makeNode('obsM', 130 + 36, -40);           // same col as source
+    const source = makeNode('src', 130 + 36, 0);
+    const target = makeNode('tgt', 0, -80);
 
-    const pathD = computeLinkPath(source, target, 'negative', [target, obsL, obsM], true);
+    const pathD = computeLinkPath(source, target, 'negative', true);
 
     // Path should start from bottom of source and go down
     const mMatch = pathD.match(/^M (\d+) (\d+)/);

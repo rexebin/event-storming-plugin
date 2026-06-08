@@ -2,83 +2,40 @@
  * Event Storming — Link path computation.
  */
 
-import type { LayoutNode, LayoutLink } from './layout/index.js';
+import type { LayoutNode } from './layout/index.js';
 import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from './layout/index.js';
 
 export function computeLinkPath(
   source: LayoutNode,
   target: LayoutNode,
   type: string,
-  _allNodes?: LayoutNode[],
   isNegative: boolean = false,
 ): string {
-  // Negative links (altNext branches) use 90-degree orthogonal routing.
   const isNeg = isNegative || type === 'negative';
-  const gapY = NODE_GAP_Y + 20;
   if (isNeg) {
-    const sourceCenterX = source.x + NODE_W / 2;
-    const targetCenterX = target.x + NODE_W / 2;
-
-    if (source.y < target.y) {
-      // Target below — direct vertical only if immediately adjacent (gap ≤ 3× NODE_GAP_Y)
-      const verticalGap = target.y - (source.y + NODE_H);
-      if (sourceCenterX === targetCenterX && verticalGap <= NODE_GAP_Y * 3) {
-        return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
-      }
-
-      const safeX = source.x + NODE_W + NODE_GAP_X / 2; // right edge + half gap
-      const routeY = source.y + NODE_H + gapY / 2; // down half-gap, turn sideways
-      const aboveTarget = target.y - gapY / 2; // stop half-gap above target
-
-      return (
-        `M ${sourceCenterX} ${source.y + NODE_H} ` +   // start at bottom-center of source
-        `L ${sourceCenterX} ${routeY} ` +              // down half gap and turn sideways
-        `L ${safeX} ${routeY} ` +                      // to first column gap (right)
-        `L ${safeX} ${aboveTarget} ` +                 // up alongside target, stop half-gap above top
-        `L ${targetCenterX} ${aboveTarget} ` +         // turn to target center X
-        `L ${targetCenterX} ${target.y}`               // down into target top edge
-      );
-    }
-
-    // ── Target above — always use orthogonal routing (never direct vertical) ──
-    // Route in the direction of the target, same as downward branch
-    const safeX = sourceCenterX > targetCenterX
-      ? source.x - NODE_GAP_X / 2                     // left edge (target is on left)
-      : source.x + NODE_W + NODE_GAP_X / 2;           // right edge (target is on right)
-    const safeY = source.y + NODE_H + gapY / 2; // down half-gap, turn sideways
-    const aboveTarget = target.y - gapY / 2;    // stop half-gap above target top
-
-    return (
-      `M ${sourceCenterX} ${source.y + NODE_H} ` +   // start at bottom-center of source
-      `L ${sourceCenterX} ${safeY} ` +               // down half gap and turn sideways
-      `L ${safeX} ${safeY} ` +                       // to first column gap toward target
-      `L ${safeX} ${aboveTarget} ` +                 // up alongside target, stop half-gap above top
-      `L ${targetCenterX} ${aboveTarget} ` +         // turn to target center X
-      `L ${targetCenterX} ${target.y}`               // down into target top edge
-    );
+    return altNextPath(source, target);
   }
 
-  // ─── next/default links: orthogonal routing whenever rows differ ───
-  const isEventToReadModelEarly = source.type === 'event' && target.type === 'readModel';
-  if ((type === 'next' || type === 'default') && source.y !== target.y && !isEventToReadModelEarly) {
+  const isEventToReadModel = source.type === 'event' && target.type === 'readModel';
+
+  if ((type === 'next' || type === 'default') && source.y !== target.y && !isEventToReadModel) {
     return nextOrthogonalPath(source, target);
   }
 
-  // ─── Same column: straight vertical, unless event → readModel (use curved bezier) ───
+  // Same column
   if (source.x === target.x) {
     const cx = source.x + NODE_W / 2;
-    if (source.type === 'event' && target.type === 'readModel') {
-      // Use gentle S-curve to stand out from the many straight vertical lines
-      const curveDir = -1; // curve left
+    if (isEventToReadModel) {
+      // S-curve to stand out from straight vertical lines
       const controlOffset = Math.max(28, NODE_GAP_X);
       const cy1 = source.y + NODE_H / 2;
       const targetYAnchor = target.y + (source.y < target.y ? NODE_H * 0.75 : NODE_H * 0.25);
       const approachY = targetYAnchor + (cy1 - targetYAnchor) * 0.45;
-      const controlX = cx + curveDir * controlOffset;
+      const controlX = cx - controlOffset;
       if (source.y < target.y) {
-        return `M ${cx} ${source.y + NODE_H} C ${controlX} ${source.y + NODE_H}, ${controlX} ${approachY}, ${target.x + NODE_W / 2} ${target.y}`;
+        return `M ${cx} ${source.y + NODE_H} C ${controlX} ${source.y + NODE_H}, ${controlX} ${approachY}, ${cx} ${target.y}`;
       }
-      return `M ${cx} ${source.y} C ${controlX} ${source.y}, ${controlX} ${cy1}, ${target.x + NODE_W / 2} ${target.y + NODE_H}`;
+      return `M ${cx} ${source.y} C ${controlX} ${source.y}, ${controlX} ${cy1}, ${cx} ${target.y + NODE_H}`;
     }
     if (source.y < target.y) {
       return `M ${cx} ${source.y + NODE_H} L ${cx} ${target.y}`;
@@ -86,58 +43,74 @@ export function computeLinkPath(
     return `M ${cx} ${source.y} L ${cx} ${target.y + NODE_H}`;
   }
 
-  // ─── Different columns: curved only for event → readModel, otherwise straight horizontal line ───
+  // Different columns
   const sourceIsLeft = source.x <= target.x;
   const sourceX = sourceIsLeft ? source.x + NODE_W : source.x;
   const targetX = sourceIsLeft ? target.x : target.x + NODE_W;
+
+  if (type === 'next') {
+    return `M ${sourceX} ${source.y + NODE_H / 2} L ${targetX} ${target.y + NODE_H / 2}`;
+  }
+
   const sourceY = source.y + NODE_H / 2;
   const targetY = target.y + NODE_H / 2;
 
-  // ─── next-type same row: straight horizontal line ───
-  if (type === 'next') {
-    const sourceIsLeft = source.x <= target.x;
-    const sourceRight = sourceIsLeft ? source.x + NODE_W : source.x;
-    const targetEdge = sourceIsLeft ? target.x : target.x + NODE_W;
-    return `M ${sourceRight} ${source.y + NODE_H / 2} L ${targetEdge} ${target.y + NODE_H / 2}`;
-  }
-
-  const isEventToReadModel = source.type === 'event' && target.type === 'readModel';
-
   if (isEventToReadModel && sourceY !== targetY) {
-    // Curved bezier: keep the existing routing logic for event → readModel links
-    const sourceIsBelowTarget = sourceY > targetY;
-    const targetAnchorY = target.y + (sourceIsBelowTarget ? NODE_H * 0.75 : NODE_H * 0.25);
-    const targetApproachY = targetAnchorY + (sourceY - targetAnchorY) * 0.45;
-    const horizontalDistance = Math.abs(targetX - sourceX);
-
-    if (horizontalDistance < 1) {
-      const sourceCenterX = source.x + NODE_W / 2;
-      const targetCenterX = target.x + NODE_W / 2;
-      if (!sourceIsBelowTarget) {
-        // target is directly below — draw straight vertical arrow
-        return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
-      }
-      const curveDirection = type === 'negative' ? 1 : -1;
-      const controlOffset = Math.max(28, NODE_GAP_X);
-      const controlX = sourceCenterX + curveDirection * controlOffset;
-
-      return `M ${sourceCenterX} ${sourceY} C ${controlX} ${sourceY}, ${controlX} ${targetApproachY}, ${targetCenterX} ${targetAnchorY}`;
-    }
-
-    const controlOffset = Math.max(32, horizontalDistance * 0.45);
-    const controlX1 = sourceX + (sourceIsLeft ? controlOffset : -controlOffset);
-    const controlX2 = targetX - (sourceIsLeft ? controlOffset : -controlOffset);
-
-    return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetApproachY}, ${targetX} ${targetAnchorY}`;
+    return eventToReadModelBezierPath(source, target, sourceIsLeft);
   }
 
-  // Straight horizontal line: right edge of source → left edge (or top/bottom-edge approach for non-same-row)
   if (sourceY !== targetY) {
     const straightTargetY = sourceIsLeft ? target.y : target.y + NODE_H;
     return `M ${sourceX} ${sourceY} L ${targetX} ${straightTargetY}`;
   }
 
   return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
+}
+
+// Orthogonal routing for altNext (negative) branches.
+// Always exits from the bottom-center of source, goes down to clear the node,
+// routes sideways toward target, then enters from above.
+function altNextPath(source: LayoutNode, target: LayoutNode): string {
+  const gapY = NODE_GAP_Y + 20;
+  const sourceCenterX = source.x + NODE_W / 2;
+  const targetCenterX = target.x + NODE_W / 2;
+
+  if (source.y < target.y) {
+    // Target is below — direct vertical only if same column and immediately adjacent
+    const verticalGap = target.y - (source.y + NODE_H);
+    if (sourceCenterX === targetCenterX && verticalGap <= NODE_GAP_Y * 3) {
+      return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
+    }
+
+    const safeX = source.x + NODE_W + NODE_GAP_X / 2;
+    const routeY = source.y + NODE_H + gapY / 2;
+    const aboveTarget = target.y - gapY / 2;
+
+    return (
+      `M ${sourceCenterX} ${source.y + NODE_H} ` +
+      `L ${sourceCenterX} ${routeY} ` +
+      `L ${safeX} ${routeY} ` +
+      `L ${safeX} ${aboveTarget} ` +
+      `L ${targetCenterX} ${aboveTarget} ` +
+      `L ${targetCenterX} ${target.y}`
+    );
+  }
+
+  // Target is above — always orthogonal, route toward target's column
+  const safeX = sourceCenterX > targetCenterX
+    ? source.x - NODE_GAP_X / 2
+    : source.x + NODE_W + NODE_GAP_X / 2;
+  const safeY = source.y + NODE_H + gapY / 2;
+  const aboveTarget = target.y - gapY / 2;
+
+  return (
+    `M ${sourceCenterX} ${source.y + NODE_H} ` +
+    `L ${sourceCenterX} ${safeY} ` +
+    `L ${safeX} ${safeY} ` +
+    `L ${safeX} ${aboveTarget} ` +
+    `L ${targetCenterX} ${aboveTarget} ` +
+    `L ${targetCenterX} ${target.y}`
+  );
 }
 
 // ─── next-type orthogonal routing ─────────────────────────────────────
@@ -188,6 +161,35 @@ function nextOrthogonalPath(source: LayoutNode, target: LayoutNode): string {
   return source.y <= target.y ? nextPathBelow(source, target) : nextPathAbove(source, target);
 }
 
+// Curved bezier for event → readModel links across different columns or rows.
+// Coordinates are always non-negative (layout positions start at 0).
+function eventToReadModelBezierPath(source: LayoutNode, target: LayoutNode, sourceIsLeft: boolean): string {
+  const sourceX = sourceIsLeft ? source.x + NODE_W : source.x;
+  const targetX = sourceIsLeft ? target.x : target.x + NODE_W;
+  const sourceY = source.y + NODE_H / 2;
+  const sourceIsBelowTarget = sourceY > target.y + NODE_H / 2;
+  const targetAnchorY = target.y + (sourceIsBelowTarget ? NODE_H * 0.75 : NODE_H * 0.25);
+  const targetApproachY = targetAnchorY + (sourceY - targetAnchorY) * 0.45;
+  const horizontalDistance = Math.abs(targetX - sourceX);
+
+  if (horizontalDistance < 1) {
+    const sourceCenterX = source.x + NODE_W / 2;
+    const targetCenterX = target.x + NODE_W / 2;
+    if (!sourceIsBelowTarget) {
+      return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
+    }
+    const controlOffset = Math.max(28, NODE_GAP_X);
+    const controlX = sourceCenterX - controlOffset;
+    return `M ${sourceCenterX} ${sourceY} C ${controlX} ${sourceY}, ${controlX} ${targetApproachY}, ${targetCenterX} ${targetAnchorY}`;
+  }
+
+  const controlOffset = Math.max(32, horizontalDistance * 0.45);
+  const controlX1 = sourceX + (sourceIsLeft ? controlOffset : -controlOffset);
+  const controlX2 = targetX - (sourceIsLeft ? controlOffset : -controlOffset);
+
+  return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetApproachY}, ${targetX} ${targetAnchorY}`;
+}
+
 function dist(x1: number, y1: number, x2: number, y2: number): number {
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -195,7 +197,6 @@ function dist(x1: number, y1: number, x2: number, y2: number): number {
 }
 
 export function getPointOnPath(d: string, t: number): { x: number; y: number } {
-   // Handle cubic bezier
   const bezierMatch = d.match(/M ([\d.]+) ([\d.]+) C ([\d.]+) ([\d.]+), ([\d.]+) ([\d.]+), ([\d.]+) ([\d.]+)/);
   if (bezierMatch) {
     const x0 = parseFloat(bezierMatch[1]), y0 = parseFloat(bezierMatch[2]);
@@ -206,15 +207,15 @@ export function getPointOnPath(d: string, t: number): { x: number; y: number } {
     return {
       x: u*u*u*x0 + 3*u*u*t*cx1 + 3*u*t*t*cx2 + t*t*t*x3,
       y: u*u*u*y0 + 3*u*u*t*cy1 + 3*u*t*t*cy2 + t*t*t*y3,
-     };
-   }
+    };
+  }
 
-   // Handle polylines (M ... L ... L ...) — walk segments by length
+  // Walk polyline segments by arc length. Coordinates are always non-negative.
   const coords = d.match(/[\d.]+/g)?.map(Number);
   if (coords && coords.length >= 4) {
     const pts: Array<[number, number]> = [];
-    for (let i = 0; i < coords.length; i += 2) {
-      if (i + 1 < coords.length) pts.push([coords[i], coords[i + 1]]);
+    for (let i = 0; i + 1 < coords.length; i += 2) {
+      pts.push([coords[i], coords[i + 1]]);
     }
     if (pts.length >= 2) {
       const segLens: number[] = [];
@@ -223,7 +224,7 @@ export function getPointOnPath(d: string, t: number): { x: number; y: number } {
         const len = dist(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
         segLens.push(len);
         totalLen += len;
-       }
+      }
       const targetT = t * totalLen;
       let acc = 0;
       for (let i = 0; i < segLens.length; i++) {
@@ -232,29 +233,18 @@ export function getPointOnPath(d: string, t: number): { x: number; y: number } {
           return {
             x: pts[i][0] + (pts[i + 1][0] - pts[i][0]) * localT,
             y: pts[i][1] + (pts[i + 1][1] - pts[i][1]) * localT,
-           };
-          }
+          };
+        }
         acc += segLens[i];
-       }
+      }
       return { x: pts[pts.length - 1][0], y: pts[pts.length - 1][1] };
-     }
-   }
+    }
+  }
 
-   // Fallback: straight line
-  const lineMatch = d.match(/M ([\d.]+) ([\d.]+) L ([\d.]+) ([\d.]+)/);
-  if (lineMatch) {
-    const x1 = parseFloat(lineMatch[1]), y1 = parseFloat(lineMatch[2]);
-    const x2 = parseFloat(lineMatch[3]), y2 = parseFloat(lineMatch[4]);
-    return { x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t };
-   }
   return { x: 0, y: 0 };
 }
 
-export function getLinkLabelPosition(d: string, _link: LayoutLink): { x: number; y: number } {
+export function getLinkLabelPosition(d: string): { x: number; y: number } {
   const mid = getPointOnPath(d, 0.5);
-
-  return {
-    x: mid.x,
-    y: mid.y - 6,
-   };
+  return { x: mid.x, y: mid.y - 6 };
 }
