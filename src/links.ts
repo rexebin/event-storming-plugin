@@ -20,11 +20,12 @@ export function computeLinkPath(
     const targetCenterX = target.x + NODE_W / 2;
 
     if (source.y < target.y) {
-      // Target below — unified gap-based routing
-      if (sourceCenterX === targetCenterX) {
+      // Target below — direct vertical only if immediately adjacent (gap ≤ 3× NODE_GAP_Y)
+      const verticalGap = target.y - (source.y + NODE_H);
+      if (sourceCenterX === targetCenterX && verticalGap <= NODE_GAP_Y * 3) {
         return `M ${sourceCenterX} ${source.y + NODE_H} L ${targetCenterX} ${target.y}`;
       }
-      
+
       const safeX = source.x + NODE_W + NODE_GAP_X / 2; // right edge + half gap
       const routeY = source.y + NODE_H + gapY / 2; // down half-gap, turn sideways
       const aboveTarget = target.y - gapY / 2; // stop half-gap above target
@@ -39,11 +40,7 @@ export function computeLinkPath(
       );
     }
 
-    // ── Target above — unified gap-based routing ────────────────────────
-    if (sourceCenterX === targetCenterX) {
-      return `M ${sourceCenterX} ${source.y} L ${targetCenterX} ${target.y + NODE_H}`;
-    }
-
+    // ── Target above — always use orthogonal routing (never direct vertical) ──
     // Route in the direction of the target, same as downward branch
     const safeX = sourceCenterX > targetCenterX
       ? source.x - NODE_GAP_X / 2                     // left edge (target is on left)
@@ -61,9 +58,9 @@ export function computeLinkPath(
     );
   }
 
-  // ─── next/default links: orthogonal routing from right edge, different columns only ───
+  // ─── next/default links: orthogonal routing whenever rows differ ───
   const isEventToReadModelEarly = source.type === 'event' && target.type === 'readModel';
-  if ((type === 'next' || type === 'default') && source.y !== target.y && source.x !== target.x && !isEventToReadModelEarly) {
+  if ((type === 'next' || type === 'default') && source.y !== target.y && !isEventToReadModelEarly) {
     return nextOrthogonalPath(source, target);
   }
 

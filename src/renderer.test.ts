@@ -6,7 +6,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './renderer.js';
 import { computeLayout } from './layout.js';
-import { NODE_H, NODE_W, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './constants.js';
+import { NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './constants.js';
 import { computeLinkPath } from './links.js';
 import { parseDSL } from './dsl.js';
 
@@ -1045,6 +1045,70 @@ describe('renderEventStorming layout', () => {
 
     const badge = containers[0].querySelector<SVGTextElement>('text.es-container-type-badge');
     expect(badge?.textContent).toBe('Process');
+  });
+});
+
+describe('computeLinkPath same-column routing', () => {
+  const STEP_Y = NODE_H + NODE_GAP_Y; // 142 — one grid row apart
+
+  function makeNode(id: string, x: number, y: number): import('./constants.js').LayoutNode {
+    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
+  }
+
+  it('next: same column, different row uses orthogonal routing (not direct vertical)', () => {
+    const source = makeNode('src', 0, 0);
+    const target = makeNode('tgt', 0, STEP_Y * 2); // two rows below, same column
+
+    const pathD = computeLinkPath(source, target, 'next');
+
+    // Must NOT be a simple two-point line
+    expect(pathD).not.toMatch(/^M \S+ \S+ L \S+ \S+$/);
+    // Must have multiple segments (orthogonal routing)
+    const segments = (pathD.match(/\bL\b/g) ?? []).length;
+    expect(segments).toBeGreaterThanOrEqual(2);
+  });
+
+  it('next: same row, adjacent column uses direct horizontal line', () => {
+    const source = makeNode('src', 0, 0);
+    const target = makeNode('tgt', NODE_W + NODE_GAP_X, 0); // same row, next column
+
+    const pathD = computeLinkPath(source, target, 'next');
+
+    // Should be a straight horizontal line (two points only)
+    expect(pathD).toMatch(/^M \S+ \S+ L \S+ \S+$/);
+  });
+
+  it('altNext: same column, immediately adjacent below uses direct vertical', () => {
+    const source = makeNode('src', 0, 0);
+    const target = makeNode('tgt', 0, STEP_Y); // immediately adjacent below
+
+    const pathD = computeLinkPath(source, target, 'negative', undefined, true);
+
+    // Should be a direct two-point vertical line
+    expect(pathD).toMatch(/^M \S+ \S+ L \S+ \S+$/);
+  });
+
+  it('altNext: same column, non-adjacent below (gap > one row) uses orthogonal routing', () => {
+    const source = makeNode('src', 0, 0);
+    const target = makeNode('tgt', 0, STEP_Y * 2); // two rows below, same column
+
+    const pathD = computeLinkPath(source, target, 'negative', undefined, true);
+
+    // Must have multiple segments (orthogonal routing)
+    const segments = (pathD.match(/\bL\b/g) ?? []).length;
+    expect(segments).toBeGreaterThanOrEqual(2);
+  });
+
+  it('altNext: same column, target above uses orthogonal routing', () => {
+    const source = makeNode('src', 0, STEP_Y);
+    const target = makeNode('tgt', 0, 0); // same column, above
+
+    const pathD = computeLinkPath(source, target, 'negative', undefined, true);
+
+    // Must NOT be a simple two-point line
+    expect(pathD).not.toMatch(/^M \S+ \S+ L \S+ \S+$/);
+    const segments = (pathD.match(/\bL\b/g) ?? []).length;
+    expect(segments).toBeGreaterThanOrEqual(2);
   });
 });
 
