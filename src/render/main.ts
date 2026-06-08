@@ -1,6 +1,6 @@
 import { parseDSL } from '../parser/';
-import { CONTAINER_PADDING } from '../constants.js';
-import { computeLayout } from '../layout.js';
+import { CONTAINER_PADDING } from '../layout/constants.js';
+import { computeLayout } from '../layout/index.js';
 import { GSelection, DestroyableReturn } from './models.js';
 import { renderDefs, createTooltip } from './svg-helpers.js';
 import { renderContainers } from './render-containers.js';

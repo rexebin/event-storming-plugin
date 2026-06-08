@@ -1,5 +1,5 @@
 import { GSelection } from './models.js';
-import { GROUP_HEADER_H } from '../constants.js';
+import { GROUP_HEADER_H } from '../layout/constants.js';
 import { appendNotesBadge } from '../notes.js';
 
 interface LayoutGroup {

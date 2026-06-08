@@ -2,8 +2,8 @@
  * Event Storming — Link path computation.
  */
 
-import { LayoutNode, LayoutLink } from './constants.js';
-import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from './constants.js';
+import type { LayoutNode, LayoutLink } from './layout/index.js';
+import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from './layout/index.js';
 
 export function computeLinkPath(
   source: LayoutNode,

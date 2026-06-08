@@ -1,5 +1,5 @@
 import { GSelection } from './models.js';
-import { CONTAINER_HEADER_H, CONTAINER_TYPE_LABELS } from '../constants.js';
+import { CONTAINER_HEADER_H, CONTAINER_TYPE_LABELS } from '../layout/constants.js';
 import { CONTAINER_BADGE_WIDTHS } from './constants.js';
 import { isLight } from '../utils.js';
 import { appendNotesBadge } from '../notes.js';

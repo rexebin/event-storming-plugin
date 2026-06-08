@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { GSelection } from './models.js';
 import { DSLModel } from '../parser/';
-import { LayoutNode } from '../constants.js';
+import type { LayoutNode } from '../layout/models.js';
 import { getNodeNotes, formatNodeType } from '../notes.js';
 import { escapeHtml } from '../utils.js';
 

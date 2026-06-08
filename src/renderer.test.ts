@@ -5,8 +5,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './render/index.js';
-import { computeLayout, computeContainerHeight } from './layout.js';
-import { NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './constants.js';
+import { computeLayout, computeContainerHeight, NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './layout/index.js';
 import { computeLinkPath } from './links.js';
 import { parseDSL } from './parser/';
 
@@ -1164,7 +1163,7 @@ describe('renderEventStorming layout', () => {
 describe('computeLinkPath same-column routing', () => {
   const STEP_Y = NODE_H + NODE_GAP_Y; // 142 — one grid row apart
 
-  function makeNode(id: string, x: number, y: number): import('./constants.js').LayoutNode {
+  function makeNode(id: string, x: number, y: number): import('./layout/index.js').LayoutNode {
     return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
   }
 
@@ -1226,7 +1225,7 @@ describe('computeLinkPath same-column routing', () => {
 });
 
 describe('computeLinkPath obstacle avoidance', () => {
-  function makeNode(id: string, x: number, y: number): import('./constants.js').LayoutNode {
+  function makeNode(id: string, x: number, y: number): import('./layout/index.js').LayoutNode {
     return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
   }
 

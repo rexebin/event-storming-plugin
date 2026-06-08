@@ -2,7 +2,7 @@
  * Event Storming — Text wrapping for node labels.
  */
 
-import { NODE_W } from './constants.js';
+import { NODE_W } from './layout/index.js';
 
 export function wrapText(
   textGroup: any,

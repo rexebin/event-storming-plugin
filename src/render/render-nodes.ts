@@ -1,5 +1,6 @@
 import { GSelection } from './models.js';
-import { NODE_W, NODE_H, NODE_FOLD, LayoutNode } from '../constants.js';
+import { NODE_W, NODE_H, NODE_FOLD } from '../layout/constants.js';
+import type { LayoutNode } from '../layout/models.js';
 import { DSLModel } from '../parser/';
 import { getNodeNotes } from '../notes.js';
 import { wrapText } from '../text.js';

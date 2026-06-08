@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { LINK_COLOR } from '../constants.js';
+import { LINK_COLOR } from '../layout/constants.js';
 
 export function renderDefs(svg: any): void {
   const defs = svg.append('defs');
