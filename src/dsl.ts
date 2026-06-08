@@ -233,60 +233,17 @@ function parseXMLDSL(text: string): DSLModel {
       pendingRefs = pendingRefs.concat(result);
     }
 
-    // Phase 1b-ii: Resolve references across all sibling containers within scope.
+    // Phase 1b: Resolve cross-container references.
     if (pendingRefs.length > 0) {
       const boundaryNodeIds = collectSubtreeNodeIds(dslContainer.id, model);
-
-      for (const { node, rawNext, rawNegativeNext } of pendingRefs) {
-        const cId = node.containerId || dslContainer.id;
-        if (rawNext !== undefined && rawNext !== '') {
-          node.next = resolveReference(rawNext, model.nodes, cId, false, boundaryNodeIds);
-        } else if (rawNext === '') {
-          node.next = null;
-        }
-        if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-          node.altNext = resolveReference(rawNegativeNext, model.nodes, cId, true, boundaryNodeIds);
-        } else if (rawNegativeNext === '') {
-          node.altNext = null;
-        }
-      }
-
-      // Apply implicit next linking within each container's flow.
-      const nodesByContainer = new Map<string, DSLNode[]>();
-      for (const p of pendingRefs) {
-        const cid = p.node.containerId || dslContainer.id;
-        if (!nodesByContainer.has(cid)) nodesByContainer.set(cid, []);
-        nodesByContainer.get(cid)!.push(p.node);
-      }
-      for (const [, nodes] of nodesByContainer) {
-        if (nodes.length > 1) {
-          fillImplicitNext(nodes, nodes.map(n => n.id));
-        }
-      }
+      resolveNodeRefs(pendingRefs, model, dslContainer.id, boundaryNodeIds);
+      applyImplicitLinking(pendingRefs);
     }
 
     // Phase 2: Resolve references for inline process nodes.
     const inlineBoundaryNodeIds = collectSubtreeNodeIds(dslContainer.id, model);
-
-    for (const { node, rawNext, rawNegativeNext } of pendingChildren) {
-      if (rawNext !== undefined && rawNext !== '') {
-        const nextId = resolveReference(rawNext, model.nodes, dslContainer.id, false, inlineBoundaryNodeIds);
-        node.next = nextId;
-        if (nextId && !inlineStepIds.includes(nextId)) inlineStepIds.push(nextId);
-      } else {
-        node.next = rawNext === '' ? null : undefined;
-      }
-      if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-        const altNextId = resolveReference(rawNegativeNext, model.nodes, dslContainer.id, true, inlineBoundaryNodeIds);
-        node.altNext = altNextId;
-        if (altNextId && !inlineStepIds.includes(altNextId)) inlineStepIds.push(altNextId);
-      } else {
-        node.altNext = rawNegativeNext === '' ? null : undefined;
-      }
-    }
-
     if (pendingChildren.length > 0) {
-      fillImplicitNext(pendingChildren.map((p) => p.node), inlineStepIds);
+      resolveInlineProcessRefs(pendingChildren, model, inlineStepIds, dslContainer.id, inlineBoundaryNodeIds);
     }
 
     if (inlineStepIds.length > 0) {
@@ -366,6 +323,65 @@ function buildContainerTree(
   return pendingRefs;
 }
 
+// Resolve next/altNext references for pending nodes (no implicit linking, no stepIds mutation).
+// Used by both cross-container resolution (Phase 1b) and inline process node resolution (Phase 2).
+function resolveNodeRefs(
+  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }>,
+  model: DSLModel,
+  scopeId: string,
+  boundaryNodeIds: Set<string>,
+): void {
+  for (const { node, rawNext, rawNegativeNext } of pending) {
+    const cId = node.containerId || scopeId;
+    if (rawNext !== undefined && rawNext !== '') {
+      const resolved = resolveReference(rawNext, model.nodes, cId, false, boundaryNodeIds);
+      node.next = resolved; // null for explicitly-empty or unresolved-without-create; undefined only when rawNext omitted entirely
+    } else {
+      node.next = rawNext === '' ? null : undefined;
+    }
+    if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
+      const resolved = resolveReference(rawNegativeNext, model.nodes, cId, true, boundaryNodeIds);
+      node.altNext = resolved; // null for explicit error creation; undefined when omitted
+    } else {
+      node.altNext = rawNegativeNext === '' ? null : undefined;
+    }
+  }
+}
+
+// Apply implicit next linking within each container's flow. Called after resolveNodeRefs.
+function applyImplicitLinking(
+  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }>,
+): void {
+  const nodesByContainer = new Map<string, DSLNode[]>();
+  for (const p of pending) {
+    const cid = p.node.containerId || (pending[0].node.containerId || '');
+    if (!nodesByContainer.has(cid)) nodesByContainer.set(cid, []);
+    nodesByContainer.get(cid)!.push(p.node);
+  }
+  for (const [, groupNodes] of nodesByContainer) {
+    if (groupNodes.length > 1) fillImplicitNext(groupNodes.map(n => n.id), groupNodes);
+  }
+}
+
+// Resolve next/altNext references for inline process nodes, add cross-referenced nodes to stepIds, then apply implicit linking.
+function resolveInlineProcessRefs(
+  pending: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }>,
+  model: DSLModel,
+  stepIds: string[],
+  scopeId: string,
+  boundaryNodeIds: Set<string>,
+): void {
+  resolveNodeRefs(pending, model, scopeId, boundaryNodeIds);
+
+  // Collect any new node IDs from resolved cross-references.
+  for (const p of pending) {
+    if (p.node.next && !stepIds.includes(p.node.next)) stepIds.push(p.node.next);
+    if (p.node.altNext && !stepIds.includes(p.node.altNext)) stepIds.push(p.node.altNext);
+  }
+
+  applyImplicitLinking(pending);
+}
+
 function xmlAttrNotes(el: Element): string[] {
   const attr = el.getAttribute('notes');
   const childNotes = Array.from(el.children)
@@ -375,11 +391,14 @@ function xmlAttrNotes(el: Element): string[] {
   return attr ? [attr, ...childNotes] : childNotes;
 }
 
-function fillImplicitNext(nodes: DSLNode[], stepIds: string[]): void {
-  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+function fillImplicitNext(stepIds: string[], groupNodes: DSLNode[]): void {
+  const nodeById = new Map(groupNodes.map((n) => [n.id, n]));
 
   // Nodes already reachable via altNext belong to an alt branch, not the sibling chain.
-  const altNextTargets = new Set(nodes.map((n) => n.altNext).filter((id): id is string => !!id));
+  const altNextTargets = new Set<string>();
+  for (const n of groupNodes) {
+    if (n.altNext) altNextTargets.add(n.altNext);
+  }
 
   for (let i = 0; i < stepIds.length - 1; i++) {
     const node = nodeById.get(stepIds[i]);

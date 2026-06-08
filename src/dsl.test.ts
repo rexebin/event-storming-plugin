@@ -803,4 +803,117 @@ describe('parseDSL', () => {
       expect(cmd!.offset).toBe(1);
     });
   });
+
+  describe('next="" explicit null in process containers', () => {
+    it('should not assign implicit next when next="" in process container', () => {
+      const xml = `<eventstorming><process name="Test">
+        <container name="Flow">
+          <command name="Place Order" next=""/>
+          <event name="Order Placed"/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.label === 'Place Order');
+      expect(placeOrder!.next).toBeNull();
+    });
+
+    it('should break implicit link at next="" and continue for later siblings in process container', () => {
+      const xml = `<eventstorming><process name="Test">
+        <container name="Flow">
+          <command name="Place Order" next=""/>
+          <event name="Order Placed"/>
+          <command name="Ship Order"/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      expect(result.nodes.find((n) => n.label === 'Place Order')!.next).toBeNull();
+      expect(result.nodes.find((n) => n.label === 'Order Placed')!.next).toBe('Flow_Ship_Order');
+    });
+
+    it('should set altNext to null when altNext="" in process container', () => {
+      const xml = `<eventstorming><process name="Test">
+        <container name="Flow">
+          <policy name="Check Stock" altNext=""/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      const policy = result.nodes.find((n) => n.label === 'Check Stock');
+      expect(policy!.altNext).toBeNull();
+    });
+  });
+
+  describe('resolveReference undefined vs null behavior', () => {
+    it('should set unresolved next to null (not undefined) when createOnError=false in process container', () => {
+      const xml = `<eventstorming><process name="Test">
+        <container name="Flow">
+          <command name="Place Order" next="NonExistent"/>
+          <event name="Order Placed"/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      const placeOrder = result.nodes.find((n) => n.label === 'Place Order');
+      expect(placeOrder!.next).toBeNull();
+    });
+
+    it('should not create implicit error node for unresolved next in process container', () => {
+      const xml = `<eventstorming><process name="Test">
+        <container name="Flow">
+          <command name="Place Order" next="GhostNode"/>
+          <event name="Order Placed"/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      const ghostError = result.nodes.find((n) => n.label === 'GhostNode' && n.type === 'error');
+      expect(ghostError).toBeUndefined();
+    });
+  });
+
+  describe('cross-sibling scope with nested containers', () => {
+    it('should resolve next reference to node in nested container within same parent container (aggregate)', () => {
+      const xml = `<eventstorming><aggregate name="Order">
+        <container name="Flow">
+          <command name="Start" next="InnerEvent"/>
+          <container name="Inner">
+            <event name="InnerEvent"/>
+          </container>
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const start = result.nodes.find((n) => n.label === 'Start');
+      // Node in nested container gets full hierarchical prefix, resolved by name suffix match
+      expect(start!.next).toBe('Flow_Inner_InnerEvent');
+    });
+
+    it('should resolve altNext from inline node to node in sibling sub-container', () => {
+      const xml = `<eventstorming><aggregate name="Order">
+        <container name="Flow">
+          <policy name="Check" next="GoodPath" altNext="BadPath"/>
+          <command name="GoodPath"/>
+          <container name="Error Branch">
+            <error name="BadPath"/>
+          </container>
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const check = result.nodes.find((n) => n.label === 'Check');
+      expect(check!.next).toBe('Flow_GoodPath');
+      // BadPath in nested container "Error Branch" has ID with full prefix
+      expect(check!.altNext).toBe('Flow_Error_Branch_BadPath');
+    });
+
+    it('should resolve cross-container next between sibling containers under process', () => {
+      const xml = `<eventstorming><process name="OrderProcess">
+        <container name="Step1">
+          <command name="DoWork" next="Result"/>
+        </container>
+        <container name="Step2">
+          <event name="Done"/>
+          <event name="Result"/>
+        </container>
+      </process></eventstorming>`;
+      const result = parseDSL(xml);
+      const doWork = result.nodes.find((n) => n.label === 'DoWork');
+      expect(doWork!.next).toBe('Step2_Result');
+    });
+  });
 });
