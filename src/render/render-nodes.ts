@@ -92,6 +92,7 @@ export function renderLinks(
     const adjustedTarget = { ...target, x: target.x + offsetX };
     const pathD = computeLinkPath(adjustedSource, adjustedTarget, link.type);
 
+    const isNoteTarget = target.type === 'note';
     g.append('path')
       .attr('class', `es-link es-link-${link.type}`)
       .attr('data-source', link.source)
@@ -99,7 +100,8 @@ export function renderLinks(
       .attr('d', pathD)
       .attr('fill', 'none')
       .attr('stroke-width', 1.5)
-      .attr('marker-end', 'url(#arrowhead)');
+      .attr('marker-end', isNoteTarget ? undefined : 'url(#arrowhead)')
+      .attr('marker-start', isNoteTarget ? 'url(#arrowhead-start)' : undefined);
 
     if (link.label) {
       const labelPosition = getLinkLabelPosition(pathD);

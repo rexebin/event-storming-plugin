@@ -342,6 +342,20 @@ describe('renderEventStorming layout', () => {
     expect(markers).toEqual(new Set(['url(#arrowhead)']));
   });
 
+  it('puts arrowhead on source element when target is a note', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    renderEventStorming(d3.select(host), noteSample);
+
+    // Find the link targeting the note element and verify arrowhead positioning
+    const links = Array.from(host.querySelectorAll('path.es-link'));
+    const noteLink = links.find((l) => l.getAttribute('data-target')?.includes('Some_Note'));
+    expect(noteLink).not.toBeNull();
+    expect(noteLink!.getAttribute('marker-start')).toBe('url(#arrowhead-start)');
+    expect(noteLink!.getAttribute('marker-end')).toBeNull();
+  });
+
   it('shows a note badge and note text in the tooltip when a node has notes', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

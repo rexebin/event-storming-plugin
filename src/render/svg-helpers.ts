@@ -27,6 +27,18 @@ export function renderDefs(svg: any): void {
     .append('path')
     .attr('d', 'M 0 0 L 10 3 L 0 6 Z')
     .attr('fill', LINK_COLOR);
+
+  defs.append('marker')
+    .attr('id', 'arrowhead-start')
+    .attr('viewBox', '0 0 10 6')
+    .attr('refX', 0)
+    .attr('refY', 3)
+    .attr('markerWidth', 8)
+    .attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M 10 0 L 0 3 L 10 6 Z')
+    .attr('fill', LINK_COLOR);
 }
 
 export function createTooltip(): any {
