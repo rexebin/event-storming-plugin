@@ -61,7 +61,7 @@ export function buildNotesHtml(notes: string[]): string {
 
 const NODE_TYPE_LABELS: Record<string, string> = {
   event: 'Domain Event', command: 'Command', aggregate: 'Aggregate',
-  actor: 'Actor', policy: 'Policy', readModel: 'Read Model',
+  actor: 'Actor', policy: 'Policy', projector: 'Projector',
   externalSystem: 'External System', tempObject: 'Object', note: 'Note',
   query: 'Query', view: 'View', error: 'Error',
 };

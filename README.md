@@ -177,14 +177,14 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <event name="OrderCancelled" next="Order Detail View" />
           <event name="OrderUpdated" next="Order Detail View" />
           <event name="OrderShipped" />
-          <readModel name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></readModel>
+          <projector name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></projector>
       </container>
   </projector>
   <process name="Customer Order View">
       <container name="View Order Details">
           <actor name="Customer" />
           <query name="GetOrderDetails" />
-          <readModel name="Order Detail Projection" />
+          <projector name="Order Detail Projection" />
       </container>
   </process>
   
@@ -297,14 +297,14 @@ Rendered:
           <event name="OrderUpdated5" next="Order Detail View" />
           <event name="OrderUpdated6" next="Order Detail View" />
           <event name="OrderShipped" />
-          <readModel name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></readModel>
+          <projector name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></projector>
       </container>
   </projector>
   <process name="Customer Order View">
       <container name="View Order Details">
           <actor name="Customer" />
           <query name="GetOrderDetails" />
-          <readModel name="Order Detail Projection" />
+          <projector name="Order Detail Projection" />
       </container>
   </process>
   
@@ -326,7 +326,7 @@ Rendered:
 | `<policy>`       | Policy              | Blue               |
 | `<error>`        | Error               | Cyan               |
 | `<externalSystem>` | External System   | Pink               |
-| `<readModel>`    | Read Model          | Dark Green         |
+| `<projector>`    | Projector           | Dark Green         |
 | `<note>`         | Note                | Light Yellow       |
 
 ### Attributes

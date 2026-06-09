@@ -28,7 +28,7 @@ export interface DSLLink {
 export interface DSLContainer {
   id: string;
   label: string;
-  type: 'aggregate' | 'readModel' | 'process' | 'externalSystem';
+  type: 'aggregate' | 'projector' | 'process' | 'externalSystem';
   color: string;
   nodeIds: string[];           // ids of nodes inside this container
   processes: DSLProcess[];     // groups/processes inside this container
@@ -64,7 +64,7 @@ export type NodeType =
   | 'aggregate'
   | 'actor'
   | 'policy'
-  | 'readModel'
+  | 'projector'
   | 'externalSystem'
   | 'tempObject'
   | 'note'
@@ -95,8 +95,8 @@ export const XML_NODE_TYPES: Record<string, NodeType> = {
   policy: 'policy',
   query: 'query',
   externalsystem: 'externalSystem',
-  readmodel: 'readModel',
   error: 'error',
   note: 'note',
   aggregate: 'aggregate',
+  projector: 'projector',
 };

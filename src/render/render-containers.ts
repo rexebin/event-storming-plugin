@@ -1,5 +1,5 @@
 import { GSelection } from './models.js';
-import { CONTAINER_HEADER_H, CONTAINER_TYPE_LABELS } from '../layout/constants.js';
+import { CONTAINER_HEADER_H, CONTAINER_TYPE_LABELS } from '../layout';
 import { CONTAINER_BADGE_WIDTHS } from './constants.js';
 import { isLight } from '../utils.js';
 import { appendNotesBadge } from '../notes.js';
@@ -59,7 +59,7 @@ export function renderContainers(
       .attr('font-size', '13px')
       .attr('font-weight', '700')
       .attr('fill', isLight(c.color) ? '#333' : '#fff')
-      .text(`${c.type === 'aggregate' ? '📦' : c.type === 'readModel' ? '📚' : c.type === 'externalSystem' ? '🔌' : '🔄'} ${c.label}`);
+      .text(`${c.type === 'aggregate' ? '📦' : c.type === 'projector' ? '📚' : c.type === 'externalSystem' ? '🔌' : '🔄'} ${c.label}`);
 
     // Container type badge
     const containerTypeLabel = CONTAINER_TYPE_LABELS[c.type] ?? c.type;

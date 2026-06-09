@@ -13,7 +13,6 @@ export function DocumentationPanel() {
           <p className="ml-4"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-blue-300">&lt;aggregate&gt;</code> — Aggregate root grouping.</p>
           <p className="ml-4"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-blue-300">&lt;externalsystem&gt;</code> — External system boundary.</p>
           <p className="ml-4"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-blue-300">&lt;projector&gt;</code> — Projector/View grouping.</p>
-          <p className="ml-4"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-blue-300">&lt;readmodel&gt;</code> — Read Model (alias of projector).</p>
           <p className="ml-4"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-blue-300">&lt;process&gt;</code> — Business process grouping.</p>
 
           <p className="mt-2 ml-4"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-blue-300">&lt;container&gt;</code> — Nestable sub-group inside any container. Supports recursive nesting.</p>

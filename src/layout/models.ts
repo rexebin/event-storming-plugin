@@ -14,7 +14,7 @@ export interface LayoutNode extends DSLNode {
 export interface LayoutContainer {
   id: string;
   label: string;
-  type: 'aggregate' | 'readModel' | 'process' | 'externalSystem';
+  type: 'aggregate' | 'projector' | 'process' | 'externalSystem';
   color: string;
   x: number;
   y: number;
@@ -27,7 +27,7 @@ export interface LayoutContainer {
 export interface LayoutGroup {
   id: string;
   label: string;
-  type: 'aggregate' | 'readModel' | 'process' | 'externalSystem';
+  type: 'aggregate' | 'projector' | 'process' | 'externalSystem';
   containerId: string;
   x: number;
   y: number;
@@ -39,7 +39,7 @@ export interface LayoutGroup {
 export interface LayoutSubGroup {
   id: string;
   label: string;
-  type: 'aggregate' | 'readModel' | 'process' | 'externalSystem';
+  type: 'aggregate' | 'projector' | 'process' | 'externalSystem';
   containerId: string;
   x: number;
   y: number;

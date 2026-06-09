@@ -9,13 +9,13 @@ export const sampleDSL = `<eventstorming>
       <event name="OrderCancelled"/>
     </container>
   </aggregate>
-  <readmodel name="OrderDetail">
+  <projector name="OrderDetail">
     <container name="Order Detail Projection">
       <event name="OrderPlaced" next="Order Detail View"/>
       <event name="OrderCancelled" next="Order Detail View"/>
       <event name="OrderUpdated" next="Order Detail View"/>
       <event name="OrderShipped" next="Order Detail View"/>
-      <readmodel name="Order Detail View"/>
+      <projector name="Order Detail View"/>
     </container>
-  </readmodel>
+  </projector>
 </eventstorming>`

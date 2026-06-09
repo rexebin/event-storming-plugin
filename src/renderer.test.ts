@@ -4,9 +4,9 @@
 
 import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
-import { renderEventStorming } from './render/index.js';
-import { computeLayout, computeContainerHeight, NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './layout/index.js';
-import { computeLinkPath } from './links/index.js';
+import { renderEventStorming } from './render';
+import { computeLayout, computeContainerHeight, NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './layout';
+import { computeLinkPath } from './links';
 import { parseDSL } from './parser/';
 
 // Test helper utilities used across suites below.
@@ -142,15 +142,15 @@ const readmeSample = `
       <event name="OrderCancelled"/>
     </container>
   </aggregate>
-  <readmodel name="OrderDetail">
+  <projector name="OrderDetail">
     <container name="Order Detail Projection">
       <event name="OrderPlaced" next="Order Detail View"/>
       <event name="OrderCancelled" next="Order Detail View"/>
       <event name="OrderUpdated" next="Order Detail View"/>
       <event name="OrderShipped" next="Order Detail View"/>
-      <readmodel name="Order Detail View"/>
+      <projector name="Order Detail View"/>
     </container>
-  </readmodel>
+  </projector>
 </eventstorming>
 `;
 
@@ -237,7 +237,7 @@ const wrapSample = `
     <container name="View Order Details">
       <actor name="Customer" next="GetOrderDetails"/>
       <query name="GetOrderDetails" next="Order Detail Projection"/>
-      <readmodel name="Order Detail Projection"/>
+      <projector name="Order Detail Projection"/>
     </container>
   </process>
 </eventstorming>
@@ -523,7 +523,7 @@ describe('renderEventStorming layout', () => {
     expect(rejoinLink!.getAttribute('marker-end')).toBe('url(#arrowhead)');
   });
 
-  it('uses straight lines for non-event-to-readModel fan-in links', () => {
+  it('uses straight lines for non-event-to-projector fan-in links', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
@@ -551,11 +551,11 @@ describe('renderEventStorming layout', () => {
       expect(path).toBeTruthy();
       expect(path!.getAttribute('marker-end')).toBe('url(#arrowhead)');
 
-      // Fan-in links from actor/event → command are not event→readModel, so straight line
+      // Fan-in links from actor/event → command are not event→projector, so straight line
       if (sourcePos.y === cancelOrderPos.y) {
         expect(pathD).not.toContain(' C ');
        } else {
-        // Different rows, still straight line for non-event-to-readModel
+        // Different rows, still straight line for non-event-to-projector
         expect(pathD).not.toContain(' C ');
        }
     }
@@ -1096,17 +1096,17 @@ describe('renderEventStorming layout', () => {
     expect(ids.length).toBe(uniqueIds.size);
   });
 
-  it('shows correct type label text for readModel (projector) containers', () => {
+  it('shows correct type label text for projector (projector) containers', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), `
 <eventstorming>
-  <readmodel name="Customer">
+  <projector name="Customer">
     <container name="Main Flow">
       <query name="ViewProfile"/>
     </container>
-  </readmodel>
+  </projector>
 </eventstorming>
 `);
 
@@ -1325,9 +1325,8 @@ describe('zoom preservation', () => {
 
     // Capture current zoom, then re-render with it passed to the second call.
     let svgEl = host.querySelector('svg')!;
-    let capturedZoom = d3.zoomTransform(svgEl);
-
-    // First pass: simulate a "user zoomed" state by destroying and re-rendering
+    d3.zoomTransform(svgEl);
+// First pass: simulate a "user zoomed" state by destroying and re-rendering
     // with non-identity initialTransform (jsdom can't drive real user zoom events)
     const expectedZoom = d3.zoomIdentity.scale(2).translate(50, 25);
     result1.destroy();

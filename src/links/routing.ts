@@ -1,5 +1,5 @@
-import type { LayoutNode } from '../layout/index.js';
-import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from '../layout/index.js';
+import type { LayoutNode } from '../layout';
+import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from '../layout';
 
 export function computeLinkPath(
   source: LayoutNode,
@@ -12,7 +12,7 @@ export function computeLinkPath(
     return altNextPath(source, target);
   }
 
-  const isEventToReadModel = source.type === 'event' && target.type === 'readModel';
+  const isEventToReadModel = source.type === 'event' && target.type === 'projector';
 
   if ((type === 'next' || type === 'default') && source.y !== target.y && !isEventToReadModel) {
     return nextOrthogonalPath(source, target);
@@ -151,7 +151,7 @@ function nextOrthogonalPath(source: LayoutNode, target: LayoutNode): string {
   return source.y <= target.y ? nextPathBelow(source, target) : nextPathAbove(source, target);
 }
 
-// Curved bezier for event → readModel links across different columns or rows.
+// Curved bezier for event → projector links across different columns or rows.
 function eventToReadModelBezierPath(source: LayoutNode, target: LayoutNode, sourceIsLeft: boolean): string {
   const sourceX = sourceIsLeft ? source.x + NODE_W : source.x;
   const targetX = sourceIsLeft ? target.x : target.x + NODE_W;

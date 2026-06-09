@@ -27,17 +27,16 @@ export function isEventStormingXML(text: string): boolean {
 
 // ─── Container type config ──────────────────────────────────────────────────
 
-const XML_CONTAINER_TYPES: Record<string, 'aggregate' | 'readModel' | 'process' | 'externalSystem'> = {
+const XML_CONTAINER_TYPES: Record<string, 'aggregate' | 'projector' | 'process' | 'externalSystem'> = {
   aggregate: 'aggregate',
   externalsystem: 'externalSystem',
-  projector: 'readModel',
-  readmodel: 'readModel',
+  projector: 'projector',
   process: 'process',
 };
 
 const CONTAINER_COLORS: Record<string, string> = {
   aggregate: '#FEE254',
-  readModel: '#5BAA62',
+  projector: '#5BAA62',
   externalSystem: '#FB8597',
   process: '#859EBF',
 };

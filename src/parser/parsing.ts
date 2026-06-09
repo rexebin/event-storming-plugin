@@ -2,8 +2,8 @@
  * Event Storming DSL — DOM parsing and reference resolution.
  */
 
-import type { DSLModel, DSLNode, DSLContainer, DSLSubGroup, NodeType } from './models.js';
-import { normalizeId, XML_NODE_TYPES } from './models.js';
+import type {DSLContainer, DSLModel, DSLNode, DSLSubGroup, NodeType} from './models.js';
+import {normalizeId, XML_NODE_TYPES} from './models.js';
 
 const DEFAULT_COLORS: Record<NodeType, string> = {
   event: '#FFA500',
@@ -11,7 +11,7 @@ const DEFAULT_COLORS: Record<NodeType, string> = {
   aggregate: '#FEE254',
   actor: '#D4D3D3',
   policy: '#859EBF',
-  readModel: '#5BAA62',
+  projector: '#5BAA62',
   externalSystem: '#FB8597',
   tempObject: '#FFF1AA',
   note: '#FFF1AA',
@@ -177,14 +177,12 @@ export function resolveNodeRefs(
   for (const { node, rawNext, rawNegativeNext } of pending) {
     const cId = node.containerId || scopeId;
     if (rawNext !== undefined && rawNext !== '') {
-      const resolved = resolveReference(rawNext, model.nodes, cId, false, boundaryNodeIds);
-      node.next = resolved;
+      node.next = resolveReference(rawNext, model.nodes, cId, false, boundaryNodeIds);
     } else {
       node.next = rawNext === '' ? null : undefined;
     }
     if (rawNegativeNext !== undefined && rawNegativeNext !== '') {
-      const resolved = resolveReference(rawNegativeNext, model.nodes, cId, true, boundaryNodeIds);
-      node.altNext = resolved;
+      node.altNext = resolveReference(rawNegativeNext, model.nodes, cId, true, boundaryNodeIds);
     } else {
       node.altNext = rawNegativeNext === '' ? null : undefined;
     }

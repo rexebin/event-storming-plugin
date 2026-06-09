@@ -23,7 +23,7 @@ export function layoutFanInProcess(
   positioned: Set<string>,
 ): number {
   const rowHeight = NODE_H + NODE_GAP_Y;
-  const useTwoSidedLayout = container.type === 'readModel' || target.type === 'view';
+  const useTwoSidedLayout = container.type === 'projector' || target.type === 'view';
 
   if (useTwoSidedLayout) {
     const splitIndex = Math.ceil(roots.length / 2);
@@ -163,7 +163,7 @@ export function computeFanInProcessColumns(
   container: import('../parser/').DSLContainer,
 ): number {
   const chainColumns = computeProcessColumns([target] as LayoutNode[], processNodeMap);
-  const useTwoSidedLayout = container.type === 'readModel' || target.type === 'view';
+  const useTwoSidedLayout = container.type === 'projector' || target.type === 'view';
 
   return useTwoSidedLayout ? Math.max(3, chainColumns + 1) : chainColumns + 1;
 }

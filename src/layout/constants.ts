@@ -30,7 +30,7 @@ export const LINK_COLOR = '#6a737d';
 
 export const CONTAINER_TYPE_LABELS: Record<string, string> = {
   aggregate: 'Aggregate',
-  readModel: 'Projector',
+  projector: 'Projector',
   process: 'Process',
   externalSystem: 'External System',
 };
