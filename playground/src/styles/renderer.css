@@ -1,0 +1,196 @@
+/* ============================================================
+   Event Storming — styles for rendered diagrams
+   ============================================================ */
+
+.event-storming-container {
+  border: 2px solid #e1e4e8;
+  border-radius: 6px;
+  background: #fafbfc;
+  margin: 16px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.event-storming-container .es-header {
+  background: #24292e;
+  color: #fff;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.event-storming-container .es-header .es-badge {
+  background: #ff8c00;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.event-storming-container .es-canvas-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  padding: 16px;
+  min-height: 60px;
+}
+
+.event-storming-container .es-canvas-wrapper svg text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+.event-storming-container .es-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(36, 41, 46, 0.8);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.event-storming-container .es-toggle:hover {
+  background: rgba(36, 41, 46, 1);
+}
+
+/* Collapsed state */
+.event-storming-container.collapsed .es-canvas-wrapper {
+  display: none;
+}
+
+.event-storming-container.collapsed .es-toggle::after {
+  content: '▶';
+}
+
+.event-storming-container .es-toggle::after {
+  content: '▼';
+}
+
+/* ============================================================
+   D3 node styles (applied to SVG elements)
+   ============================================================ */
+
+.es-node {
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.es-node:hover {
+  filter: brightness(1.1) drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.es-node.selected {
+  filter: drop-shadow(0 0 0 3px rgba(0,122,204,0.7));
+}
+
+.es-timeline {
+  opacity: 0.6;
+}
+
+.es-link {
+  fill: none;
+  stroke: #6a737d;
+  stroke-width: 1.5;
+}
+
+.es-link-domain {
+  stroke: #ff8c00;
+  stroke-dasharray: none;
+}
+
+.es-link-command {
+  stroke: #0366d6;
+  stroke-dasharray: none;
+}
+
+.es-link-event {
+  stroke: #6a737d;
+  stroke-dasharray: 4 3;
+}
+
+/* Tooltip */
+.es-tooltip {
+  position: absolute;
+  background: #24292e;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  max-width: 300px;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.es-tooltip .es-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.es-tooltip .es-tooltip-type {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.es-tooltip .es-tooltip-notes {
+  margin-top: 6px;
+}
+
+.es-tooltip .es-tooltip-notes-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.es-tooltip .es-tooltip-notes ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.es-tooltip .es-tooltip-notes li + li {
+  margin-top: 2px;
+}
+
+.es-tooltip .es-tooltip-flow {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+/* Legend */
+.es-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 11px;
+  color: #586069;
+  border-top: 1px solid #e1e4e8;
+  background: #f6f8fa;
+}
+
+.es-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.es-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}

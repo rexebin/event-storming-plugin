@@ -2,7 +2,7 @@
  * Event Storming — Layout type definitions.
  */
 
-import { DSLModel, DSLNode } from '../parser/';
+import { DSLNode } from '../parser/';
 
 // ─── Layout interfaces ───────────────────────────────────────
 

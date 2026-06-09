@@ -30,7 +30,8 @@
     "dev": "node build.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package:vscode": "npm run build && npx @vscode/vsce package"
+    "package:vscode": "npm run build && npx @vscode/vsce package",
+    "playground": "cd playground && vp dev"
   },
   "contributes": {
     "markdown.previewScripts": [

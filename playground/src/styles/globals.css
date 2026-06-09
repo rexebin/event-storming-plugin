@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* Import renderer styles AFTER Tailwind so unscoped selectors (tooltip, node classes) take precedence */
+@import "./renderer.css";
+
+.playground-diagram {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
