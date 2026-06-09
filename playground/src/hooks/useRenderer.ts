@@ -6,7 +6,7 @@ import type { DestroyableReturn, ZoomOptions } from '../../../src/render/index.j
 export function useRenderer(containerRef: React.RefObject<HTMLDivElement | null>) {
   const instanceRef = useRef<DestroyableReturn | null>(null)
   const abortRef = useRef(0)
-  const zoomStateRef = useRef<ZoomOptions | undefined>()
+  const zoomStateRef = useRef<ZoomOptions | undefined>(undefined)
 
   const render = useCallback(
     (dslText: string) => {
