@@ -7,5 +7,6 @@
     build agent: responsible for building the vsix file using /vsix-build and installing it after each job.
 1. use codebase-memory-mcp where possible
 2. boy scout rule: always leave the codebase cleaner than you found it.
+3. should not allow any typescript warnings.
 
 3. save the plan to ./claude/plans/{feature-name}.md and refer to it if context is lost. 
