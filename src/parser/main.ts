@@ -59,7 +59,11 @@ function parseXMLDSL(text: string): DSLModel {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, 'text/xml');
   const root = doc.documentElement;
-  if (root.tagName !== 'eventstorming' || root.querySelector('parsererror')) return model;
+  if (root.tagName !== 'eventstorming' || root.querySelector('parsererror')) {
+    const errEl = root.querySelector('parsererror');
+    const msg = errEl ? errEl.textContent.trim() : 'Document does not contain <eventstorming>…</eventstorming>';
+    throw new Error(`Invalid XML: ${msg}`);
+  }
 
   for (const diagramEl of Array.from(root.children)) {
     const tagLower = diagramEl.tagName.toLowerCase();

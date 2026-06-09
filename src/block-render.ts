@@ -8,8 +8,6 @@ export interface RenderedBlockInstance {
 }
 
 export function mountRenderedBlock(targetElement: HTMLElement, dslText: string): RenderedBlockInstance {
-  const model = parseDSL(dslText);
-
   const container = document.createElement('div');
   container.className = 'event-storming-container';
 
@@ -22,7 +20,8 @@ export function mountRenderedBlock(targetElement: HTMLElement, dslText: string):
 
   const titleSpan = document.createElement('span');
   titleSpan.className = 'es-title';
-  titleSpan.textContent = model.title || 'Event Storming';
+  // Use safe default since model may not be available on error
+  titleSpan.textContent = 'Event Storming';
 
   header.appendChild(badge);
   header.appendChild(titleSpan);
@@ -74,13 +73,35 @@ export function mountRenderedBlock(targetElement: HTMLElement, dslText: string):
   targetElement.parentElement?.insertBefore(container, targetElement);
   targetElement.style.display = 'none';
 
-  const d3Container = d3.select(canvasWrapper);
-  const instance = renderEventStorming(d3Container as any, dslText);
+  let d3Destroy: () => void;
+
+  try {
+    const model = parseDSL(dslText);
+    titleSpan.textContent = model.title || 'Event Storming';
+
+    const d3Container = d3.select(canvasWrapper);
+    const instance = renderEventStorming(d3Container as any, dslText);
+    d3Destroy = instance.destroy;
+  } catch (e: any) {
+    // Show inline error overlay instead of blank area
+    const errorMsg = String(e.message ?? e);
+    const truncated = errorMsg.length > 200 ? errorMsg.slice(0, 200) + '...' : errorMsg;
+
+    const errorEl = document.createElement('div');
+    errorEl.className = 'es-error-display';
+    errorEl.textContent = truncated;
+
+    canvasWrapper.appendChild(errorEl);
+    d3Destroy = () => {
+      // Error overlay is part of container — just remove the container itself.
+      // Nothing extra to clean up, but keep the signature compatible.
+    };
+  }
 
   return {
     container,
     destroy: () => {
-      instance.destroy();
+      d3Destroy();
       container.remove();
       targetElement.style.display = '';
       targetElement.removeAttribute('data-es-rendered');
