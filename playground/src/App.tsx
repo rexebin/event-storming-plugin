@@ -8,6 +8,11 @@ import { DiagramPreview } from '@/components/DiagramPreview'
 import { EditorPanel } from '@/components/EditorPanel'
 import { sampleDSL } from '@/lib/sample-dsl'
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __setPlaygroundDSL: ((value: string) => void) | undefined
+}
+
 const DEFAULT_EDITOR_RATIO = 0.45
 const MIN_EDITOR_RATIO = 0.12
 
@@ -17,9 +22,10 @@ export default function App() {
   // Force re-render when DSL changes, but keep DiagramPreview mounted (no key).
   // A plain state update triggers React reconciliation without unmounting child components.
   const [_, setDslTick] = useState(0)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Expose a test helper for E2E tests to programmatically change DSL content.
-  ;(globalThis as any).__setPlaygroundDSL = (value: string) => {
+  globalThis.__setPlaygroundDSL = (value: string) => {
     editorValueRef.current = value
     renderSourceRef.current = value
     setDslTick((n) => n + 1)
@@ -27,9 +33,8 @@ export default function App() {
 
   const handleEditorChange = useCallback((value: string) => {
     editorValueRef.current = value
-    // Debounced sync for automatic renders
-    clearTimeout((handleEditorChange as any)._timer)
-    ;(handleEditorChange as any)._timer = setTimeout(() => {
+    clearTimeout(debounceTimerRef.current!)
+    debounceTimerRef.current = setTimeout(() => {
       renderSourceRef.current = value
       setDslTick((n) => n + 1)
     }, 300)
