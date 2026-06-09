@@ -6,12 +6,6 @@ on:
     paths:
       - 'playground/**'
   workflow_dispatch:
-    inputs:
-      node-version:
-        description: Node.js version
-        type: choice
-        options: ['18', '20', '22']
-        default: '22'
 
 permissions:
   contents: read
@@ -34,7 +28,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ github.event.inputs.node-version || '22' }}
+          node-version: '22'
           cache: pnpm
           cache-dependency-path: playground/pnpm-lock.yaml
 
