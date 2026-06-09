@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/resizable'
 import { DiagramPreview } from '@/components/DiagramPreview'
 import { EditorPanel } from '@/components/EditorPanel'
+import { DocumentationPanel } from '@/components/DocumentationPanel'
 import { sampleDSL } from '@/lib/sample-dsl'
 
 declare global {
@@ -15,6 +16,7 @@ declare global {
 
 const DEFAULT_EDITOR_RATIO = 0.45
 const MIN_EDITOR_RATIO = 0.12
+const DEFAULT_EDITOR_CONTENT_RATIO = 0.67
 
 export default function App() {
   const editorValueRef = useRef<string>(sampleDSL)
@@ -70,7 +72,7 @@ export default function App() {
         </button>
       </header>
 
-      {/* Resizable panels: diagram / editor */}
+      {/* Resizable panels: diagram / (editor | docs) */}
       <ResizablePanelGroup orientation="vertical">
         <ResizablePanel defaultSize={1 - DEFAULT_EDITOR_RATIO}>
           <div className="h-full min-h-0 overflow-hidden bg-white">
@@ -79,7 +81,15 @@ export default function App() {
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel minSize={MIN_EDITOR_RATIO} defaultSize={DEFAULT_EDITOR_RATIO}>
-          <EditorPanel initialValue={sampleDSL} onChange={handleEditorChange} />
+          <ResizablePanelGroup orientation="horizontal">
+            <ResizablePanel defaultSize={DEFAULT_EDITOR_CONTENT_RATIO}>
+              <EditorPanel initialValue={sampleDSL} onChange={handleEditorChange} />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={1 - DEFAULT_EDITOR_CONTENT_RATIO} minSize={0.15}>
+              <DocumentationPanel />
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
