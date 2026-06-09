@@ -61,7 +61,7 @@ function parseXMLDSL(text: string): DSLModel {
   const root = doc.documentElement;
   if (root.tagName !== 'eventstorming' || root.querySelector('parsererror')) {
     const errEl = root.querySelector('parsererror');
-    const msg = errEl ? errEl.textContent.trim() : 'Document does not contain <eventstorming>…</eventstorming>';
+    const msg = errEl ? (errEl.textContent?.trim() ?? '') : 'Document does not contain <eventstorming>…</eventstorming>';
     throw new Error(`Invalid XML: ${msg}`);
   }
 
