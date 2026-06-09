@@ -26,7 +26,7 @@ export function DiagramPreview({ dslText }: DiagramPreviewProps) {
     <div className="playground-diagram">
       {error && (
         <div className="es-diagram-error" data-testid="diagram-error">
-          {error}
+          <span>{error}</span>
         </div>
       )}
       <div ref={containerRef} />

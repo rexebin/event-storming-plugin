@@ -33,3 +33,37 @@
   height: 100%;
   position: relative;
 }
+
+.es-diagram-error {
+  position: absolute;
+  inset: 16px;
+  z-index: 50;
+  background: oklch(0.94 0.12 23);
+  border: 1px solid oklch(0.85 0.18 20);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  color: oklch(0.35 0.16 20);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.es-diagram-error::before {
+  content: '';
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='oklch(0.45 0.2 20)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.es-diagram-error span {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
