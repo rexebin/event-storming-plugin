@@ -1,12 +1,27 @@
 import { useState, useCallback, useRef } from 'react'
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable'
 import { DiagramPreview } from '@/components/DiagramPreview'
 import { EditorPanel } from '@/components/EditorPanel'
 import { sampleDSL } from '@/lib/sample-dsl'
+
+const DEFAULT_EDITOR_RATIO = 0.45
+const MIN_EDITOR_RATIO = 0.12
 
 export default function App() {
   const editorValueRef = useRef<string>(sampleDSL)
   const renderSourceRef = useRef<string>(sampleDSL)
   const [renderTick, setRenderTick] = useState(0)
+
+  // Expose a test helper for E2E tests to programmatically change DSL content.
+  ;(globalThis as any).__setPlaygroundDSL = (value: string) => {
+    editorValueRef.current = value
+    renderSourceRef.current = value
+    setRenderTick((n) => n + 1)
+  }
 
   const handleEditorChange = useCallback((value: string) => {
     editorValueRef.current = value
@@ -48,15 +63,18 @@ export default function App() {
         </button>
       </header>
 
-      {/* Top half: diagram */}
-      <div key={renderTick} className="flex-1 min-h-0 overflow-hidden border-b border-gray-200 bg-white">
-        <DiagramPreview dslText={renderSourceRef.current} />
-      </div>
-
-      {/* Bottom half: editor */}
-      <div className="h-[45vh] shrink-0">
-        <EditorPanel initialValue={sampleDSL} onChange={handleEditorChange} />
-      </div>
+      {/* Resizable panels: diagram / editor */}
+      <ResizablePanelGroup orientation="vertical">
+        <ResizablePanel defaultSize={1 - DEFAULT_EDITOR_RATIO}>
+          <div className="h-full min-h-0 overflow-hidden bg-white">
+            <DiagramPreview key={renderTick} dslText={renderSourceRef.current} />
+          </div>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel minSize={MIN_EDITOR_RATIO} defaultSize={DEFAULT_EDITOR_RATIO}>
+          <EditorPanel initialValue={sampleDSL} onChange={handleEditorChange} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }

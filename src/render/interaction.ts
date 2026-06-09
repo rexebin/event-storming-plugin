@@ -1,12 +1,12 @@
 import * as d3 from 'd3';
-import { GSelection } from './models.js';
-import { DSLModel } from '../parser/';
-import type { LayoutNode } from '../layout/models.js';
-import { getNodeNotes, formatNodeType } from '../notes.js';
-import { escapeHtml } from '../utils.js';
+import {GSelection} from './models.js';
+import {DSLModel} from '../parser/';
+import type {LayoutNode} from '../layout';
+import {formatNodeType, getNodeNotes} from '../notes.js';
+import {escapeHtml} from '../utils.js';
 
 export function setupZoom(
-  svg: any,
+  svg: d3.Selection<SVGSVGElement, unknown, null, unknown>,
   groupNames: string[],
 ): void {
   const zoom = d3.zoom()
