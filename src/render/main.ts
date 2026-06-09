@@ -6,11 +6,12 @@ import { renderDefs, createTooltip } from './svg-helpers.js';
 import { renderContainers } from './render-containers.js';
 import { renderGroups, renderSubGroups } from './render-groups.js';
 import { renderNodes, renderLinks } from './render-nodes.js';
-import { setupZoom, setupTooltips } from './interaction.js';
+import { setupZoom, setupTooltips, type ZoomOptions } from './interaction.js';
 
 export function renderEventStorming(
   container: any,
   dslText: string,
+  options?: ZoomOptions,
 ): DestroyableReturn {
   const model = parseDSL(dslText);
   const layout = computeLayout(model);
@@ -57,7 +58,7 @@ export function renderEventStorming(
   renderLinks(linksGroup as GSelection, layout.links, layout.nodes, offsetX);
 
   // Zoom & pan
-  setupZoom(svg, ['nodes', 'links', 'containers', 'groups', 'sub-groups']);
+  setupZoom(svg, ['nodes', 'links', 'containers', 'groups', 'sub-groups'], options);
 
   // Tooltips
   setupTooltips(nodesGroup as GSelection, layout.nodes, model, tooltip);

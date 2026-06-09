@@ -5,9 +5,14 @@ import type {LayoutNode} from '../layout';
 import {formatNodeType, getNodeNotes} from '../notes.js';
 import {escapeHtml} from '../utils.js';
 
+export interface ZoomOptions {
+  initialTransform?: d3.ZoomTransform;
+}
+
 export function setupZoom(
   svg: d3.Selection<SVGSVGElement, unknown, null, unknown>,
   groupNames: string[],
+  options?: { initialTransform?: d3.ZoomTransform },
 ): void {
   const zoom = d3.zoom()
     .scaleExtent([0.3, 2])
@@ -19,6 +24,10 @@ export function setupZoom(
     });
 
   (svg as any).call(zoom);
+
+  if (options?.initialTransform) {
+    (zoom as any).transform(svg, options.initialTransform);
+  }
 }
 
 export function setupTooltips(

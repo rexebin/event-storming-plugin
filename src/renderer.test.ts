@@ -1296,3 +1296,63 @@ describe('computeLinkPath obstacle avoidance', () => {
     expect(parseInt(mMatch![2])).toBe(source.y + NODE_H);       // bottom Y
   });
 });
+
+describe('zoom preservation', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('applies initialTransform when provided', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const transform = d3.zoomIdentity.translate(50, 30).scale(1.5);
+    renderEventStorming(d3.select(host), readmeSample, { initialTransform: transform });
+
+    const svgEl = host.querySelector('svg')!;
+    const result = d3.zoomTransform(svgEl);
+    expect(result.k).toBeCloseTo(1.5);
+    expect(result.x).toBeCloseTo(50);
+    expect(result.y).toBeCloseTo(30);
+  });
+
+  it('preserves zoom level after re-render with new DSL', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    // First render at default (identity) zoom
+    const result1 = renderEventStorming(d3.select(host), readmeSample);
+
+    // Capture current zoom, then re-render with it passed to the second call.
+    let svgEl = host.querySelector('svg')!;
+    let capturedZoom = d3.zoomTransform(svgEl);
+
+    // First pass: simulate a "user zoomed" state by destroying and re-rendering
+    // with non-identity initialTransform (jsdom can't drive real user zoom events)
+    const expectedZoom = d3.zoomIdentity.scale(2).translate(50, 25);
+    result1.destroy();
+
+    while (host.firstChild) {
+      host.removeChild(host.firstChild);
+    }
+    renderEventStorming(d3.select(host), showerSample, { initialTransform: expectedZoom });
+
+    svgEl = host.querySelector('svg')!;
+    const afterRender = d3.zoomTransform(svgEl);
+    // scale(2).translate(50, 25) → k=2, x=50*2=100, y=25*2=50
+    expect(afterRender.k).toBeCloseTo(2);
+    expect(afterRender.x).toBeCloseTo(100);
+    expect(afterRender.y).toBeCloseTo(50);
+
+    // Second pass: re-render with same captured zoom, verify preserved
+    svgEl = host.querySelector('svg')!;
+    const againZoom = d3.zoomTransform(svgEl);
+    renderEventStorming(d3.select(host), readmeSample, { initialTransform: againZoom });
+
+    svgEl = host.querySelector('svg')!;
+    const afterSecondRender = d3.zoomTransform(svgEl);
+    expect(afterSecondRender.k).toBeCloseTo(2);
+    expect(afterSecondRender.x).toBeCloseTo(100);
+    expect(afterSecondRender.y).toBeCloseTo(50);
+  });
+});

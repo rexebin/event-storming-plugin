@@ -14,13 +14,15 @@ const MIN_EDITOR_RATIO = 0.12
 export default function App() {
   const editorValueRef = useRef<string>(sampleDSL)
   const renderSourceRef = useRef<string>(sampleDSL)
-  const [renderTick, setRenderTick] = useState(0)
+  // Force re-render when DSL changes, but keep DiagramPreview mounted (no key).
+  // A plain state update triggers React reconciliation without unmounting child components.
+  const [_, setDslTick] = useState(0)
 
   // Expose a test helper for E2E tests to programmatically change DSL content.
   ;(globalThis as any).__setPlaygroundDSL = (value: string) => {
     editorValueRef.current = value
     renderSourceRef.current = value
-    setRenderTick((n) => n + 1)
+    setDslTick((n) => n + 1)
   }
 
   const handleEditorChange = useCallback((value: string) => {
@@ -29,14 +31,14 @@ export default function App() {
     clearTimeout((handleEditorChange as any)._timer)
     ;(handleEditorChange as any)._timer = setTimeout(() => {
       renderSourceRef.current = value
-      setRenderTick((n) => n + 1)
+      setDslTick((n) => n + 1)
     }, 300)
   }, [])
 
   const handleManualRender = useCallback(() => {
     // Read Monaco's current value directly to avoid stale state (rubber-duck C2)
     renderSourceRef.current = editorValueRef.current
-    setRenderTick((n) => n + 1)
+    setDslTick((n) => n + 1)
   }, [])
 
   const handleCopyDsl = useCallback(() => {
@@ -67,7 +69,7 @@ export default function App() {
       <ResizablePanelGroup orientation="vertical">
         <ResizablePanel defaultSize={1 - DEFAULT_EDITOR_RATIO}>
           <div className="h-full min-h-0 overflow-hidden bg-white">
-            <DiagramPreview key={renderTick} dslText={renderSourceRef.current} />
+            <DiagramPreview dslText={renderSourceRef.current} />
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
