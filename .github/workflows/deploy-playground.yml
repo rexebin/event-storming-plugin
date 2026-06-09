@@ -32,6 +32,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: playground/pnpm-lock.yaml
 
+      - name: Approve build scripts
+        working-directory: playground
+        run: pnpm approve-builds --all
+
       - name: Install dependencies
         working-directory: playground
         run: pnpm install --frozen-lockfile
