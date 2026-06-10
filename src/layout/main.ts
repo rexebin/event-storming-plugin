@@ -18,6 +18,34 @@ import {
 
 // ─── Private helpers ─────────────────────────────────────────
 
+function expandGroupBoundsForNotes(group: LayoutGroup, notes: LayoutNode[]): void {
+  for (const note of notes) {
+    const nTop    = note.y - GROUP_PADDING;
+    const nLeft   = note.x - GROUP_PADDING;
+    const nRight  = note.x + NODE_W + GROUP_PADDING;
+    const nBottom = note.y + NODE_H + GROUP_PADDING;
+    if (nTop    < group.y)                  { group.height += group.y - nTop;  group.y = nTop; }
+    if (nLeft   < group.x)                  { group.width  += group.x - nLeft; group.x = nLeft; }
+    if (nRight  > group.x + group.width)    group.width  = nRight  - group.x;
+    if (nBottom > group.y + group.height)   group.height = nBottom - group.y;
+  }
+}
+
+function collectDescendantIds(rootId: string, containers: DSLContainer[]): Set<string> {
+  const ids = new Set<string>([rootId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const c of containers) {
+      if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) {
+        ids.add(c.id);
+        changed = true;
+      }
+    }
+  }
+  return ids;
+}
+
 function computeProcessTopPad(process: DSLProcess): number {
   const maxSubDepth = process.subGroups ? computeMaxSubGroupDepth(process.subGroups) : 0;
   const maxSubPad = SUB_PAD_BASE + maxSubDepth * NESTED_GAP;
@@ -203,6 +231,7 @@ function layoutUnpositionedNodes(
 }
 
 function computeContainerBounds(
+  treeIds: Set<string>,
   containerId: string,
   cx: number,
   cy: number,
@@ -215,7 +244,7 @@ function computeContainerBounds(
   let maxBottom = 0;
   let maxRight = 0;
   for (const n of allNodes) {
-    if (n.containerId === containerId) {
+    if (treeIds.has(n.containerId!)) {
       maxBottom = Math.max(maxBottom, n.y + NODE_H);
       maxRight = Math.max(maxRight, n.x + NODE_W);
     }
@@ -286,8 +315,47 @@ export function computeLayout(model: DSLModel): LayoutResult {
 
     layoutUnpositionedNodes(container, model, innerX, processY, containerW, positioned, allNodes);
 
+    const treeIds = collectDescendantIds(container.id, model.containers);
+
+    // Position notes for this container tree before computing bounds, then create their links.
+    for (const note of model.nodes) {
+      if (!treeIds.has(note.containerId!) || note.type !== 'note' || !note.parentId) continue;
+      if (allNodes.some((n) => n.id === note.id)) continue;
+      const parent = allNodes.find((n) => n.id === note.parentId!);
+      if (!parent) continue;
+      const noteX = note.noteX ?? 0;
+      const noteY = note.noteY ?? -1;
+      allNodes.push({ ...note, x: parent.x + noteX * (NODE_W + NODE_GAP_X), y: parent.y - noteY * (NODE_H + NODE_GAP_Y) });
+      allLinks.push({ source: note.id, target: note.parentId!, label: '', type: 'default', noteX: note.noteX, noteY: note.noteY });
+    }
+
+    // Correct top/left overflow: shift all container tree contents down/right if notes extend outside.
+    const containerNotes = allNodes.filter((n) => treeIds.has(n.containerId!) && n.type === 'note');
+    if (containerNotes.length > 0) {
+      const minNoteY = Math.min(...containerNotes.map((n) => n.y));
+      const minNoteX = Math.min(...containerNotes.map((n) => n.x));
+      const topOverflow  = Math.max(0, (cy + CONTAINER_HEADER_H + CONTAINER_PADDING) - minNoteY);
+      const leftOverflow = Math.max(0, (cx + CONTAINER_PADDING) - minNoteX);
+      if (topOverflow > 0 || leftOverflow > 0) {
+        for (const n of allNodes)      { if (treeIds.has(n.containerId!))    { n.y += topOverflow; n.x += leftOverflow; } }
+        for (const g of allGroups)     { if (g.containerId === container.id) { g.y += topOverflow; g.x += leftOverflow; } }
+        for (const sg of allSubGroups) { if (sg.containerId === container.id){ sg.y += topOverflow; sg.x += leftOverflow; } }
+        containerRef.height += topOverflow;
+        containerRef.width  += leftOverflow;
+      }
+    }
+
+    // Expand each process group to include notes attached to its nodes.
+    container.processes.forEach((process, processIndex) => {
+      const group = allGroups.find((g) => g.id === `${container.id}_group_${processIndex}`);
+      if (!group) return;
+      const stepIdSet = new Set(process.stepIds);
+      const groupNotes = allNodes.filter((n) => n.type === 'note' && n.parentId && stepIdSet.has(n.parentId));
+      expandGroupBoundsForNotes(group, groupNotes);
+    });
+
     const bounds = computeContainerBounds(
-      container.id, cx, cy, containerH, containerW, allNodes, allGroups, allSubGroups,
+      treeIds, container.id, cx, cy, containerRef.height, containerRef.width, allNodes, allGroups, allSubGroups,
     );
     containerRef.width = bounds.width;
     containerRef.height = bounds.height;
@@ -299,26 +367,6 @@ export function computeLayout(model: DSLModel): LayoutResult {
   if (standaloneNodes.length > 0) {
     const startY = y > 0 ? y + CONTAINER_GAP_Y : 0;
     layoutStandaloneNodes(standaloneNodes as LayoutNode[], allNodes, 0, startY);
-  }
-
-  // Position notes with grid offset from their parent node (after all chain/layout is done).
-  for (const note of model.nodes) {
-    if (note.type !== 'note' || !note.parentId) continue;
-    const alreadyPlaced = allNodes.some((n) => n.id === note.id);
-    if (alreadyPlaced) continue;
-    const parent = allNodes.find((n) => n.id === note.parentId!);
-    if (!parent) continue; // spec: "only placed as child of node, or ignored"
-    const noteX = note.noteX ?? 0;
-    const noteY = note.noteY ?? -1;
-    allNodes.push({ ...note, x: parent.x + noteX * (NODE_W + NODE_GAP_X), y: parent.y - noteY * (NODE_H + NODE_GAP_Y) });
-  }
-
-  // Create note-to-parent links for positioned notes.
-  for (const note of model.nodes) {
-    if (note.type !== 'note' || !note.parentId) continue;
-    const alreadyPlaced = allNodes.some((n) => n.id === note.id);
-    if (!alreadyPlaced) continue;
-    allLinks.push({ source: note.id, target: note.parentId!, label: '', type: 'default', noteX: note.noteX, noteY: note.noteY });
   }
 
   let totalWidth = 0;

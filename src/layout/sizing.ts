@@ -10,6 +10,12 @@ import { computeProcessColumns, computeFanInProcessColumns } from './fan-in.js';
 import { computeMaxSubGroupDepth } from './chains.js';
 import { NODE_W, NODE_GAP_X, CONTAINER_PADDING, GROUP_PADDING, SUB_GROUP_GAP_X, NODE_H, NODE_GAP_Y, CONTAINER_HEADER_H, NESTED_GAP } from './constants.js';
 
+function getNonProcessNodes(container: DSLContainer, model: DSLModel) {
+  return model.nodes.filter(
+    (n) => n.containerId === container.id && n.type !== 'note' && !container.processes.some((p) => p.stepIds.includes(n.id))
+  );
+}
+
 export function computeContainerWidth(container: DSLContainer, model: DSLModel): number {
   let maxW = 0;
 
@@ -58,9 +64,7 @@ export function computeContainerWidth(container: DSLContainer, model: DSLModel):
     maxW = Math.max(maxW, w);
      }
 
-  const nonProcess = model.nodes.filter(
-     (n) => n.containerId === container.id && !container.processes.some((process) => process.stepIds.includes(n.id))
-   );
+  const nonProcess = getNonProcessNodes(container, model);
   const gridCols = Math.min(nonProcess.length, 4);
   const gridW = gridCols > 0 ? gridCols * (NODE_W + NODE_GAP_X) - NODE_GAP_X : 0;
   const processPadding = container.processes.length > 0 ? GROUP_PADDING * 2 : 0;
@@ -70,7 +74,7 @@ export function computeContainerWidth(container: DSLContainer, model: DSLModel):
 
 export function computeContainerHeight(container: DSLContainer, model: DSLModel): number {
   const processRows = container.processes.length;
-  const nonProcess = model.nodes.filter((n) => n.containerId === container.id && !container.processes.some(p => p.stepIds.includes(n.id)));
+  const nonProcess = getNonProcessNodes(container, model);
   const nonProcessRows = Math.ceil(nonProcess.length / 4);
   const negativeOffsetRows = container.processes.reduce((total, process) => {
     const shift = process.stepIds

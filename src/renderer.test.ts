@@ -1337,6 +1337,125 @@ describe('zoom preservation', () => {
     expect(result.y).toBeCloseTo(30);
   });
 
+  describe('note-aware container sizing', () => {
+    function makeNoteXml(noteX: number, noteY: number) {
+      return `
+<eventstorming>
+  <aggregate name="Test">
+    <container name="C">
+      <event name="E1"/>
+      <note x="${noteX}" y="${noteY}">Test note</note>
+    </container>
+  </aggregate>
+</eventstorming>`;
+    }
+
+    it('note above first row (default y=1) sits inside container top boundary', () => {
+      const layout = computeLayout(parseDSL(makeNoteXml(0, 1)));
+      const container = layout.containers[0];
+      const note = layout.nodes.find(n => n.type === 'note')!;
+
+      expect(note).toBeTruthy();
+      expect(note.y).toBeGreaterThanOrEqual(container.y + CONTAINER_HEADER_H);
+    });
+
+    it('note far above (y=3) sits inside container top boundary', () => {
+      const layout = computeLayout(parseDSL(makeNoteXml(0, 3)));
+      const container = layout.containers[0];
+      const note = layout.nodes.find(n => n.type === 'note')!;
+
+      expect(note.y).toBeGreaterThanOrEqual(container.y + CONTAINER_HEADER_H);
+    });
+
+    it('note below (y=-1) is contained within container bottom boundary', () => {
+      const layout = computeLayout(parseDSL(makeNoteXml(0, -1)));
+      const container = layout.containers[0];
+      const note = layout.nodes.find(n => n.type === 'note')!;
+
+      expect(container.y + container.height).toBeGreaterThanOrEqual(note.y + NODE_H + CONTAINER_PADDING);
+    });
+
+    it('note right (noteX=2) is contained within container right boundary', () => {
+      const layout = computeLayout(parseDSL(makeNoteXml(2, 0)));
+      const container = layout.containers[0];
+      const note = layout.nodes.find(n => n.type === 'note')!;
+
+      expect(container.x + container.width).toBeGreaterThanOrEqual(note.x + NODE_W + CONTAINER_PADDING);
+    });
+
+    it('note left (noteX=-1) sits inside container left boundary', () => {
+      const layout = computeLayout(parseDSL(makeNoteXml(-1, 0)));
+      const container = layout.containers[0];
+      const note = layout.nodes.find(n => n.type === 'note')!;
+
+      expect(note.x).toBeGreaterThanOrEqual(container.x + CONTAINER_PADDING);
+    });
+
+    describe('process group bounds include notes', () => {
+      function makeGroupNoteXml(noteX: number, noteY: number) {
+        return `
+<eventstorming>
+  <aggregate name="Order">
+    <container name="Cancel Order">
+      <event name="OrderCancelled"/>
+      <note x="${noteX}" y="${noteY}">group note</note>
+    </container>
+  </aggregate>
+</eventstorming>`;
+      }
+
+      it('note below group is contained within process group bottom', () => {
+        const layout = computeLayout(parseDSL(makeGroupNoteXml(0, -1)));
+        const group = layout.groups.find(g => g.label === 'Cancel Order')!;
+        const note = layout.nodes.find(n => n.type === 'note')!;
+
+        expect(group).toBeTruthy();
+        expect(note).toBeTruthy();
+        expect(group.y + group.height).toBeGreaterThanOrEqual(note.y + NODE_H + GROUP_PADDING);
+      });
+
+      it('note to the left of group is contained within process group left', () => {
+        const layout = computeLayout(parseDSL(makeGroupNoteXml(-1, 0)));
+        const group = layout.groups.find(g => g.label === 'Cancel Order')!;
+        const note = layout.nodes.find(n => n.type === 'note')!;
+
+        expect(note.x).toBeGreaterThanOrEqual(group.x);
+      });
+
+      it('note to the right of group expands process group right boundary', () => {
+        const layout = computeLayout(parseDSL(makeGroupNoteXml(2, 0)));
+        const group = layout.groups.find(g => g.label === 'Cancel Order')!;
+        const note = layout.nodes.find(n => n.type === 'note')!;
+
+        expect(group.x + group.width).toBeGreaterThanOrEqual(note.x + NODE_W + GROUP_PADDING);
+      });
+
+      it('note above group is contained within process group top', () => {
+        const layout = computeLayout(parseDSL(makeGroupNoteXml(0, 1)));
+        const group = layout.groups.find(g => g.label === 'Cancel Order')!;
+        const note = layout.nodes.find(n => n.type === 'note')!;
+
+        expect(note.y).toBeGreaterThanOrEqual(group.y);
+      });
+    });
+
+    it('note nodes do not add grid rows to container height', () => {
+      const withNote = computeLayout(parseDSL(makeNoteXml(0, 0)));
+      const withoutNote = computeLayout(parseDSL(`
+<eventstorming>
+  <aggregate name="Test">
+    <container name="C">
+      <event name="E1"/>
+    </container>
+  </aggregate>
+</eventstorming>`));
+
+      const heightWithNote = withNote.containers[0].height;
+      const heightWithoutNote = withoutNote.containers[0].height;
+      expect(heightWithNote).toBe(heightWithoutNote);
+    });
+  });
+
   it('preserves zoom level after re-render with new DSL', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
