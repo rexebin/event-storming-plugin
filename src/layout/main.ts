@@ -104,7 +104,6 @@ function layoutProcessGroup(
   model: DSLModel,
   groupX: number,
   groupY: number,
-  groupWidth: number,
   allNodes: LayoutNode[],
   allLinks: LayoutLink[],
   allGroups: LayoutGroup[],
@@ -162,6 +161,12 @@ function layoutProcessGroup(
     }
   }
 
+  const maxNodeRight = processNodes.reduce((max, n) => {
+    const ln = allNodes.find((a) => a.id === n.id);
+    return ln ? Math.max(max, ln.x + NODE_W) : max;
+  }, groupInnerX);
+  const initialGroupWidth = maxNodeRight + GROUP_PADDING - groupX;
+
   const processGroupRef: LayoutGroup = {
     id: `${container.id}_group_${processIndex}`,
     label: process.name,
@@ -169,7 +174,7 @@ function layoutProcessGroup(
     containerId: container.id,
     x: groupX,
     y: groupY,
-    width: groupWidth,
+    width: initialGroupWidth,
     height: Math.max(GROUP_HEADER_H + GROUP_PADDING * 2 + NODE_H, processBottom - groupY + GROUP_PADDING),
     notes: process.notes,
   };
@@ -186,14 +191,6 @@ function layoutProcessGroup(
         processGroupRef.width = sgRight + GROUP_PADDING - processGroupRef.x;
     }
   }
-
-  // Grow process group rightward for offset nodes that exceed its boundary.
-  const maxNodeRight = processNodes.reduce((max, n) => {
-    const ln = allNodes.find((a) => a.id === n.id);
-    return ln ? Math.max(max, ln.x + NODE_W) : max;
-  }, groupX + GROUP_PADDING);
-  if (maxNodeRight + GROUP_PADDING > processGroupRef.x + processGroupRef.width)
-    processGroupRef.width = maxNodeRight + GROUP_PADDING - processGroupRef.x;
 
   return processGroupRef.height;
 }
@@ -302,15 +299,12 @@ export function computeLayout(model: DSLModel): LayoutResult {
     let processY = innerY;
 
     container.processes.forEach((process, processIndex) => {
-      const groupX = innerX;
-      const groupY = processY;
-      const groupWidth = containerW - CONTAINER_PADDING * 2;
       const groupHeight = layoutProcessGroup(
         process, processIndex, container, model,
-        groupX, groupY, groupWidth,
+        innerX, processY,
         allNodes, allLinks, allGroups, allSubGroups, positioned,
       );
-      processY = groupY + groupHeight + GROUP_GAP_Y;
+      processY += groupHeight + GROUP_GAP_Y;
     });
 
     layoutUnpositionedNodes(container, model, innerX, processY, containerW, positioned, allNodes);
