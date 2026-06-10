@@ -36,6 +36,3 @@ export { layoutAltBranch, layoutChainFrom, computeSubGroupDepths, computeMaxSubG
 
 export { layoutFanInProcess, computeProcessColumns, computeFanInProcessColumns } from './fan-in.js';
 
-// ─── Container sizing ──────────────────────────────────────
-
-export { computeContainerWidth, computeContainerHeight } from './sizing.js';
