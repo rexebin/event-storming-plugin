@@ -133,7 +133,7 @@ function layoutProcessGroup(
   if (fanInTarget && allRootsInSameSubGroup) {
     processBottom = layoutFanInProcess(
       roots, fanInTarget, groupInnerX, groupInnerY, container,
-      groupWidth - GROUP_PADDING * 2, model, processNodeMap,
+      model, processNodeMap,
       allNodes, allLinks, processPositioned, positioned,
     );
   } else {

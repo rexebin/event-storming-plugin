@@ -14,7 +14,6 @@ export function layoutFanInProcess(
   innerX: number,
   processY: number,
   container: import('../parser/').DSLContainer,
-  processWidth: number,
   model: DSLModel,
   processNodeMap: Map<string, DSLNode>,
   allNodes: LayoutNode[],
@@ -24,6 +23,8 @@ export function layoutFanInProcess(
 ): number {
   const rowHeight = NODE_H + NODE_GAP_Y;
   const useTwoSidedLayout = container.type === 'projector' || target.type === 'view';
+  const cols = computeFanInProcessColumns(roots, target, processNodeMap, container);
+  const processWidth = cols * (NODE_W + NODE_GAP_X) - NODE_GAP_X;
 
   if (useTwoSidedLayout) {
     const splitIndex = Math.ceil(roots.length / 2);
