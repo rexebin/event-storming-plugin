@@ -13,7 +13,7 @@ import {
   NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y,
   CONTAINER_PADDING, CONTAINER_HEADER_H, CONTAINER_GAP_X, CONTAINER_GAP_Y,
   GROUP_PADDING, GROUP_HEADER_H, GROUP_GAP_Y,
-  SUB_PAD_BASE, NESTED_GAP, CONTAINER_BOTTOM_EXTRA, MAX_ROW_WIDTH,
+  SUB_PAD_BASE, NESTED_GAP, CONTAINER_BOTTOM_EXTRA, MAX_ROW_WIDTH, ALT_BRANCH_GAP,
 } from './constants.js';
 
 // ─── Private helpers ─────────────────────────────────────────
@@ -193,15 +193,12 @@ function layoutUnpositionedNodes(
     }
   }
 
-  const notes = model.nodes.filter(
-    (n) => n.containerId === container.id && n.type === 'note' && !positioned.has(n.id),
+  // Position notes that are truly orphaned (no parentId, no parent in allNodes).
+  const orphanNotes = model.nodes.filter(
+    (n) => n.containerId === container.id && n.type === 'note' && !positioned.has(n.id) && !n.parentId,
   );
-  for (const note of notes) {
-    const target = allNodes.find((n) => n.id === note.noteTarget);
-    allNodes.push(target
-      ? { ...note, x: target.x + NODE_W + 8, y: target.y - 8 }
-      : { ...note, x: innerX, y: npY + 10 },
-    );
+  for (const note of orphanNotes) {
+    allNodes.push({ ...note, x: innerX, y: npY + 10 });
   }
 }
 
@@ -302,6 +299,26 @@ export function computeLayout(model: DSLModel): LayoutResult {
   if (standaloneNodes.length > 0) {
     const startY = y > 0 ? y + CONTAINER_GAP_Y : 0;
     layoutStandaloneNodes(standaloneNodes as LayoutNode[], allNodes, 0, startY);
+  }
+
+  // Position notes with grid offset from their parent node (after all chain/layout is done).
+  for (const note of model.nodes) {
+    if (note.type !== 'note' || !note.parentId) continue;
+    const alreadyPlaced = allNodes.some((n) => n.id === note.id);
+    if (alreadyPlaced) continue;
+    const parent = allNodes.find((n) => n.id === note.parentId!);
+    if (!parent) continue; // spec: "only placed as child of node, or ignored"
+    const noteX = note.noteX ?? 0;
+    const noteY = note.noteY ?? -1;
+    allNodes.push({ ...note, x: parent.x + noteX * (NODE_W + NODE_GAP_X), y: parent.y - noteY * (NODE_H + NODE_GAP_Y + ALT_BRANCH_GAP) });
+  }
+
+  // Create note-to-parent links for positioned notes.
+  for (const note of model.nodes) {
+    if (note.type !== 'note' || !note.parentId) continue;
+    const alreadyPlaced = allNodes.some((n) => n.id === note.id);
+    if (!alreadyPlaced) continue;
+    allLinks.push({ source: note.id, target: note.parentId!, label: '', type: 'default', noteX: note.noteX, noteY: note.noteY });
   }
 
   let totalWidth = 0;

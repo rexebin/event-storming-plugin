@@ -2,7 +2,6 @@
  * Event Storming — Notes badges and tooltip rendering.
  */
 
-import { DSLModel, DSLNode, normalizeId } from './parser/';
 import { escapeHtml } from './utils.js';
 
 export function appendNotesBadge(
@@ -70,19 +69,4 @@ export function formatNodeType(type: string): string {
   return NODE_TYPE_LABELS[type] ?? type;
 }
 
-export function getNodeNotes(node: DSLNode, model: DSLModel): string[] {
-  const directNotes = node.notes || [];
-  const attachedNotes = model.nodes
-     .filter((candidate) => candidate.type === 'note')
-     .filter((candidate) => isAttachedNote(candidate, node))
-     .map((candidate) => candidate.label);
 
-  return [...new Set([...directNotes, ...attachedNotes])];
-}
-
-export function isAttachedNote(noteNode: DSLNode, node: DSLNode): boolean {
-  if (noteNode.type !== 'note' || !noteNode.noteTarget) return false;
-  if (noteNode.containerId !== node.containerId) return false;
-
-  return noteNode.noteTarget === node.id || noteNode.noteTarget === normalizeId(node.label);
-}

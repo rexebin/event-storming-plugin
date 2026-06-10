@@ -5,7 +5,7 @@
 import type {DSLContainer, DSLModel, DSLNode, DSLSubGroup, NodeType} from './models.js';
 import {normalizeId, XML_NODE_TYPES} from './models.js';
 
-const DEFAULT_COLORS: Record<NodeType, string> = {
+export const DEFAULT_COLORS: Record<NodeType, string> = {
   event: '#FFA500',
   command: '#91D49C',
   aggregate: '#FEE254',
@@ -21,15 +21,6 @@ const DEFAULT_COLORS: Record<NodeType, string> = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-export function xmlAttrNotes(el: Element): string[] {
-  const attr = el.getAttribute('notes');
-  const childNotes = Array.from(el.children)
-    .filter(c => ['note', 'notes'].includes(c.tagName.toLowerCase()) && !c.getAttribute('name'))
-    .map(c => c.textContent?.trim() ?? '')
-    .filter(Boolean);
-  return attr ? [attr, ...childNotes] : childNotes;
-}
 
 // ─── Node construction ─────────────────────────────────────────────────────
 
@@ -51,11 +42,44 @@ export function makeXmlNode(el: Element, nodeType: NodeType, containerId: string
     color: DEFAULT_COLORS[nodeType] || '#6a737d',
     containerId,
     processIndex: -1,
-    noteTarget: null,
+    parentId: undefined,
+    noteX: undefined,
+    noteY: undefined,
     ...(customIdAttr && { customId: customIdAttr }),
     ...(offsetAttr && { offset: offsetAttr }),
-    notes: xmlAttrNotes(el),
+    notes: el.getAttribute('notes') ? [el.getAttribute('notes')!] : [],
   };
+}
+
+// ─── Positioned note creation ───────────────────────────────────────────────
+
+function safeInt(attr: string | null, fallback: number): number {
+  if (!attr) return fallback;
+  const v = parseInt(attr, 10);
+  return isNaN(v) ? fallback : v;
+}
+
+export function addPositionedNote(
+  child: Element,
+  dslContainer: DSLContainer,
+  model: DSLModel,
+  lastRegularNodeId: string,
+  indexSuffix: number,
+): void {
+  const noteX = safeInt(child.getAttribute('x'), 0);
+  const noteY = safeInt(child.getAttribute('y'), 1);
+  model.nodes.push({
+    id: `${lastRegularNodeId}_note_${indexSuffix}`,
+    label: child.textContent?.trim() ?? '',
+    type: 'note',
+    color: DEFAULT_COLORS.note,
+    containerId: dslContainer.id,
+    processIndex: -1,
+    parentId: lastRegularNodeId,
+    noteX,
+    noteY,
+    notes: [],
+  });
 }
 
 // ─── Container tree building ────────────────────────────────────────────────
@@ -77,11 +101,13 @@ export function buildContainerTree(
     processes: [],
     parentId: parentContainer.id,
     subContainers: [],
-    notes: xmlAttrNotes(childEl),
+    notes: childEl.getAttribute('notes') ? [childEl.getAttribute('notes')!] : [],
   };
 
   const stepIds: string[] = [];
   const pendingRefs: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> = [];
+  let lastRegularNodeId: string | undefined;
+  let noteIndex = 0;
 
   for (const child of Array.from(childEl.children)) {
     const tagLower = child.tagName.toLowerCase();
@@ -92,13 +118,27 @@ export function buildContainerTree(
       continue;
     }
 
+    if (tagLower === 'note') {
+      if (lastRegularNodeId) {
+        addPositionedNote(child, childContainer, model, lastRegularNodeId, noteIndex++);
+      }
+      continue;
+    }
+
     const nodeType = XML_NODE_TYPES[tagLower];
     if (!nodeType) continue;
-    if (tagLower === 'note' && !child.getAttribute('name')) continue;
 
     const n = makeXmlNode(child, nodeType, childId, containerPrefix);
     model.nodes.push(n);
     stepIds.push(n.id);
+    lastRegularNodeId = n.id;
+
+    // Process <note> children of this regular node (positioned notes attached to the element)
+    for (const noteChild of Array.from(child.children)) {
+      if (noteChild.tagName.toLowerCase() === 'note') {
+        addPositionedNote(noteChild, childContainer, model, n.id, noteIndex++);
+      }
+    }
 
     pendingRefs.push({
       node: n,
@@ -161,8 +201,8 @@ function resolveReference(
     type: 'error',
     containerId: scopeContainerId,
     processIndex: -1,
+    parentId: undefined,
     color: DEFAULT_COLORS.error,
-    noteTarget: null,
     notes: [],
   });
   return nodeId;
@@ -249,8 +289,15 @@ export function collectDesc(c: DSLContainer, allNodes: DSLNode[]): string[] {
   const ids: string[] = [];
   const add = (id: string) => { if (!seen.has(id)) { seen.add(id); ids.push(id); } };
 
-  for (const n of allNodes) if (n.containerId === c.id) add(n.id);
-  for (const p of c.processes) for (const sid of p.stepIds) add(sid);
+  for (const n of allNodes) {
+    if (n.containerId === c.id && n.type !== 'note') add(n.id);
+  }
+  for (const p of c.processes) {
+    for (const sid of p.stepIds) {
+      const node = allNodes.find((n) => n.id === sid);
+      if (node && node.type !== 'note') add(sid);
+    }
+  }
   for (const child of c.subContainers) for (const nid of collectDesc(child, allNodes)) add(nid);
 
   return ids;
@@ -298,12 +345,12 @@ export function ensureSyntheticProcesses(container: DSLContainer, allNodes: DSLN
         });
       }
     }
-    const ownNodes = allNodes.filter(n => n.containerId === container.id);
+    const ownNodes = allNodes.filter(n => n.containerId === container.id && n.type !== 'note');
     if (ownNodes.length > 0) {
       container.processes.push({ name: container.label, stepIds: ownNodes.map(n => n.id), notes: container.notes ?? [] });
     }
   } else {
-    const allNodeIds = allNodes.filter(n => n.containerId === container.id).map(n => n.id);
+    const allNodeIds = allNodes.filter(n => n.containerId === container.id && n.type !== 'note').map(n => n.id);
     if (allNodeIds.length > 0) {
       container.processes.push({ name: container.label, stepIds: allNodeIds, notes: container.notes ?? [] });
     }

@@ -158,16 +158,14 @@ const noteSample = `
 <eventstorming>
    <aggregate name="Order">
      <container name="Place Order">
-        <command name="PlaceOrder">
-             <notes>Requires manager approval</notes>
-             <notes>Audit this action</notes>
-          </command>
+        <command name="PlaceOrder" notes="Requires manager approval;Audit this action"/>
       </container>
     </aggregate>
     <aggregate name="User">
       <container name="User Registration">
-        <event name="UserRegistered" next="Some Note"/>
-        <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
+        <event name="UserRegistered"/>
+        <note x="0" y="-1">This is a positioned note below the event.</note>
+        <note x="1" y="0">This is a positioned note to the right.</note>
       </container>
     </aggregate>
 </eventstorming>
@@ -191,8 +189,7 @@ const showerSample = `
 const groupedSample = `
 <eventstorming>
   <aggregate name="Order">
-    <container name="Place Order">
-      <notes>Handles the happy path for order placement.</notes>
+    <container name="Place Order" notes="Handles the happy path for order placement.">
       <actor name="Customer" next="PlaceOrder"/>
       <command name="PlaceOrder" next="OrderPlaced"/>
       <event name="OrderPlaced"/>
@@ -342,18 +339,22 @@ describe('renderEventStorming layout', () => {
     expect(markers).toEqual(new Set(['url(#arrowhead)']));
   });
 
-  it('puts arrowhead on source element when target is a note', () => {
+
+
+  it('renders positioned notes with arrowhead at parent end', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), noteSample);
 
-    // Find the link targeting the note element and verify arrowhead positioning
+    // Find links from/to positioned notes — arrow should use standard marker-end (pointing to parent)
     const links = Array.from(host.querySelectorAll('path.es-link'));
-    const noteLink = links.find((l) => l.getAttribute('data-target')?.includes('Some_Note'));
-    expect(noteLink).not.toBeNull();
-    expect(noteLink!.getAttribute('marker-start')).toBe('url(#arrowhead-start)');
-    expect(noteLink!.getAttribute('marker-end')).toBeNull();
+    const noteLinks = links.filter((l) => l.getAttribute('data-source')?.includes('_note_'));
+    expect(noteLinks.length).toBeGreaterThan(0);
+    for (const link of noteLinks) {
+      expect(link.getAttribute('marker-end')).toBe('url(#arrowhead)');
+      expect(link.getAttribute('marker-start')).toBeNull();
+    }
   });
 
   it('shows a note badge and note text in the tooltip when a node has notes', () => {
@@ -410,13 +411,13 @@ describe('renderEventStorming layout', () => {
     expect(tooltip!.innerHTML).toContain('Handles the happy path for order placement.');
   });
 
-  it('renders Note nodes with the note color instead of the command color', () => {
+  it('renders positioned notes with the note color', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), noteSample);
 
-    const note = host.querySelector('[data-id="User_Registration_Some_Note"]');
+    const note = host.querySelector('[data-id*="_note_"]');
     expect(note).toBeTruthy();
 
     const noteShape = note!.querySelector('polygon');
@@ -424,25 +425,31 @@ describe('renderEventStorming layout', () => {
     expect(noteShape!.getAttribute('fill')).toBe('#FFF1AA');
   });
 
-  it('shows the has-notes icon on Note nodes that have notes', () => {
+  it('positioned notes are not gathered into parent tooltip', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), noteSample);
 
-    const note = host.querySelector('[data-id="User_Registration_Some_Note"]');
-    expect(note).toBeTruthy();
-    expect(note!.querySelector('.es-note-badge')).toBeTruthy();
+    const eventNode = host.querySelector('[data-id="User_Registration_UserRegistered"]');
+    expect(eventNode).toBeTruthy();
+
+    eventNode!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const tooltip = document.body.querySelector('.es-tooltip');
+    expect(tooltip).toBeTruthy();
+    // Positioned note text should NOT appear in tooltip (only direct <notes> content)
+    expect(tooltip!.innerHTML).not.toContain('positioned note above the event');
   });
 
-  it('does not render Note nodes twice', () => {
+  it('does not render positioned notes twice', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
 
     renderEventStorming(d3.select(host), noteSample);
 
-    const notes = host.querySelectorAll('[data-id="User_Registration_Some_Note"]');
-    expect(notes).toHaveLength(1);
+    const notes = host.querySelectorAll('[data-id*="_note_"]');
+    expect(notes).toHaveLength(2);
   });
 
   it('sizes branched containers to the horizontal flow instead of total node count', () => {
@@ -1178,7 +1185,7 @@ describe('computeLinkPath same-column routing', () => {
   const STEP_Y = NODE_H + NODE_GAP_Y; // 142 — one grid row apart
 
   function makeNode(id: string, x: number, y: number): import('./layout/index.js').LayoutNode {
-    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
+    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, next: undefined, altNext: undefined, notes: [] };
   }
 
   it('next: same column, different row uses orthogonal routing (not direct vertical)', () => {
@@ -1240,7 +1247,7 @@ describe('computeLinkPath same-column routing', () => {
 
 describe('computeLinkPath obstacle avoidance', () => {
   function makeNode(id: string, x: number, y: number): import('./layout/index.js').LayoutNode {
-    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, noteTarget: null, next: undefined, altNext: undefined, notes: [] };
+    return { id, x, y, label: '', type: 'command' as any, color: '#FEE254', containerId: 'c', processIndex: 0, next: undefined, altNext: undefined, notes: [] };
   }
 
   it('routes upward negative link around intermediate nodes by going down first', () => {

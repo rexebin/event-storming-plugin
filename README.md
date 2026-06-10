@@ -80,7 +80,7 @@ In any Markdown file (README, issue, PR comment, wiki), write a fenced code bloc
 
 ### XML DSL
 
-Use a ` ```xml ` block. XML is more concise to write by hand and supports multiple notes per element via child `<note>` elements.
+Use a ` ```xml ` block. XML is more concise to write by hand. Attach inline metadata with the `notes` attribute, or create positioned annotation badges with `<note x="…" y="…">`.
 
 ```text
 <eventstorming>
@@ -109,9 +109,9 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
         <actor name="Customer1" />
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
-        <error name="Invalid Email" next=""><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
+        <error name="Invalid Email" next="" notes="The email address provided is not valid. Please enter a valid email address and try again." />
         <event name="UserRegistered" />
-        <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
+        <note x="1" y="-1"><note>This is a positioned note on the UserRegistered event.</note></note>
      </container>
   </aggregate>
   <aggregate name="Morning Routine">
@@ -119,7 +119,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <actor name="Me"/>
           <command name="Wake Up" />
           <policy name="Is Alarm Ringing?" altNext="Sleep In" />
-          <error name="Sleep In" next=""><note>You chose to sleep in instead of waking up.</note></error>
+          <error name="Sleep In" next="" notes="You chose to sleep in instead of waking up." />
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
@@ -132,12 +132,11 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
       </container>
   </aggregate>
   <aggregate name="User Profile">
-      <container name="Update Profile">
-          <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
+      <container name="Update Profile" notes="This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.">
           <actor name="Customer" />
           <command name="UpdateProfile" />
           <policy name="Is User Authenticated?" altNext="Authentication Required" />
-          <error name="Authentication Required" next=""><note>You must be logged in to update your profile. Please log in and try again.</note></error>
+          <error name="Authentication Required" next="" notes="You must be logged in to update your profile. Please log in and try again." />
           <event name="ProfileUpdated" />
       </container>
   </aggregate>
@@ -150,16 +149,16 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
                <container name="Another Sub Process">
                   <command name="Do Something" />
                   <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
-                  <error name="Something Is Invalid" next=""><note>Something is invalid, please review and try again.</note></error>
+                  <error name="Something Is Invalid" next="" notes="Something is invalid, please review and try again." />
                </container>
           </container>
           <externalSystem name="InventoryService" />
           <policy name="Do We Have Stock?" altNext="Out Of Stock" />
           <policy name="Is Order Detail Valid?" altNext="Invalid Order Detail" />
-          <error name="Invalid Order Detail" next=""><note>Order details are invalid, please review your order and try again.</note></error>
+          <error name="Invalid Order Detail" next="" notes="Order details are invalid, please review your order and try again." />
           <externalSystem name="PaymentGateway" />
           <policy name="Is Payment Successful?" altNext="PaymentFailed" />
-          <error name="PaymentFailed" next=""><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
+          <error name="PaymentFailed" next="" notes="Payment failed, please try again or use a different payment method. Client should handle this error." />
           <event name="OrderPlaced" />
       </container>
   </aggregate>
@@ -177,7 +176,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand and supports multip
           <event name="OrderCancelled" next="Order Detail View" />
           <event name="OrderUpdated" next="Order Detail View" />
           <event name="OrderShipped" />
-          <projector name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></projector>
+          <projector name="Order Detail View" notes="This view is used to display the details of an order, including its status, items, and other relevant information." />
       </container>
   </projector>
   <process name="Customer Order View">
@@ -220,9 +219,9 @@ Rendered:
         <actor name="Customer1" />
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
-        <error name="Invalid Email" next=""><note>The email address provided is not valid. Please enter a valid email address and try again.</note></error>
+        <error name="Invalid Email" next="" notes="The email address provided is not valid. Please enter a valid email address and try again." />
         <event name="UserRegistered" />
-        <note name="Some Note"><note>This is a note attached to the UserRegistered event.</note></note>
+        <note x="1" y="-1"><note>This is a positioned note on the UserRegistered event.</note></note>
      </container>
   </aggregate>
   <aggregate name="Morning Routine">
@@ -230,7 +229,7 @@ Rendered:
           <actor name="Me"/>
           <command name="Wake Up" />
           <policy name="Is Alarm Ringing?" altNext="Sleep In" />
-          <error name="Sleep In" next=""><note>You chose to sleep in instead of waking up.</note></error>
+          <error name="Sleep In" next="" notes="You chose to sleep in instead of waking up." />
           <event name="Got Out of Bed" />
       </container>
       <container name="Shower">
@@ -243,12 +242,11 @@ Rendered:
       </container>
   </aggregate>
   <aggregate name="User Profile">
-      <container name="Update Profile">
-          <note>This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.</note>
+      <container name="Update Profile" notes="This process allows users to update their profile information, but only if they are authenticated. If the user is not authenticated, an error is returned.">
           <actor name="Customer" />
           <command name="UpdateProfile" />
           <policy name="Is User Authenticated?" altNext="Authentication Required" />
-          <error name="Authentication Required" next=""><note>You must be logged in to update your profile. Please log in and try again.</note></error>
+          <error name="Authentication Required" next="" notes="You must be logged in to update your profile. Please log in and try again." />
           <event name="ProfileUpdated" next="" />
       </container>
   </aggregate>
@@ -261,16 +259,16 @@ Rendered:
                <container name="Another Sub Process">
                   <command name="Do Something" />
                   <policy name="Is Something Valid?" next="InventoryService" altNext="Something Is Invalid" />
-                  <error name="Something Is Invalid" next=""><note>Something is invalid, please review and try again.</note></error>
+                  <error name="Something Is Invalid" next="" notes="Something is invalid, please review and try again." />
                </container>
           </container>
           <externalSystem name="InventoryService" />
           <policy name="Do We Have Stock?" altNext="Out Of Stock" />
           <policy name="Is Order Detail Valid?" altNext="Invalid Order Detail" />
-          <error name="Invalid Order Detail" next=""><note>Order details are invalid, please review your order and try again.</note></error>
+          <error name="Invalid Order Detail" next="" notes="Order details are invalid, please review your order and try again." />
           <externalSystem name="PaymentGateway" />
           <policy name="Is Payment Successful?" altNext="PaymentFailed" />
-          <error name="PaymentFailed" next=""><note>Payment failed, please try again or use a different payment method. Client should handle this error.</note></error>
+          <error name="PaymentFailed" next="" notes="Payment failed, please try again or use a different payment method. Client should handle this error." />
           <event name="OrderPlaced" />
       </container>
   </aggregate>
@@ -297,7 +295,7 @@ Rendered:
           <event name="OrderUpdated5" next="Order Detail View" />
           <event name="OrderUpdated6" next="Order Detail View" />
           <event name="OrderShipped" />
-          <projector name="Order Detail View"><note>This view is used to display the details of an order, including its status, items, and other relevant information.</note></projector>
+          <projector name="Order Detail View" notes="This view is used to display the details of an order, including its status, items, and other relevant information." />
       </container>
   </projector>
   <process name="Customer Order View">
@@ -327,7 +325,7 @@ Rendered:
 | `<error>`        | Error               | Cyan               |
 | `<externalSystem>` | External System   | Pink               |
 | `<projector>`    | Projector           | Dark Green         |
-| `<note>`         | Note                | Light Yellow       |
+| `<note>`         | Positioned Note     | Light Yellow       |
 
 ### Attributes
 
@@ -335,7 +333,8 @@ Rendered:
 - `next` — links to another node in the same container and renders to the **right**. **`next` is optional** — if omitted, the node automatically connects to the immediately following sibling in the container, so you only need to set it when jumping non-sequentially.
 - `altNext` — used for policy failure paths and renders **below** the policy. When a policy has an `altNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
 - `offset` — shifts a node horizontally to the right by the given number of units. Use when an `altNext` failure branch would visually collide with a sibling node, e.g. `offset="1"`. The entire subtree (including nested `<container>` and altNext children) shifts together.
-- `<note>...</note>` — child element to attach one or more notes to any node. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
+- Use the `notes="…"` attribute on any element to attach inline metadata annotations. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
+- Positioned notes: a `<note x="…" y="…">` child renders as a separate annotation badge connected by an arrow pointing TO the parent node. `x` is the grid column offset (positive = right), `y` is the grid row offset (positive = above). Example: `<note x="1" y="1">Requires manager approval</note>`
 
 ### Diagram Types
 
@@ -357,8 +356,7 @@ This extension only tests up to 2 levels of nesting.
 ```text
 <eventstorming>
   <aggregate name="Order">
-    <container name="Order Lifecycle">
-      <note>Top-level group grouping placement and cancellation sub-flows.</note>
+    <container name="Order Lifecycle" notes="Top-level group grouping placement and cancellation sub-flows.">
       <container name="Place Order">
         <actor name="Customer" />
         <command name="PlaceOrder" />
@@ -381,8 +379,7 @@ Rendered:
 ```xml
 <eventstorming>
   <aggregate name="Order">
-    <container name="Order Lifecycle Container">
-      <note>Top-level group grouping placement and cancellation sub-flows.</note>
+    <container name="Order Lifecycle Container" notes="Top-level group grouping placement and cancellation sub-flows.">
       <container name="Place Order">
         <actor name="Customer" />
         <command name="PlaceOrder" />

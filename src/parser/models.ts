@@ -9,7 +9,9 @@ export interface DSLNode {
   color: string;
   containerId: string | null; // immediate parent container id (scope boundary for reference resolution)
   processIndex: number; // index within a process chain (-1 if standalone)
-  noteTarget: string | null; // if type='note', the node it's attached to
+  parentId?: string | null; // positioned note: the DSL node id of the containing element
+  noteX?: number; // positioned note: grid column offset relative to parent (0 = same column)
+  noteY?: number; // positioned note: grid row offset relative to parent (0 = same row)
   customId?: string; // optional user-provided id (differs from auto-generated id when set)
   next?: string | null; // next node id; null = explicitly no next (from next="")
   altNext?: string | null; // negative next node id (for policy no-path, rendered below)

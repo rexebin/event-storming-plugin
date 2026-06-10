@@ -63,4 +63,6 @@ export interface LayoutLink {
   target: string;
   label: string;
   type: string;
+  noteX?: number;
+  noteY?: number;
 }

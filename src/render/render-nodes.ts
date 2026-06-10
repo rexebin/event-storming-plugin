@@ -1,21 +1,18 @@
 import * as d3 from 'd3';
 import { GSelection } from './models.js';
-import { NODE_W, NODE_H, NODE_FOLD } from '../layout/constants.js';
-import type { LayoutNode } from '../layout/models.js';
-import { DSLModel } from '../parser/';
-import { getNodeNotes } from '../notes.js';
+import { NODE_W, NODE_H, NODE_FOLD } from '../layout';
+import type { LayoutNode, LayoutLink } from '../layout';
 import { wrapText } from '../text.js';
 import { isLight } from '../utils.js';
-import { computeLinkPath, getLinkLabelPosition } from '../links/index.js';
+import { computeLinkPath, getLinkLabelPosition } from '../links';
 
 export function renderNodes(
   g: GSelection,
   nodes: LayoutNode[],
   offsetX: number,
-  model: DSLModel,
 ): void {
   for (const node of nodes) {
-    const nodeNotes = getNodeNotes(node, model);
+    const nodeNotes = node.notes || [];
     const ng = g.append('g')
       .attr('class', 'es-node')
       .attr('transform', `translate(${node.x + offsetX}, ${node.y})`)
@@ -78,7 +75,7 @@ export function renderNodes(
 
 export function renderLinks(
   g: GSelection,
-  links: { source: string; target: string; label: string; type: string }[],
+  links: LayoutLink[],
   nodes: LayoutNode[],
   offsetX: number,
 ): void {
@@ -90,9 +87,8 @@ export function renderLinks(
 
     const adjustedSource = { ...source, x: source.x + offsetX };
     const adjustedTarget = { ...target, x: target.x + offsetX };
-    const pathD = computeLinkPath(adjustedSource, adjustedTarget, link.type);
+    const pathD = computeLinkPath(adjustedSource, adjustedTarget, link.type, false, link.noteX, link.noteY);
 
-    const isNoteTarget = target.type === 'note';
     g.append('path')
       .attr('class', `es-link es-link-${link.type}`)
       .attr('data-source', link.source)
@@ -100,8 +96,7 @@ export function renderLinks(
       .attr('d', pathD)
       .attr('fill', 'none')
       .attr('stroke-width', 1.5)
-      .attr('marker-end', isNoteTarget ? undefined : 'url(#arrowhead)')
-      .attr('marker-start', isNoteTarget ? 'url(#arrowhead-start)' : undefined);
+      .attr('marker-end', 'url(#arrowhead)');
 
     if (link.label) {
       const labelPosition = getLinkLabelPosition(pathD);

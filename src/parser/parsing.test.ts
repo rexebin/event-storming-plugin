@@ -45,26 +45,55 @@ describe('parseDSL', () => {
       parseDSL(xml);
     });
 
-    it('should parse Note nodes as note type with note color', () => {
+    it('should parse any <note> child as positioned with default grid offsets', () => {
       const xml = `<eventstorming><aggregate name="User"><container name="User Registration">
-        <event name="UserRegistered" next="Some Note"/>
-        <note name="Some Note"><note>Attached to the event</note></note>
+        <event name="UserRegistered"/>
+        <note>Note above</note>
+        <note x="1" y="0">With attributes (ignored)</note>
       </container></aggregate></eventstorming>`;
-      parseDSL(xml);
+      const result = parseDSL(xml);
+      const noteNodes = result.nodes.filter((n) => n.type === 'note');
+      expect(noteNodes).toHaveLength(2);
+      expect(noteNodes[0].parentId).toBe('User_Registration_UserRegistered');
+      // Defaults always applied
+      expect(noteNodes[0].noteX).toBe(0);
+      expect(noteNodes[0].noteY).toBe(1);
+      expect(noteNodes[1].label).toBe('With attributes (ignored)');
     });
 
-    it('parses notes from child <note> element on a note flow node', () => {
-      const xml = `<eventstorming>
-  <aggregate name="Order">
-    <container name="Test">
-      <event name="OrderPlaced" next="Some Note" />
-      <note name="Some Note"><note>This is a note attached to the event.</note></note>
-    </container>
-  </aggregate>
-</eventstorming>`;
+    it('should skip note when no parent node exists yet', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Test">
+        <note>No parent</note>
+        <command name="PlaceOrder"/>
+      </container></aggregate></eventstorming>`;
       const result = parseDSL(xml);
-      const noteNode = result.nodes.find(n => n.label === 'Some Note');
-      expect(noteNode?.notes).toEqual(['This is a note attached to the event.']);
+      const noteNodes = result.nodes.filter((n) => n.type === 'note');
+      // First note has no parent → skipped. Command is a regular node, not a note.
+      expect(noteNodes).toHaveLength(0);
+    });
+
+    it('should read x/y attributes from note for positioning', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Test">
+        <command name="PlaceOrder"/>
+        <note x="99" y="-3">Positioned note</note>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const noteNodes = result.nodes.filter((n) => n.type === 'note');
+      expect(noteNodes).toHaveLength(1);
+      expect(noteNodes[0].noteX).toBe(99);
+      expect(noteNodes[0].noteY).toBe(-3);
+    });
+
+    it('should default to x=0, y=1 when no attributes on note', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Test">
+        <command name="PlaceOrder"/>
+        <note>Default position</note>
+      </container></aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      const noteNodes = result.nodes.filter((n) => n.type === 'note');
+      expect(noteNodes).toHaveLength(1);
+      expect(noteNodes[0].noteX).toBe(0);
+      expect(noteNodes[0].noteY).toBe(1);
     });
 
     it('should not assign implicit next when next="" (XML)', () => {

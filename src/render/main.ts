@@ -51,7 +51,7 @@ export function renderEventStorming(
 
   // Nodes
   const nodesGroup = svg.append('g').attr('class', 'nodes');
-  renderNodes(nodesGroup as GSelection, layout.nodes, offsetX, model);
+  renderNodes(nodesGroup as GSelection, layout.nodes, offsetX);
 
   // Links (on top of nodes so arrowheads are visible)
   const linksGroup = svg.append('g').attr('class', 'links');

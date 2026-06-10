@@ -31,7 +31,7 @@ export function DocumentationPanel() {
           <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-blue-300">&lt;policy&gt;</code> — Blue, rule or decision.</p>
           <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-cyan-300">&lt;error&gt;</code> — Cyan, error/exception path.</p>
           <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-pink-300">&lt;externalsystem&gt;</code> — Pink, external system interaction.</p>
-          <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-yellow-400">&lt;note&gt;</code> — Light yellow, annotation label (flow node).</p>
+          <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-yellow-400">&lt;note&gt;</code> — Light yellow, positioned annotation badge (requires x and y attributes).</p>
         </div>
       </section>
 
@@ -41,20 +41,22 @@ export function DocumentationPanel() {
         <div className="space-y-1.5 text-xs">
           <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">name</code> — Display label on the node. Required for visibility.</p>
 
-          <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">id</code> — Optional custom identifier. Prefixed with <code className="bg-[#2d2d2d] px-1 py-0.5 rounded">custom-</code> internally.</p>
-
-          <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">next</code> — Reference ID of another node in the same scope. Renders as arrow pointing right. Set to empty string to end flow.</p>
-
-          <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">altNext</code> — Reference ID for failure/alternative path. Renders below the node. Unresolved refs auto-create an implicit error node.</p>
+          <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">id</code> — Optional custom identifier for referencing in <code className="bg-[#2d2d2d] px-1 py-0.5 rounded">next</code>/<code className="bg-[#2d2d2d] px-1 py-0.5 rounded">altNext</code>. Prefixed with <code className="bg-[#2d2d2d] px-1 py-0.5 rounded">custom-</code> internally.</p>
 
           <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">offset</code> — Integer horizontal shift (1 unit = NODE_W + NODE_GAP_X). Positive or negative values allowed.</p>
+
+          <p><code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">x</code>, <code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-purple-300">y</code> — Grid column/row offsets for positioned notes. A <code className="bg-[#2d2d2d] px-1 py-0.5 rounded">&lt;note x="1" y="-1"&gt;</code> placed as a child creates a note badge at 1 column right, 1 row above its parent node.</p>
         </div>
       </section>
 
       {/* Notes */}
       <section className="mb-4">
         <h3 className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2">Inline Notes</h3>
-        <p className="text-xs text-gray-400">Bare <code className="bg-[#2d2d2d] px-1 py-0.5 rounded">&lt;note&gt;...&lt;/note&gt;</code> as a child element provides metadata annotation on the parent node.</p>
+        <p className="text-xs text-gray-400">Use the <code className="bg-[#2d2d2d] px-1 py-0.5 rounded">notes="…"</code> attribute on any element to attach inline metadata annotations. Elements with notes show an `i` badge, and hovering them shows a notes-only tooltip.</p>
+        <h3 className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2 mt-3">Positioned Notes</h3>
+        <p className="text-xs text-gray-400"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded">&lt;note x="…" y="…"&gt;…&lt;/note&gt;</code> as a child element renders a separate badge connected by an arrow from the note to its parent:</p>
+        <p className="text-xs text-gray-400 mt-1"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded">&lt;note x="1" y="-1"&gt;Requires manager approval&lt;/note&gt;</code></p>
+        <p className="text-xs text-gray-400 mt-1"><code className="bg-[#2d2d2d] px-1 py-0.5 rounded">x</code>: grid column offset from parent (0 = same column, positive = right). <code className="bg-[#2d2d2d] px-1 py-0.5 rounded">y</code>: grid row offset (0 = same row, negative = above).</p>
       </section>
     </div>
   )

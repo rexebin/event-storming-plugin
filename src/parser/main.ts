@@ -5,13 +5,14 @@
  * → synthetic process generation.
  */
 
-import type { DSLModel, DSLContainer, DSLNode } from './models.js';
+import type { DSLModel, DSLContainer } from './models.js';
 import type { PendingRef } from './parsing.js';
 import { normalizeId, XML_NODE_TYPES } from './models.js';
 import {
-  xmlAttrNotes,
-  makeXmlNode,
+
   buildContainerTree,
+  addPositionedNote,
+  makeXmlNode,
   resolveNodeRefs,
   applyImplicitLinking,
   resolveInlineProcessRefs,
@@ -81,13 +82,14 @@ function parseXMLDSL(text: string): DSLModel {
       processes: [],
       parentId: null,
       subContainers: [],
-      notes: xmlAttrNotes(diagramEl),
+      notes: diagramEl.getAttribute('notes') ? [diagramEl.getAttribute('notes')!] : [],
     };
 
     // Phase 1 & 1b: Collect inline process nodes and nested containers.
     const pendingChildren: Array<{ node: PendingRef['node']; rawNext?: string; rawNegativeNext?: string }> = [];
     const inlineStepIds: string[] = [];
     const allChildContainers: Array<{ el: Element; prefix: string }> = [];
+    let lastRegularNodeId: string | undefined;
 
     for (const childEl of Array.from(diagramEl.children)) {
       const tagLower2 = childEl.tagName.toLowerCase();
@@ -96,12 +98,21 @@ function parseXMLDSL(text: string): DSLModel {
         allChildContainers.push({ el: childEl, prefix: childPrefix });
         continue;
       }
-      if (cType !== 'process') continue;
 
-      const n = makeXmlNodeForTag(childEl, tagLower2, dslContainer.id, containerId + '_');
-      if (!n) continue;
+      // Positioned note → create as layout node linked to parent
+      if (tagLower2 === 'note') {
+        if (lastRegularNodeId) {
+          addPositionedNote(childEl, dslContainer, model, lastRegularNodeId, inlineStepIds.length);
+        }
+        continue;
+      }
+
+      const nodeType = XML_NODE_TYPES[tagLower2];
+      if (!nodeType) continue;
+      const n = makeXmlNode(childEl, nodeType, dslContainer.id, containerId + '_');
       model.nodes.push(n);
       inlineStepIds.push(n.id);
+      lastRegularNodeId = n.id;
       pendingChildren.push({ node: n, rawNext: childEl.getAttribute('next') ?? undefined, rawNegativeNext: childEl.getAttribute('altNext') ?? undefined });
     }
 
@@ -142,13 +153,6 @@ function parseXMLDSL(text: string): DSLModel {
   for (const c of model.containers) ensureSyntheticProcesses(c, model.nodes);
 
   return model;
-}
-
-function makeXmlNodeForTag(el: Element, tagLower: string, containerId: string, idPrefix: string): DSLNode | null {
-  const nodeType = XML_NODE_TYPES[tagLower];
-  if (!nodeType) return null;
-  if (tagLower === 'note' && !el.getAttribute('name')) return null;
-  return makeXmlNode(el, nodeType, containerId, idPrefix);
 }
 
 export function parseDSL(text: string): DSLModel {

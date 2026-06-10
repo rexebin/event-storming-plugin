@@ -1,4 +1,4 @@
-import type { LayoutNode } from '../layout';
+import {ALT_BRANCH_GAP, LayoutNode} from '../layout';
 import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from '../layout';
 
 export function computeLinkPath(
@@ -6,7 +6,14 @@ export function computeLinkPath(
   target: LayoutNode,
   type: string,
   isNegative: boolean = false,
+  noteX?: number,
+  noteY?: number,
 ): string {
+  // ─── Note link routing (special case) ──────────────────────────
+  if (source.type === 'note' && typeof noteX === 'number' && typeof noteY === 'number') {
+    return noteLinkPath(source, target, noteX, noteY);
+  }
+
   const isNeg = isNegative || type === 'negative';
   if (isNeg) {
     return altNextPath(source, target);
@@ -178,3 +185,112 @@ function eventToReadModelBezierPath(source: LayoutNode, target: LayoutNode, sour
 
   return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetApproachY}, ${targetX} ${targetAnchorY}`;
 }
+
+// ─── Note-to-parent link routing (grid-based offsets) ──────────────
+// All cases use near edges so the arrowhead lands at the facing edge of the parent.
+
+function noteLinkPath(
+  source: LayoutNode,
+  target: LayoutNode,
+  noteX: number,
+  noteY: number,
+): string {
+  if (noteX === 0) {
+    return verticalNotePath(source, target, noteY);
+  }
+  if (noteY === 0) {
+    return horizontalNotePath(source, target, noteX);
+  }
+  return orthogonalNotePath(source, target, noteX, noteY);
+}
+
+function verticalNotePath(source: LayoutNode, target: LayoutNode, noteY: number): string {
+  const midLeftX = source.x;
+  const midLeftY = source.y + NODE_H / 2;
+  const targetMidY = target.y + NODE_H / 2;
+
+  // Large vertical offset — route from mid-left edge to avoid passing through parent's space
+  if (Math.abs(noteY) > 1) {
+    const detourX = source.x - NODE_GAP_X / 2;
+    // Note above → down along left-detour to target mid-Y, then right into parent
+    // Note below → up along left-detour to target mid-Y, then right into parent
+    return `M ${midLeftX} ${midLeftY} L ${detourX} ${midLeftY} L ${detourX} ${targetMidY} L ${target.x} ${targetMidY}`;
+  }
+
+  // Adjacent (|y|=1) → straight vertical from near edges via center-X
+  const cx = source.x + NODE_W / 2;
+  if (source.y < target.y) {
+    // Note above → near edges: bottom of note to top of parent
+    return `M ${cx} ${source.y + NODE_H} L ${cx} ${target.y}`;
+  }
+  // Note below → near edges: top of note to bottom of parent
+  return `M ${cx} ${source.y} L ${cx} ${target.y + NODE_H}`;
+}
+
+function horizontalNotePath(source: LayoutNode, target: LayoutNode, noteX: number): string {
+  const cx = source.x + NODE_W / 2;
+  const cy = source.y + NODE_H / 2;
+
+  if (Math.abs(noteX) === 1) {
+    // Adjacent → straight horizontal line between near edges
+    const startX = noteX > 0 ? source.x : source.x + NODE_W;
+    const endX = noteX > 0 ? target.x + NODE_W : target.x;
+    return `M ${startX} ${cy} L ${endX} ${cy}`;
+  }
+
+  // Non-adjacent → top-center detour: start from source top-edge middle, horizontal to target CX, down to target.y
+  const gapOffset = (NODE_GAP_Y + ALT_BRANCH_GAP) / 2;
+  const detourY = source.y - gapOffset;
+  const targetCX = target.x + NODE_W / 2;
+
+  return `M ${cx} ${source.y} L ${cx} ${detourY} L ${targetCX} ${detourY} L ${targetCX} ${target.y}`;
+}
+
+function orthogonalNotePath(source: LayoutNode, target: LayoutNode, noteX: number, noteY: number): string {
+  const sourceCX = source.x + NODE_W / 2;
+  const targetCX = target.x + NODE_W / 2;
+  const colGapX = noteX > 0
+    ? target.x + NODE_W + NODE_GAP_X / 2   // gap to the right of parent column
+    : target.x - NODE_GAP_X / 2;           // gap to the left of parent column
+
+  if (source.y < target.y) {
+    const step1Y = Math.abs(noteY) > 1
+      ? source.y + NODE_H + (NODE_GAP_Y + ALT_BRANCH_GAP) / 2
+      : Math.round((source.y + NODE_H + target.y) / 2);
+    if (Math.abs(noteY) > 1) {
+      const gapAboveParentY = target.y - (NODE_GAP_Y + ALT_BRANCH_GAP) / 2;
+      return (
+        `M ${sourceCX} ${source.y + NODE_H} ` +
+        `L ${sourceCX} ${step1Y} ` +
+        `L ${colGapX} ${step1Y} ` +
+        `L ${colGapX} ${gapAboveParentY} ` +
+        `L ${targetCX} ${gapAboveParentY} ` +
+        `L ${targetCX} ${target.y}`
+      );
+    }
+    return `M ${sourceCX} ${source.y + NODE_H}
+     L ${sourceCX} ${step1Y} 
+     L ${targetCX} ${step1Y} 
+     L ${targetCX} ${target.y}`;
+  }
+
+  const step1Y = Math.abs(noteY) > 1
+    ? source.y - (NODE_GAP_Y + ALT_BRANCH_GAP) / 2
+    : Math.round((source.y  + target.y + NODE_H) / 2);
+  if (Math.abs(noteY) > 1) {
+    const gapBelowParentY = target.y + NODE_H + (NODE_GAP_Y + ALT_BRANCH_GAP) / 2;
+    return (
+      `M ${sourceCX} ${source.y} ` +
+      `L ${sourceCX} ${step1Y} ` +
+      `L ${colGapX} ${step1Y} ` +
+      `L ${colGapX} ${gapBelowParentY} ` +
+      `L ${targetCX} ${gapBelowParentY} ` +
+      `L ${targetCX} ${target.y + NODE_H}`
+    );
+  }
+  return `M ${sourceCX} ${source.y} 
+  L ${sourceCX} ${step1Y} 
+  L ${targetCX} ${step1Y} 
+  L ${targetCX} ${target.y + NODE_H}`;
+}
+

@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 import {GSelection} from './models.js';
 import {DSLModel} from '../parser/';
 import type {LayoutNode} from '../layout';
-import {formatNodeType, getNodeNotes} from '../notes.js';
+import {formatNodeType} from '../notes.js';
 import {escapeHtml} from '../utils.js';
 
 export interface ZoomOptions {
@@ -41,7 +41,7 @@ export function setupTooltips(
     const node = nodeMap.get(nodeId);
     if (!node) return '';
 
-    const nodeNotes = getNodeNotes(node, model);
+    const nodeNotes = node.notes || [];
     const notesHtml = nodeNotes.length > 0
       ? `<div class="es-tooltip-notes"><div class="es-tooltip-notes-label">Notes</div><ul>${
         nodeNotes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')
