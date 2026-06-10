@@ -6,7 +6,7 @@ export const NODE_W = 130;
 export const NODE_H = 120;
 export const NODE_FOLD = 16;
 export const NODE_GAP_X = 36;
-export const NODE_GAP_Y = 22;
+export const NODE_GAP_Y = 42;
 
 export const CONTAINER_PADDING = 24;
 export const CONTAINER_HEADER_H = 32;
@@ -21,7 +21,6 @@ export const SUB_GROUP_GAP_X = 24;
 
 export const SUB_PAD_BASE = 8;
 export const NESTED_GAP = 14;
-export const ALT_BRANCH_GAP = 20;
 export const CONTAINER_BOTTOM_EXTRA = 20;
 
 export const MAX_ROW_WIDTH = 1200;

@@ -13,7 +13,7 @@ import {
   NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y,
   CONTAINER_PADDING, CONTAINER_HEADER_H, CONTAINER_GAP_X, CONTAINER_GAP_Y,
   GROUP_PADDING, GROUP_HEADER_H, GROUP_GAP_Y,
-  SUB_PAD_BASE, NESTED_GAP, CONTAINER_BOTTOM_EXTRA, MAX_ROW_WIDTH, ALT_BRANCH_GAP,
+  SUB_PAD_BASE, NESTED_GAP, CONTAINER_BOTTOM_EXTRA, MAX_ROW_WIDTH,
 } from './constants.js';
 
 // ─── Private helpers ─────────────────────────────────────────
@@ -310,7 +310,7 @@ export function computeLayout(model: DSLModel): LayoutResult {
     if (!parent) continue; // spec: "only placed as child of node, or ignored"
     const noteX = note.noteX ?? 0;
     const noteY = note.noteY ?? -1;
-    allNodes.push({ ...note, x: parent.x + noteX * (NODE_W + NODE_GAP_X), y: parent.y - noteY * (NODE_H + NODE_GAP_Y + ALT_BRANCH_GAP) });
+    allNodes.push({ ...note, x: parent.x + noteX * (NODE_W + NODE_GAP_X), y: parent.y - noteY * (NODE_H + NODE_GAP_Y) });
   }
 
   // Create note-to-parent links for positioned notes.

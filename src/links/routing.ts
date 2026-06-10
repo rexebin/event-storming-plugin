@@ -1,4 +1,4 @@
-import {ALT_BRANCH_GAP, LayoutNode} from '../layout';
+import {LayoutNode} from '../layout';
 import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from '../layout';
 
 export function computeLinkPath(
@@ -70,7 +70,7 @@ export function computeLinkPath(
 // Always exits from the bottom-center of source, goes down to clear the node,
 // routes sideways toward target, then enters from above.
 function altNextPath(source: LayoutNode, target: LayoutNode): string {
-  const gapY = NODE_GAP_Y + 20;
+  const gapY = NODE_GAP_Y;
   const sourceCenterX = source.x + NODE_W / 2;
   const targetCenterX = target.x + NODE_W / 2;
 
@@ -239,7 +239,7 @@ function horizontalNotePath(source: LayoutNode, target: LayoutNode, noteX: numbe
   }
 
   // Non-adjacent → top-center detour: start from source top-edge middle, horizontal to target CX, down to target.y
-  const gapOffset = (NODE_GAP_Y + ALT_BRANCH_GAP) / 2;
+  const gapOffset = NODE_GAP_Y / 2;
   const detourY = source.y - gapOffset;
   const targetCX = target.x + NODE_W / 2;
 
@@ -255,10 +255,10 @@ function orthogonalNotePath(source: LayoutNode, target: LayoutNode, noteX: numbe
 
   if (source.y < target.y) {
     const step1Y = Math.abs(noteY) > 1
-      ? source.y + NODE_H + (NODE_GAP_Y + ALT_BRANCH_GAP) / 2
+      ? source.y + NODE_H + NODE_GAP_Y / 2
       : Math.round((source.y + NODE_H + target.y) / 2);
     if (Math.abs(noteY) > 1) {
-      const gapAboveParentY = target.y - (NODE_GAP_Y + ALT_BRANCH_GAP) / 2;
+      const gapAboveParentY = target.y - NODE_GAP_Y / 2;
       return (
         `M ${sourceCX} ${source.y + NODE_H} ` +
         `L ${sourceCX} ${step1Y} ` +
@@ -275,10 +275,10 @@ function orthogonalNotePath(source: LayoutNode, target: LayoutNode, noteX: numbe
   }
 
   const step1Y = Math.abs(noteY) > 1
-    ? source.y - (NODE_GAP_Y + ALT_BRANCH_GAP) / 2
+    ? source.y - NODE_GAP_Y / 2
     : Math.round((source.y  + target.y + NODE_H) / 2);
   if (Math.abs(noteY) > 1) {
-    const gapBelowParentY = target.y + NODE_H + (NODE_GAP_Y + ALT_BRANCH_GAP) / 2;
+    const gapBelowParentY = target.y + NODE_H + NODE_GAP_Y / 2;
     return (
       `M ${sourceCX} ${source.y} ` +
       `L ${sourceCX} ${step1Y} ` +
