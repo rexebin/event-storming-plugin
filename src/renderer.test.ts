@@ -5,7 +5,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import * as d3 from 'd3';
 import { renderEventStorming } from './render';
-import { computeLayout, computeContainerHeight, NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './layout';
+import { computeLayout, NODE_H, NODE_W, NODE_GAP_X, NODE_GAP_Y, CONTAINER_PADDING, GROUP_PADDING, CONTAINER_HEADER_H } from './layout';
 import { computeLinkPath } from './links';
 import { parseDSL } from './parser/';
 
@@ -793,14 +793,13 @@ describe('renderEventStorming layout', () => {
       expect(nodeC.y + NODE_H).toBeLessThanOrEqual(group.y + group.height);
     });
 
-    it('computeContainerHeight includes extra rows for negative-offset nodes', () => {
-      const model = parseDSL(negOffsetXml);
-      const container = model.containers[0];
-      const height = computeContainerHeight(container, model);
-      // base = CONTAINER_HEADER_H + CONTAINER_PADDING*2 + 1*(NODE_H+NODE_GAP_Y) + 10 = 232
-      // with 1 node having offset=-1, should add at least one extra row
-      const baseOneProcess = CONTAINER_HEADER_H + CONTAINER_PADDING * 2 + (NODE_H + NODE_GAP_Y) + 10;
-      expect(height).toBeGreaterThan(baseOneProcess);
+    it('container with a negative-offset node is tall enough to contain it', () => {
+      const layout = computeLayout(parseDSL(negOffsetXml));
+      const container = layout.containers[0];
+      const offsetNode = layout.nodes.find(n => n.label === 'B')!;
+
+      expect(offsetNode).toBeTruthy();
+      expect(container.y + container.height).toBeGreaterThanOrEqual(offsetNode.y + NODE_H + CONTAINER_PADDING);
     });
 
     it('positive offset is still horizontal (unchanged)', () => {
