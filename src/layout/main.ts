@@ -7,7 +7,7 @@ import type { LayoutNode, LayoutContainer, LayoutGroup, LayoutSubGroup, LayoutLi
 import { getProcessNodes, getProcessRoots, detectSharedTargetFanIn } from './helpers.js';
 import { computeSubGroupDepths, computeMaxSubGroupDepth, layoutChainFrom } from './chains.js';
 import { layoutFanInProcess } from './fan-in.js';
-import { computeContainerWidth, computeContainerHeight } from './sizing.js';
+
 import { layoutStandaloneNodes } from './standalone.js';
 import {
   NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y,
@@ -232,43 +232,6 @@ function layoutUnpositionedNodes(
   }
 }
 
-function computeContainerBounds(
-  treeIds: Set<string>,
-  containerId: string,
-  cx: number,
-  cy: number,
-  containerH: number,
-  containerW: number,
-  allNodes: LayoutNode[],
-  allGroups: LayoutGroup[],
-  allSubGroups: LayoutSubGroup[],
-): { width: number; height: number } {
-  let maxBottom = 0;
-  let maxRight = 0;
-  for (const n of allNodes) {
-    if (treeIds.has(n.containerId!)) {
-      maxBottom = Math.max(maxBottom, n.y + NODE_H);
-      maxRight = Math.max(maxRight, n.x + NODE_W);
-    }
-  }
-  for (const g of allGroups) {
-    if (g.containerId === containerId) {
-      maxBottom = Math.max(maxBottom, g.y + g.height);
-      maxRight = Math.max(maxRight, g.x + g.width);
-    }
-  }
-  for (const sg of allSubGroups) {
-    if (sg.containerId === containerId) {
-      maxBottom = Math.max(maxBottom, sg.y + sg.height);
-      maxRight = Math.max(maxRight, sg.x + sg.width);
-    }
-  }
-  return {
-    height: Math.max(containerH, maxBottom - cy + CONTAINER_PADDING + CONTAINER_BOTTOM_EXTRA),
-    width: Math.max(containerW, maxRight - cx + CONTAINER_PADDING),
-  };
-}
-
 // ─── Orchestrator ────────────────────────────────────────────
 
 export function computeLayout(model: DSLModel): LayoutResult {
@@ -277,29 +240,27 @@ export function computeLayout(model: DSLModel): LayoutResult {
   const allGroups: LayoutGroup[] = [];
   const allSubGroups: LayoutSubGroup[] = [];
   const allLinks: LayoutLink[] = [];
-  let x = 0;
-  let y = 0;
-  let rowBottom = 0;
 
-  // Render top-level containers only — nested child containers are rendered inside
-  // their parent's synthetic process instead.
+  type PendingContainer = {
+    containerRef: LayoutContainer;
+    treeIds: Set<string>;
+    nodeIndices: number[];
+    groupIndices: number[];
+    subGroupIndices: number[];
+  };
+  const pending: PendingContainer[] = [];
+
+  // Phase 1+2: layout each top-level container at origin (0,0), then compute real size from bounding box.
   for (const container of model.containers) {
     if (container.parentId !== null) continue;
-    const containerW = computeContainerWidth(container, model);
-    const containerH = computeContainerHeight(container, model);
 
-    if (x > 0 && x + containerW > (CONTAINER_GAP_X * 2 + MAX_ROW_WIDTH)) {
-      x = 0;
-      y = rowBottom + CONTAINER_GAP_Y;
-    }
+    const treeIds = collectDescendantIds(container.id, model.containers);
+    const nodesBefore = allNodes.length;
+    const groupsBefore = allGroups.length;
+    const subGroupsBefore = allSubGroups.length;
 
-    const cx = x;
-    const cy = y;
-    const containerRef: LayoutContainer = { ...container, x: cx, y: cy, width: containerW, height: containerH, notes: container.notes };
-    allContainers.push(containerRef);
-
-    const innerX = cx + CONTAINER_PADDING;
-    const innerY = cy + CONTAINER_HEADER_H + CONTAINER_PADDING;
+    const innerX = CONTAINER_PADDING;
+    const innerY = CONTAINER_HEADER_H + CONTAINER_PADDING;
     const positioned = new Set<string>();
     let processY = innerY;
 
@@ -314,9 +275,6 @@ export function computeLayout(model: DSLModel): LayoutResult {
 
     layoutUnpositionedNodes(container, model, innerX, processY, positioned, allNodes);
 
-    const treeIds = collectDescendantIds(container.id, model.containers);
-
-    // Position notes for this container tree before computing bounds, then create their links.
     for (const note of model.nodes) {
       if (!treeIds.has(note.containerId!) || note.type !== 'note' || !note.parentId) continue;
       if (allNodes.some((n) => n.id === note.id)) continue;
@@ -328,20 +286,40 @@ export function computeLayout(model: DSLModel): LayoutResult {
       allLinks.push({ source: note.id, target: note.parentId!, label: '', type: 'default', noteX: note.noteX, noteY: note.noteY });
     }
 
-    // Correct top/left overflow: shift all container tree contents down/right if notes extend outside.
-    const containerNotes = allNodes.filter((n) => treeIds.has(n.containerId!) && n.type === 'note');
-    if (containerNotes.length > 0) {
-      const minNoteY = Math.min(...containerNotes.map((n) => n.y));
-      const minNoteX = Math.min(...containerNotes.map((n) => n.x));
-      const topOverflow  = Math.max(0, (cy + CONTAINER_HEADER_H + CONTAINER_PADDING) - minNoteY);
-      const leftOverflow = Math.max(0, (cx + CONTAINER_PADDING) - minNoteX);
-      if (topOverflow > 0 || leftOverflow > 0) {
-        for (const n of allNodes)      { if (treeIds.has(n.containerId!))    { n.y += topOverflow; n.x += leftOverflow; } }
-        for (const g of allGroups)     { if (g.containerId === container.id) { g.y += topOverflow; g.x += leftOverflow; } }
-        for (const sg of allSubGroups) { if (sg.containerId === container.id){ sg.y += topOverflow; sg.x += leftOverflow; } }
-        containerRef.height += topOverflow;
-        containerRef.width  += leftOverflow;
-      }
+    // Compute bounding box over all content for this container tree.
+    let minX = innerX;
+    let minY = innerY;
+    let maxRight = 0;
+    let maxBottom = 0;
+    for (const n of allNodes.slice(nodesBefore)) {
+      if (!treeIds.has(n.containerId!)) continue;
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxRight = Math.max(maxRight, n.x + NODE_W);
+      maxBottom = Math.max(maxBottom, n.y + NODE_H);
+    }
+    for (const g of allGroups.slice(groupsBefore)) {
+      if (g.containerId !== container.id) continue;
+      minX = Math.min(minX, g.x);
+      minY = Math.min(minY, g.y);
+      maxRight = Math.max(maxRight, g.x + g.width);
+      maxBottom = Math.max(maxBottom, g.y + g.height);
+    }
+    for (const sg of allSubGroups.slice(subGroupsBefore)) {
+      if (sg.containerId !== container.id) continue;
+      maxRight = Math.max(maxRight, sg.x + sg.width);
+      maxBottom = Math.max(maxBottom, sg.y + sg.height);
+    }
+
+    // Shift content if notes overflow the container's left/top boundary.
+    const overflowLeft = Math.max(0, CONTAINER_PADDING - minX);
+    const overflowTop  = Math.max(0, innerY - minY);
+    if (overflowLeft > 0 || overflowTop > 0) {
+      for (const n of allNodes)      { if (treeIds.has(n.containerId!))     { n.x += overflowLeft; n.y += overflowTop; } }
+      for (const g of allGroups)     { if (g.containerId === container.id)  { g.x += overflowLeft; g.y += overflowTop; } }
+      for (const sg of allSubGroups) { if (sg.containerId === container.id) { sg.x += overflowLeft; sg.y += overflowTop; } }
+      maxRight  += overflowLeft;
+      maxBottom += overflowTop;
     }
 
     // Expand each process group to include notes attached to its nodes.
@@ -353,13 +331,40 @@ export function computeLayout(model: DSLModel): LayoutResult {
       expandGroupBoundsForNotes(group, groupNotes);
     });
 
-    const bounds = computeContainerBounds(
-      treeIds, container.id, cx, cy, containerRef.height, containerRef.width, allNodes, allGroups, allSubGroups,
-    );
-    containerRef.width = bounds.width;
-    containerRef.height = bounds.height;
-    rowBottom = Math.max(rowBottom, cy + bounds.height);
-    x += bounds.width + CONTAINER_GAP_X;
+    const width  = maxRight  + CONTAINER_PADDING;
+    const height = maxBottom + CONTAINER_PADDING + CONTAINER_BOTTOM_EXTRA;
+
+    const containerRef: LayoutContainer = { ...container, x: 0, y: 0, width, height, notes: container.notes };
+    allContainers.push(containerRef);
+
+    pending.push({
+      containerRef,
+      treeIds,
+      nodeIndices:     allNodes.reduce<number[]>((acc, n, i)   => { if (i >= nodesBefore      && treeIds.has(n.containerId!))     acc.push(i); return acc; }, []),
+      groupIndices:    allGroups.reduce<number[]>((acc, g, i)  => { if (i >= groupsBefore     && g.containerId === container.id)  acc.push(i); return acc; }, []),
+      subGroupIndices: allSubGroups.reduce<number[]>((acc, sg, i) => { if (i >= subGroupsBefore && sg.containerId === container.id) acc.push(i); return acc; }, []),
+    });
+  }
+
+  // Phase 3: pack containers into rows and translate content to absolute positions.
+  let x = 0;
+  let y = 0;
+  let rowBottom = 0;
+
+  for (const { containerRef, nodeIndices, groupIndices, subGroupIndices } of pending) {
+    if (x > 0 && x + containerRef.width > CONTAINER_GAP_X * 2 + MAX_ROW_WIDTH) {
+      x = 0;
+      y = rowBottom + CONTAINER_GAP_Y;
+    }
+    const cx = x;
+    const cy = y;
+    containerRef.x = cx;
+    containerRef.y = cy;
+    for (const i of nodeIndices)     { allNodes[i].x     += cx; allNodes[i].y     += cy; }
+    for (const i of groupIndices)    { allGroups[i].x    += cx; allGroups[i].y    += cy; }
+    for (const i of subGroupIndices) { allSubGroups[i].x += cx; allSubGroups[i].y += cy; }
+    rowBottom = Math.max(rowBottom, cy + containerRef.height);
+    x += containerRef.width + CONTAINER_GAP_X;
   }
 
   const standaloneNodes = model.nodes.filter((n) => !n.containerId);
