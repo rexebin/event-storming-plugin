@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeLinkPath } from './links';
-import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y, ALT_BRANCH_GAP } from './layout/constants';
+import { NODE_W, NODE_H, NODE_GAP_X, NODE_GAP_Y } from './layout/constants.js';
 
 function makeNode(id: string, x: number, y: number, type: string) {
   return { id, x, y, label: '', type, color: '#FEE254', containerId: 'c', processIndex: 0, next: undefined, altNext: undefined, notes: [] } as any;
@@ -204,10 +204,10 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(65);       // center X = source.x + NODE_W/2 = 0+65
-        expect(coords[1]).toBe(142);      // source.y (near edge for below-note in vertical path)
+        expect(coords[0]).toBe(65);
+        expect(coords[1]).toBe(162);
         expect(coords[2]).toBe(65);
-        expect(coords[3]).toBe(120);      // target.bottom (near edge for below-note)
+        expect(coords[3]).toBe(120);
       }
     });
 
@@ -222,60 +222,57 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(65);       // center X = source.x + NODE_W/2 = 0+65
-        expect(coords[1]).toBe(-22);      // source.bottom edge = -142 + 120
+        expect(coords[0]).toBe(65);
+        expect(coords[1]).toBe(-42);
         expect(coords[2]).toBe(65);
-        expect(coords[3]).toBe(0);        // target.y (top edge of parent, near edge for above-note)
+        expect(coords[3]).toBe(0);
       }
     });
 
     it('source above with |y|>1 → depart bottom, go left below parent, approach top', () => {
       // noteX=0, noteY=3 → same column, far above; routes from source.bottom via left-detour below parent to target.top
-      const source = makeNoteNode('note', 0, -3 * (NODE_H + NODE_GAP_Y + ALT_BRANCH_GAP));
+      const source = makeNoteNode('note', 0, -3 * (NODE_H + 2 * NODE_GAP_Y));
       const target = makeNoteNode('parent', 0, 0, 'command');
       const pathD = makeNoteLink(source, target, 0, 3);
 
       expect(pathD).not.toContain(' C ');
-      // source.y = -486; source.bottom = -486 + 120 = -366
-      // gapBelowParentY = NODE_H + (GAP_Y+ALT)/2 = 120 + 21 = 141
-      // Expected: M 0 -366 L -18 -366 L -18 141 L 0 0
+      // source.y = -534; source.bottom = -534 + 120 = -414
+      // gapBelowParentY = NODE_H + NODE_GAP_Y = 120+44 = 164
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
         expect(coords.length).toBe(8);
-        expect(coords[0]).toBe(0);         // source.leftX
-        expect(coords[1]).toBe(-426);      // midLeftY = source.y + NH/2 = -486+60 (above |y|>1)
-        expect(coords[2]).toBe(-18);       // left-detour X
-        expect(coords[3]).toBe(-426);      // same Y, horizontal extension
-        expect(coords[4]).toBe(-18);       // left-detour X stays constant
-        expect(coords[5]).toBe(60);        // NODE_H/2
-        expect(coords[6]).toBe(0);         // target.leftX
-        expect(coords[7]).toBe(60);         // target.y (top edge, near edge for above-note)
+        expect(coords[0]).toBe(0);
+        expect(coords[1]).toBe(-552);
+        expect(coords[2]).toBe(-18);
+        expect(coords[3]).toBe(-552);
+        expect(coords[4]).toBe(-18);
+        expect(coords[5]).toBe(60);
+        expect(coords[6]).toBe(0);
+        expect(coords[7]).toBe(60);
       }
     });
 
     it('source below with |y|>1 → depart top, go left above parent, approach bottom', () => {
       // noteX=0, noteY=-3 → same column, far below; routes from source.bottom via left-detour above parent to target.bottom
-      const source = makeNoteNode('note', 0, 3 * (NODE_H + NODE_GAP_Y + ALT_BRANCH_GAP));
+      const source = makeNoteNode('note', 0, 3 * (NODE_H + 2 * NODE_GAP_Y));
       const target = makeNoteNode('parent', 0, 0, 'command');
       const pathD = makeNoteLink(source, target, 0, -3);
 
       expect(pathD).not.toContain(' C ');
-      // source.y = 486; source.bottom = 486 + 120 = 606
-      // gapAboveParentY = -(GAP_Y+ALT)/2 = -21
-      // Expected: M 0 606 L -18 606 L -18 -21 L 0 120
+      // source.y = 534; source.bottom = 534 + 120 = 654
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
         expect(coords.length).toBe(8);
-        expect(coords[0]).toBe(0);         // source.leftX
-        expect(coords[1]).toBe(546);       // midLeftY = source.y + NH/2 = 486+60 (below |y|>1)
-        expect(coords[2]).toBe(-18);       // left-detour X
-        expect(coords[3]).toBe(546);       // same Y, horizontal extension
-        expect(coords[4]).toBe(-18);       // left-detour X stays constant
-        expect(coords[5]).toBe(60);        // NODE_H/2
-        expect(coords[6]).toBe(0);         // target.leftX
-        expect(coords[7]).toBe(60);       // target.bottom (near edge for below-note)
+        expect(coords[0]).toBe(0);
+        expect(coords[1]).toBe(672);
+        expect(coords[2]).toBe(-18);
+        expect(coords[3]).toBe(672);
+        expect(coords[4]).toBe(-18);
+        expect(coords[5]).toBe(60);
+        expect(coords[6]).toBe(0);
+        expect(coords[7]).toBe(60);
       }
     });
 
@@ -319,46 +316,46 @@ describe('computeLinkPath — note links with grid offsets', () => {
     });
 
     it('source right non-adjacent (noteX=2) → top-center detour from source CX up then horizontal to parent CX', () => {
-      // Routes from source top-edge middle, up by (GAP_Y + ALT_BRANCH_GAP)/2, then horizontal to target
+      // Routes from source top-edge middle, up by NODE_GAP_Y, then horizontal to target
       const source = makeNoteNode('note', 2 * (NODE_W + NODE_GAP_X), 0);
       const target = makeNoteNode('parent', 0, 0, 'command');
       const pathD = makeNoteLink(source, target, 2, 0);
 
       expect(pathD).not.toContain(' C ');
-      // source_cx=397, source.y=0, detourY=0-(22+20)/2=-21, target_cx=65, target.y=0
+      // source_cx=397, source.y=0, detourY=0-44=-44, target_cx=65, target.y=0
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(397);    // source center X
-        expect(coords[1]).toBe(0);      // top edge of source
-        expect(coords[2]).toBe(397);    // same X (going up)
-        expect(coords[3]).toBe(-21);    // source.y - (GAP_Y + ALT_BRANCH_GAP)/2 = 0-21
-        expect(coords[4]).toBe(65);     // target center X
-        expect(coords[5]).toBe(-21);    // same detour Y
-        expect(coords[6]).toBe(65);     // target center X
-        expect(coords[7]).toBe(0);      // top edge of target
+        expect(coords[0]).toBe(397);
+        expect(coords[1]).toBe(0);
+        expect(coords[2]).toBe(397);
+        expect(coords[3]).toBe(-21);
+        expect(coords[4]).toBe(65);
+        expect(coords[5]).toBe(-21);
+        expect(coords[6]).toBe(65);
+        expect(coords[7]).toBe(0);
       }
     });
 
     it('source left non-adjacent (noteX=-2) → top-center detour from source CX up then horizontal to parent CX', () => {
-      // Routes from source top-edge middle, up by (GAP_Y + ALT_BRANCH_GAP)/2, then horizontal to target
+      // Routes from source top-edge middle, up by NODE_GAP_Y, then horizontal to target
       const source = makeNoteNode('note', -2 * (NODE_W + NODE_GAP_X), 0);
       const target = makeNoteNode('parent', 0, 0, 'command');
       const pathD = makeNoteLink(source, target, -2, 0);
 
       expect(pathD).not.toContain(' C ');
-      // source_cx=-267, source.y=0, detourY=0-21=-21, target_cx=65, target.y=0
+      // source_cx=-267, source.y=0, detourY=0-44=-44, target_cx=65, target.y=0
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(-267);   // source center X (-332 + 65)
-        expect(coords[1]).toBe(0);      // top edge of source
-        expect(coords[2]).toBe(-267);   // same X (going up)
-        expect(coords[3]).toBe(-21);    // source.y - 21
-        expect(coords[4]).toBe(65);     // target center X
-        expect(coords[5]).toBe(-21);    // same detour Y
-        expect(coords[6]).toBe(65);     // target center X
-        expect(coords[7]).toBe(0);      // top edge of target
+        expect(coords[0]).toBe(-267);
+        expect(coords[1]).toBe(0);
+        expect(coords[2]).toBe(-267);
+        expect(coords[3]).toBe(-21);
+        expect(coords[4]).toBe(65);
+        expect(coords[5]).toBe(-21);
+        expect(coords[6]).toBe(65);
+        expect(coords[7]).toBe(0);
       }
     });
   });
@@ -378,14 +375,14 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(231);    // source center X
-        expect(coords[1]).toBe(142);    // source.y = 142 + 0 (=NODE_H*0 for below branch |y|<=1)
-        expect(coords[2]).toBe(231);    // same X (vertical segment)
-        expect(coords[3]).toBe(131);    // step1Y = Math.round((source.y+NODE_H+target.y)/2)
-        expect(coords[4]).toBe(65);     // target center X
-        expect(coords[5]).toBe(131);    // same Y (horizontal segment)
-        expect(coords[6]).toBe(65);     // target center X
-        expect(coords[7]).toBe(120);    // target.bottom (near edge for below-note)
+        expect(coords[0]).toBe(231);
+        expect(coords[1]).toBe(162);
+        expect(coords[2]).toBe(231);
+        expect(coords[3]).toBe(141);
+        expect(coords[4]).toBe(65);
+        expect(coords[5]).toBe(141);
+        expect(coords[6]).toBe(65);
+        expect(coords[7]).toBe(120);
       }
     });
 
@@ -399,14 +396,14 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(-101);   // source center X = -(NODE_W+NODE_GAP_X)+NODE_W/2 = -166+65=-101
-        expect(coords[1]).toBe(-22);    // source.bottom = -142 + 120
-        expect(coords[2]).toBe(-101);   // same X (vertical segment)
-        expect(coords[3]).toBe(-11);    // Math.round((-142+120+0)/2) = -11
-        expect(coords[4]).toBe(65);     // target center X
-        expect(coords[5]).toBe(-11);    // same Y (horizontal segment)
-        expect(coords[6]).toBe(65);     // target center X
-        expect(coords[7]).toBe(0);      // target.y (top edge, near edge for above-note)
+        expect(coords[0]).toBe(-101);
+        expect(coords[1]).toBe(-42);
+        expect(coords[2]).toBe(-101);
+        expect(coords[3]).toBe(-21);
+        expect(coords[4]).toBe(65);
+        expect(coords[5]).toBe(-21);
+        expect(coords[6]).toBe(65);
+        expect(coords[7]).toBe(0);
       }
     });
 
@@ -420,14 +417,14 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(-101);   // source center X = -166 + 65
-        expect(coords[1]).toBe(142);    // source.y (below branch |y|<=1 departs from source.y)
-        expect(coords[2]).toBe(-101);   // same X (vertical segment)
-        expect(coords[3]).toBe(131);    // step1Y = Math.round((source.y+NODE_H+target.y)/2)
-        expect(coords[4]).toBe(65);     // target center X
-        expect(coords[5]).toBe(131);    // step1Y = Math.round((source.y+NODE_H+target.y)/2) for |noteY|<=1
-        expect(coords[6]).toBe(65);     // target center X
-        expect(coords[7]).toBe(120);    // target.bottom (near edge for below-note)
+        expect(coords[0]).toBe(-101);
+        expect(coords[1]).toBe(162);
+        expect(coords[2]).toBe(-101);
+        expect(coords[3]).toBe(141);
+        expect(coords[4]).toBe(65);
+        expect(coords[5]).toBe(141);
+        expect(coords[6]).toBe(65);
+        expect(coords[7]).toBe(120);
       }
     });
 
@@ -441,39 +438,39 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(231);    // source center X
-        expect(coords[1]).toBe(-22);    // source.bottom = -142 + 120
-        expect(coords[2]).toBe(231);    // same X (vertical segment)
-        expect(coords[3]).toBe(-11);    // Math.round((-142+120+0)/2) = -11
-        expect(coords[4]).toBe(65);     // target center X
-        expect(coords[5]).toBe(-11);    // same Y (horizontal segment)
-        expect(coords[6]).toBe(65);     // target center X
-        expect(coords[7]).toBe(0);      // target.y (top edge, near edge for above-note)
+        expect(coords[0]).toBe(231);
+        expect(coords[1]).toBe(-42);
+        expect(coords[2]).toBe(231);
+        expect(coords[3]).toBe(-21);
+        expect(coords[4]).toBe(65);
+        expect(coords[5]).toBe(-21);
+        expect(coords[6]).toBe(65);
+        expect(coords[7]).toBe(0);
       }
     });
 
     it('wide below-right (x=2,y=-2) → 5-segment column-gap routing to parent bottom', () => {
-      const source = makeNoteNode('note', 2 * (NODE_W + NODE_GAP_X), 2 * (NODE_H + NODE_GAP_Y));
+      const source = makeNoteNode('note', 2 * (NODE_W + NODE_GAP_X), 2 * (NODE_H + 2 * NODE_GAP_Y));
       const target = makeNoteNode('parent', 0, 0, 'command');
       const pathD = makeNoteLink(source, target, 2, -2);
 
       expect(pathD).not.toContain(' C ');
-      // Path: M 397 284 L 397 263 L 148 263 L 148 141 L 65 141 L 65
+      // Path: M 397 328 L 397 408 L 213 408 L 213 164 L 65 164 L 65
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(397);    // source center X
-        expect(coords[1]).toBe(284);    // source.y = 284 (below branch |y|>1 departs from source.y)
-        expect(coords[2]).toBe(397);    // same X
-        expect(coords[3]).toBe(263);    // step1Y = midLeftY - GAP = 284+60-21
-        expect(coords[4]).toBe(148);    // column gap right of parent
-        expect(coords[5]).toBe(263);    // same Y (horizontal)
-        expect(coords[6]).toBe(148);    // same X
-        expect(coords[7]).toBe(141);    // gapBelowParentY = NODE_H + (GAP_Y+ALT)/2 = 120+21
-        expect(coords[8]).toBe(65);     // target center X
-        expect(coords[9]).toBe(141);    // gapBelowParentY
-        expect(coords[10]).toBe(65);    // target center X
-        expect(coords[11]).toBe(120);   // bottom edge of target (near edge for below-note)
+        expect(coords[0]).toBe(397);
+        expect(coords[1]).toBe(408);
+        expect(coords[2]).toBe(397);
+        expect(coords[3]).toBe(387);
+        expect(coords[4]).toBe(148);
+        expect(coords[5]).toBe(387);
+        expect(coords[6]).toBe(148);
+        expect(coords[7]).toBe(141);
+        expect(coords[8]).toBe(65);
+        expect(coords[9]).toBe(141);
+        expect(coords[10]).toBe(65);
+        expect(coords[11]).toBe(120);
       }
     });
 
@@ -483,22 +480,22 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const pathD = makeNoteLink(source, target, -2, 2);
 
       expect(pathD).not.toContain(' C ');
-      // Path: M -267 -164 L -267 -143 L -18 -143 L -18 141 L 65 141 L 65
+      // Path: M -331 -204 L -331 -252 L -18 -252 L -18 164 L 65 164 L 65
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(-267);   // source center X
-        expect(coords[1]).toBe(-164);   // source.bottom = -284 + 120 (code uses source.bottom for wide above)
-        expect(coords[2]).toBe(-267);   // same X
-        expect(coords[3]).toBe(-143);   // step1Y = source.y + NODE_H + GAP = -284+120+21
-        expect(coords[4]).toBe(-18);    // column gap left of parent
-        expect(coords[5]).toBe(-143);   // same Y (horizontal)
-        expect(coords[6]).toBe(-18);    // same X
-        expect(coords[7]).toBe(-21);    // gapAboveParentY = -(GAP_Y+ALT)/2 = -21 for above case
-        expect(coords[8]).toBe(65);     // target center X
-        expect(coords[9]).toBe(-21);    // same Y (gapAboveParentY)
-        expect(coords[10]).toBe(65);    // target center X
-        expect(coords[11]).toBe(0);     // target.y (top edge, near edge for above-note)
+        expect(coords[0]).toBe(-267);
+        expect(coords[1]).toBe(-204);
+        expect(coords[2]).toBe(-267);
+        expect(coords[3]).toBe(-183);
+        expect(coords[4]).toBe(-18);
+        expect(coords[5]).toBe(-183);
+        expect(coords[6]).toBe(-18);
+        expect(coords[7]).toBe(-21);
+        expect(coords[8]).toBe(65);
+        expect(coords[9]).toBe(-21);
+        expect(coords[10]).toBe(65);
+        expect(coords[11]).toBe(0);
       }
     });
 
@@ -512,14 +509,14 @@ describe('computeLinkPath — note links with grid offsets', () => {
       const coords = pathD.match(/-?[\d.]+/g)?.map(Number);
       expect(coords).toBeDefined();
       if (coords) {
-        expect(coords[0]).toBe(397);    // source center X
-        expect(coords[1]).toBe(-22);    // source.bottom = -142 + 120
-        expect(coords[2]).toBe(397);    // same X
-        expect(coords[3]).toBe(-11);    // Math.round((-142+120+0)/2) = -11
-        expect(coords[4]).toBe(65);     // target center X
-        expect(coords[5]).toBe(-11);    // same Y (horizontal segment)
-        expect(coords[6]).toBe(65);     // target center X
-        expect(coords[7]).toBe(0);      // target.y (top edge, near edge for above-note)
+        expect(coords[0]).toBe(397);
+        expect(coords[1]).toBe(-42);
+        expect(coords[2]).toBe(397);
+        expect(coords[3]).toBe(-21);
+        expect(coords[4]).toBe(65);
+        expect(coords[5]).toBe(-21);
+        expect(coords[6]).toBe(65);
+        expect(coords[7]).toBe(0);
       }
     });
   });
