@@ -195,26 +195,31 @@ function layoutProcessGroup(
   return processGroupRef.height;
 }
 
+const UNPOSITIONED_GRID_COLS = 4;
+
 function layoutUnpositionedNodes(
   container: DSLContainer,
   model: DSLModel,
   innerX: number,
   startY: number,
-  containerW: number,
   positioned: Set<string>,
   allNodes: LayoutNode[],
 ): void {
   const nonProcessNodes = model.nodes.filter(
     (n) => n.containerId === container.id && n.type !== 'note' && !positioned.has(n.id),
   );
+  let col = 0;
   let npX = innerX;
   let npY = startY + 10;
   for (const np of nonProcessNodes) {
     allNodes.push({ ...np, x: npX, y: npY });
-    npX += NODE_W + NODE_GAP_X;
-    if (npX - innerX > containerW - CONTAINER_PADDING * 2 - NODE_W) {
+    col++;
+    if (col >= UNPOSITIONED_GRID_COLS) {
+      col = 0;
       npX = innerX;
       npY += NODE_H + NODE_GAP_Y;
+    } else {
+      npX += NODE_W + NODE_GAP_X;
     }
   }
 
@@ -307,7 +312,7 @@ export function computeLayout(model: DSLModel): LayoutResult {
       processY += groupHeight + GROUP_GAP_Y;
     });
 
-    layoutUnpositionedNodes(container, model, innerX, processY, containerW, positioned, allNodes);
+    layoutUnpositionedNodes(container, model, innerX, processY, positioned, allNodes);
 
     const treeIds = collectDescendantIds(container.id, model.containers);
 
