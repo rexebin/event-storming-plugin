@@ -28,6 +28,63 @@ describe('normalizeId', () => {
 });
 
 describe('parseDSL', () => {
+  describe('orphaned nodes detection', () => {
+    it('should throw when nodes are found outside any container, listing reasons and node names', () => {
+      const xml = `<eventstorming>
+        <event name="OrderPlaced"/>
+        <command name="ProcessOrder"/>
+      </eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(
+        /Node element\(s\) found outside of a container: OrderPlaced \(event\), ProcessOrder \(command\)/,
+      );
+    });
+
+    it('should throw when root-level \x3cnote\x3e is found without a container parent', () => {
+      const xml = `<eventstorming>
+        <note>This note has no container</note>
+        <aggregate name="Order"><container name="Flow">
+          <command name="PlaceOrder"/>
+        </container></aggregate>
+      </eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(
+        /Note element\(s\) found outside of a container: This note has no container \(note\)/,
+      );
+    });
+
+    it('should throw with mixed orphan types listed together', () => {
+      const xml = `<eventstorming>
+        <event name="OrderPlaced"/>
+        <note>Orphaned note</note>
+        <command name="ProcessOrder"/>
+      </eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(
+        /Node element\(s\) found outside of a container: OrderPlaced \(event\), Orphaned note \(note\), ProcessOrder \(command\)/,
+      );
+    });
+
+    it('should NOT throw when all nodes are inside containers', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <command name="PlaceOrder"/>
+        <event name="OrderPlaced"/>
+        <note>Valid note</note>
+      </container></aggregate></eventstorming>`;
+      expect(() => parseDSL(xml)).not.toThrow();
+      const result = parseDSL(xml);
+      expect(result.nodes.filter((n) => n.type === 'note')).toHaveLength(1);
+    });
+
+    it('should throw only if there are also node elements (not just notes)', () => {
+      // Note-only orphans should be treated as nodes too (they need a container parent conceptually)
+      const xml = `<eventstorming>
+        <note>Isolated note 1</note>
+        <note>Isolated note 2</note>
+      </eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(
+        /Note element\(s\) found outside of a container: Isolated note 1 \(note\), Isolated note 2 \(note\)/,
+      );
+    });
+  });
+
   describe('basic XML parsing', () => {
     it('should resolve DSL references even when names differ by spaces or punctuation', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Place Order">
