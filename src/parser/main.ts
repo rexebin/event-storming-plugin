@@ -162,12 +162,6 @@ function parseXMLDSL(text: string): DSLModel {
     const noteOrphans = orphanedNodes.filter((o) => o.tagName === 'note');
     const otherOrphans = orphanedNodes.filter((o) => o.tagName !== 'note');
 
-    // Exclude container types from the error message — they are containers, not nodes
-    const containerTypeKeysSet = Object.keys(XML_CONTAINER_TYPES);
-    const nodeTypeKeys: string[] = Object.keys(XML_NODE_TYPES).filter(
-      (t) => !containerTypeKeysSet.includes(t),
-    );
-    const knownTypesStr = nodeTypeKeys.map((t) => `<${t}>`).join(', ');
     const containerTypesStr = Object.keys(XML_CONTAINER_TYPES)
       .map((t) => `<${t}>`)
       .join(', ');
