@@ -334,7 +334,22 @@ Rendered:
 - `altNext` — used for policy failure paths and renders **below** the policy. When a policy has an `altNext` pointing to an inline `error` node, that error node is automatically skipped when inferring the implicit `next`. The positive flow continues to the node after the error, while the error only appears on the negative branch.
 - `offset` — shifts a node horizontally to the right by the given number of units. Use when an `altNext` failure branch would visually collide with a sibling node, e.g. `offset="1"`. The entire subtree (including nested `<container>` and altNext children) shifts together.
 - Use the `notes="…"` attribute on any element to attach inline metadata annotations. Elements with notes show a small `i` badge, and hovering them shows a notes-only tooltip.
-- Positioned notes: a `<note x="…" y="…">` child renders as a separate annotation badge connected by an arrow pointing TO the parent node. `x` is the grid column offset (positive = right), `y` is the grid row offset (positive = above). Example: `<note x="1" y="1">Requires manager approval</note>`
+- Positioned notes: a `<note x="…" y="…">` child renders as a separate annotation badge connected by an arrow pointing TO the parent node. `x` is the grid column offset (positive = right), `y` is the grid row offset (positive = above). Use text content for the label; no `name` attribute. Example: `<note x="1" y="1">Requires manager approval</note>`
+
+**Positioned note examples:**
+
+```xml
+<!-- Attached to a projector element -->
+<projector name="Order Detail View" notes="Shows item, status and timeline">
+  <note x="-2" y="-1">Projected from aggregate events</note>
+</projector>
+
+<!-- Standalone note in an aggregate container -->
+<event name="OrderCancelled"/>
+<note x="1" y="-2">Cancellation only allowed within 1 hour</note>
+```
+
+Positioned notes render in a distinct color (light yellow) per the Event Storming visual standard. They provide additional contextual information without cluttering the main process flow.
 
 ### Diagram Types
 
