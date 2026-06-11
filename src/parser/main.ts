@@ -159,29 +159,35 @@ function parseXMLDSL(text: string): DSLModel {
 
   // Validate no orphaned node elements exist outside any container
   if (orphanedNodes.length > 0) {
-    const detailParts: string[] = [];
     const noteOrphans = orphanedNodes.filter((o) => o.tagName === 'note');
     const otherOrphans = orphanedNodes.filter((o) => o.tagName !== 'note');
 
-    // When only notes are orphaned, report them as "Note element(s)"
-    // When any non-note orphans exist, list everything under "Node element(s)"
+    // Exclude container types from the error message — they are containers, not nodes
+    const containerTypeKeysSet = Object.keys(XML_CONTAINER_TYPES);
+    const nodeTypeKeys: string[] = Object.keys(XML_NODE_TYPES).filter(
+      (t) => !containerTypeKeysSet.includes(t),
+    );
+    const knownTypesStr = nodeTypeKeys.map((t) => `<${t}>`).join(', ');
+    const containerTypesStr = Object.keys(XML_CONTAINER_TYPES)
+      .map((t) => `<${t}>`)
+      .join(', ');
+
+    let message: string;
     if (otherOrphans.length > 0 && noteOrphans.length > 0) {
-      // Mixed: all orphans listed together under "Node element(s)"
+      // Mixed orphans: list all under "Node element(s)"
       const allDetails = orphanedNodes.map((o) => `${o.name ?? o.tagName} (${o.tagName})`).join(', ');
-      const knownTypes = Object.keys(XML_NODE_TYPES).map((t) => `<${t}>`).join(', ');
-      detailParts.push(`Node element(s) found outside of a container: ${allDetails}. All node elements (${knownTypes}, etc.) must be inside a container element (<aggregate>, <projector>, <process>, or <externalSystem>).`);
+      message = `Node elements found outside of a container: ${allDetails}. All node elements must be inside a container (${containerTypesStr}).`;
     } else if (otherOrphans.length > 0) {
       // Only non-note orphans
       const details = otherOrphans.map((o) => `${o.name ?? o.tagName} (${o.tagName})`).join(', ');
-      const knownTypes = Object.keys(XML_NODE_TYPES).map((t) => `<${t}>`).join(', ');
-      detailParts.push(`Node element(s) found outside of a container: ${details}. All node elements (${knownTypes}, etc.) must be inside a container element (<aggregate>, <projector>, <process>, or <externalSystem>).`);
+      message = `Node elements found outside of a container: ${details}. All node elements must be inside a container (${containerTypesStr}).`;
     } else {
       // Only note orphans
       const details = noteOrphans.map((o) => `${o.name ?? o.tagName} (${o.tagName})`).join(', ');
-      detailParts.push(`Note element(s) found outside of a container: ${details}`);
+      message = `Note element(s) found outside of a container: ${details}. All notes must be inside a container (${containerTypesStr}) and after a node element to attach.`;
     }
 
-    throw new Error(detailParts.join('. '));
+    throw new Error(message);
   }
 
   for (const c of model.containers) ensureSyntheticProcesses(c, model.nodes);

@@ -35,7 +35,7 @@ describe('parseDSL', () => {
         <command name="ProcessOrder"/>
       </eventstorming>`;
       expect(() => parseDSL(xml)).toThrow(
-        /Node element\(s\) found outside of a container: OrderPlaced \(event\), ProcessOrder \(command\)/,
+        /Node elements found outside of a container: OrderPlaced \(event\), ProcessOrder \(command\). All node elements must be inside a container/,
       );
     });
 
@@ -51,14 +51,14 @@ describe('parseDSL', () => {
       );
     });
 
-    it('should throw with mixed orphan types listed together', () => {
+    it('should throw with mixed orphan types listed together as node elements', () => {
       const xml = `<eventstorming>
         <event name="OrderPlaced"/>
         <note>Orphaned note</note>
         <command name="ProcessOrder"/>
       </eventstorming>`;
       expect(() => parseDSL(xml)).toThrow(
-        /Node element\(s\) found outside of a container: OrderPlaced \(event\), Orphaned note \(note\), ProcessOrder \(command\)/,
+        /Node elements found outside of a container: OrderPlaced \(event\), Orphaned note \(note\), ProcessOrder \(command\). All node elements must be inside a container/,
       );
     });
 
@@ -70,11 +70,15 @@ describe('parseDSL', () => {
       </container></aggregate></eventstorming>`;
       expect(() => parseDSL(xml)).not.toThrow();
       const result = parseDSL(xml);
-      expect(result.nodes.filter((n) => n.type === 'note')).toHaveLength(1);
+      const noteNodes = result.nodes.filter((n) => n.type === 'note');
+      expect(noteNodes).toHaveLength(1);
+      // Verify container and child nodes are also parsed correctly
+      expect(result.containers).toHaveLength(2); // aggregate + container
+      const flowContainer = result.containers.find((c) => c.label === 'Flow');
+      expect(flowContainer?.processes[0]?.stepIds.some((id) => id.includes('PlaceOrder'))).toBe(true);
     });
 
-    it('should throw only if there are also node elements (not just notes)', () => {
-      // Note-only orphans should be treated as nodes too (they need a container parent conceptually)
+    it('should throw on note-only orphaned elements too', () => {
       const xml = `<eventstorming>
         <note>Isolated note 1</note>
         <note>Isolated note 2</note>
