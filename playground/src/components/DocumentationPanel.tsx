@@ -25,12 +25,13 @@ export function DocumentationPanel() {
         <p className="text-xs text-gray-400 mb-2">The parser enforces a strict hierarchy. Violations throw an error with the offending line number.</p>
 
         <div className="bg-[#252526] rounded p-2 font-mono text-[10px] leading-tight text-green-300 whitespace-pre mb-2">
-&lt;eventstorming&gt;
+{`<eventstorming>
   └── ( aggregate | projector | process | externalSystem )+   ← root containers only
-       └── &lt;container&gt;+                                     ← nodes must nest inside containers
-            └── &lt;container&gt;+                                  ← recursive nesting allowed
+       └── <container>+                                     ← nodes must nest inside containers
+            └── <container>+                                  ← recursive nesting allowed
                  └── ( event | command | policy | actor | error | query | externalsystem )+  ← leaf nodes
-                      └── &lt;note&gt;+                             ← notes only inside node elements</div>
+                      └── <note>+                             ← notes only inside node elements`}
+</div>
 
         <div className="space-y-1.5 text-xs">
           <div className="bg-[#2d2d2d] rounded p-1.5">
