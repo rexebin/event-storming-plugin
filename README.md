@@ -343,6 +343,25 @@ The top-level elements define the diagram layout container:
 - `<projector>` — represents a projector/view
 - `<process>` — represents a business process
 
+### Grammar Rules
+
+The parser enforces a strict hierarchy to prevent structural errors. Violations throw an error with the offending line number:
+
+```text
+<eventstorming>
+  └── ( aggregate | projector | process | externalSystem )+       ← root containers only
+       └── <container>+                                           ← nodes must nest inside containers
+            └── <container>+                                      ← recursive nesting allowed
+                 └── ( event | command | policy | actor | error | query | externalsystem )+  ← leaf nodes
+                      └── <note>+                                 ← notes only inside node elements
+```
+
+| Rule | Valid | Invalid | Error |
+| ---- | ----- | ------- | ----- |
+| `<note>` must be inside a node element | `<event name="X"><note>text</note></event>` | `<note>text</note>` at root or inside a container | `Note element must be nested inside a node element` |
+| Root containers cannot have direct child nodes | `<aggregate name="A"><container><event name="X"/></container></aggregate>` | `<aggregate name="A"><event name="X"/></aggregate>` | `Element <event> cannot be a direct child of <aggregate>. Node elements must be inside a <container> element.` |
+| `<container>` can only be a child of root containers or other `<container>` elements | `<process><container><container><event name="X"/></container></container></process>` | `<container>` directly under `<eventstorming>`, or `<event><container>…</container></event>` | `Unexpected element <container> inside <eventstorming>` / `Element <container> cannot be a child of <event>` |
+
 ### Recursive Containers
 
 A container may include nested `<container>` elements. Each nested container becomes its own labelled sub-group rendered inside the parent container.
