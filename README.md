@@ -110,8 +110,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand. Attach inline meta
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
         <error name="Invalid Email" next="" notes="The email address provided is not valid. Please enter a valid email address and try again." />
-        <event name="UserRegistered" />
-        <note x="1" y="-1"><note>This is a positioned note on the UserRegistered event.</note></note>
+        <event name="UserRegistered"><note x="1" y="-1">This is a positioned note on the UserRegistered event.</note></event>
      </container>
   </aggregate>
   <aggregate name="Morning Routine">
@@ -220,8 +219,7 @@ Rendered:
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
         <error name="Invalid Email" next="" notes="The email address provided is not valid. Please enter a valid email address and try again." />
-        <event name="UserRegistered" />
-        <note x="1" y="-1"><note>This is a positioned note on the UserRegistered event.</note></note>
+        <event name="UserRegistered"><note x="1" y="-1">This is a positioned note on the UserRegistered event.</note></event>
      </container>
   </aggregate>
   <aggregate name="Morning Routine">

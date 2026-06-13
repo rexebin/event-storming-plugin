@@ -8,10 +8,11 @@
 import type { DSLModel, DSLContainer } from './models.js';
 import type { PendingRef } from './parsing.js';
 import { normalizeId, XML_NODE_TYPES } from './models.js';
+import { PositionTracker } from './position.js';
+import { validateStructure } from './validator.js';
 import {
 
   buildContainerTree,
-  addPositionedNote,
   makeXmlNode,
   resolveNodeRefs,
   applyImplicitLinking,
@@ -66,18 +67,13 @@ function parseXMLDSL(text: string): DSLModel {
     throw new Error(`Invalid XML: ${msg}`);
   }
 
-  const orphanedNodes: Array<{ tagName: string; name?: string }> = [];
+  // Structural validation — must pass before any model building
+  const tracker = new PositionTracker(text);
+  validateStructure(root, tracker, text);
 
   for (const diagramEl of Array.from(root.children)) {
     const tagLower = diagramEl.tagName.toLowerCase();
     const cType = XML_CONTAINER_TYPES[tagLower];
-    if (!cType) {
-      // Track any root-level element that isn't a container as orphaned
-      const name = diagramEl.getAttribute('name') || diagramEl.textContent?.trim() || diagramEl.tagName;
-      orphanedNodes.push({ tagName: tagLower, name });
-      continue;
-    }
-
     const containerName = diagramEl.getAttribute('name') || diagramEl.tagName;
     const containerId = normalizeId(containerName);
     const dslContainer: DSLContainer = {
@@ -96,8 +92,6 @@ function parseXMLDSL(text: string): DSLModel {
     const pendingChildren: Array<{ node: PendingRef['node']; rawNext?: string; rawNegativeNext?: string }> = [];
     const inlineStepIds: string[] = [];
     const allChildContainers: Array<{ el: Element; prefix: string }> = [];
-    let lastRegularNodeId: string | undefined;
-
     for (const childEl of Array.from(diagramEl.children)) {
       const tagLower2 = childEl.tagName.toLowerCase();
       if (tagLower2 === 'container') {
@@ -106,20 +100,11 @@ function parseXMLDSL(text: string): DSLModel {
         continue;
       }
 
-      // Positioned note → create as layout node linked to parent
-      if (tagLower2 === 'note') {
-        if (lastRegularNodeId) {
-          addPositionedNote(childEl, dslContainer, model, lastRegularNodeId, inlineStepIds.length);
-        }
-        continue;
-      }
-
       const nodeType = XML_NODE_TYPES[tagLower2];
       if (!nodeType) continue;
       const n = makeXmlNode(childEl, nodeType, dslContainer.id, containerId + '_');
       model.nodes.push(n);
       inlineStepIds.push(n.id);
-      lastRegularNodeId = n.id;
       pendingChildren.push({ node: n, rawNext: childEl.getAttribute('next') ?? undefined, rawNegativeNext: childEl.getAttribute('altNext') ?? undefined });
     }
 
@@ -155,33 +140,6 @@ function parseXMLDSL(text: string): DSLModel {
     }
 
     model.containers.push(dslContainer);
-  }
-
-  // Validate no orphaned node elements exist outside any container
-  if (orphanedNodes.length > 0) {
-    const noteOrphans = orphanedNodes.filter((o) => o.tagName === 'note');
-    const otherOrphans = orphanedNodes.filter((o) => o.tagName !== 'note');
-
-    const containerTypesStr = Object.keys(XML_CONTAINER_TYPES)
-      .map((t) => `<${t}>`)
-      .join(', ');
-
-    let message: string;
-    if (otherOrphans.length > 0 && noteOrphans.length > 0) {
-      // Mixed orphans: list all under "Node element(s)"
-      const allDetails = orphanedNodes.map((o) => `${o.name ?? o.tagName} (${o.tagName})`).join(', ');
-      message = `Node elements found outside of a container: ${allDetails}. All node elements must be inside a container (${containerTypesStr}).`;
-    } else if (otherOrphans.length > 0) {
-      // Only non-note orphans
-      const details = otherOrphans.map((o) => `${o.name ?? o.tagName} (${o.tagName})`).join(', ');
-      message = `Node elements found outside of a container: ${details}. All node elements must be inside a container (${containerTypesStr}).`;
-    } else {
-      // Only note orphans
-      const details = noteOrphans.map((o) => `${o.name ?? o.tagName} (${o.tagName})`).join(', ');
-      message = `Note element(s) found outside of a container: ${details}. All notes must be inside a container (${containerTypesStr}) and after a node element to attach.`;
-    }
-
-    throw new Error(message);
   }
 
   for (const c of model.containers) ensureSyntheticProcesses(c, model.nodes);

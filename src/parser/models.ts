@@ -90,6 +90,7 @@ export function normalizeId(text: string): string {
   return text.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
+/** Tags that represent node elements (events, commands, policies, etc.). Notes are NOT included — they can only appear as children of node elements. */
 export const XML_NODE_TYPES: Record<string, NodeType> = {
   actor: 'actor',
   command: 'command',
@@ -98,7 +99,9 @@ export const XML_NODE_TYPES: Record<string, NodeType> = {
   query: 'query',
   externalsystem: 'externalSystem',
   error: 'error',
-  note: 'note',
   aggregate: 'aggregate',
   projector: 'projector',
 };
+
+/** Tags allowed as direct children of <eventstorming>. Single source of truth for root container types. */
+export const VALID_CONTAINER_TAGS = new Set(['aggregate', 'projector', 'process', 'externalsystem']);

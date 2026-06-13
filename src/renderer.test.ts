@@ -163,9 +163,10 @@ const noteSample = `
     </aggregate>
     <aggregate name="User">
       <container name="User Registration">
-        <event name="UserRegistered"/>
-        <note x="0" y="-1">This is a positioned note below the event.</note>
-        <note x="1" y="0">This is a positioned note to the right.</note>
+        <event name="UserRegistered">
+          <note x="0" y="-1">This is a positioned note below the event.</note>
+          <note x="1" y="0">This is a positioned note to the right.</note>
+        </event>
       </container>
     </aggregate>
 </eventstorming>
@@ -1342,8 +1343,9 @@ describe('zoom preservation', () => {
 <eventstorming>
   <aggregate name="Test">
     <container name="C">
-      <event name="E1"/>
-      <note x="${noteX}" y="${noteY}">Test note</note>
+      <event name="E1">
+        <note x="${noteX}" y="${noteY}">Test note</note>
+      </event>
     </container>
   </aggregate>
 </eventstorming>`;
@@ -1396,8 +1398,9 @@ describe('zoom preservation', () => {
 <eventstorming>
   <aggregate name="Order">
     <container name="Cancel Order">
-      <event name="OrderCancelled"/>
-      <note x="${noteX}" y="${noteY}">group note</note>
+      <event name="OrderCancelled">
+        <note x="${noteX}" y="${noteY}">group note</note>
+      </event>
     </container>
   </aggregate>
 </eventstorming>`;

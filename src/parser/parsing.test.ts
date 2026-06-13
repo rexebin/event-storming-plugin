@@ -28,64 +28,84 @@ describe('normalizeId', () => {
 });
 
 describe('parseDSL', () => {
-  describe('orphaned nodes detection', () => {
-    it('should throw when nodes are found outside any container, listing reasons and node names', () => {
-      const xml = `<eventstorming>
-        <event name="OrderPlaced"/>
-        <command name="ProcessOrder"/>
-      </eventstorming>`;
-      expect(() => parseDSL(xml)).toThrow(
-        /Node elements found outside of a container: OrderPlaced \(event\), ProcessOrder \(command\). All node elements must be inside a container/,
-      );
+  describe('structural validation', () => {
+    it('should throw when root element is not a valid container type (aggregate/projector/process/externalsystem)', () => {
+      const xml = `<eventstorming><container name="Flow"><command name="PlaceOrder"/></container></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Unexpected element <container> inside <eventstorming>/);
     });
 
-    it('should throw when root-level \x3cnote\x3e is found without a container parent', () => {
-      const xml = `<eventstorming>
-        <note>This note has no container</note>
-        <aggregate name="Order"><container name="Flow">
-          <command name="PlaceOrder"/>
-        </container></aggregate>
-      </eventstorming>`;
-      expect(() => parseDSL(xml)).toThrow(
-        /Note element\(s\) found outside of a container: This note has no container \(note\)/,
-      );
+    it('should throw when a node element is at root level (outside any container)', () => {
+      const xml = `<eventstorming><event name="OrderPlaced"/></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Unexpected element <event> inside <eventstorming>/);
     });
 
-    it('should throw with mixed orphan types listed together as node elements', () => {
-      const xml = `<eventstorming>
-        <event name="OrderPlaced"/>
-        <note>Orphaned note</note>
-        <command name="ProcessOrder"/>
-      </eventstorming>`;
-      expect(() => parseDSL(xml)).toThrow(
-        /Node elements found outside of a container: OrderPlaced \(event\), Orphaned note \(note\), ProcessOrder \(command\). All node elements must be inside a container/,
-      );
+    it('should throw when a note is at root level', () => {
+      const xml = `<eventstorming><note>orphaned note</note></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Unexpected element <note> inside <eventstorming>/);
     });
 
-    it('should NOT throw when all nodes are inside containers', () => {
+    it('should throw when a node is a direct child of a root container (must be inside <container>)', () => {
+      const xml = `<eventstorming><aggregate name="Order"><event name="OrderPlaced"/></aggregate></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Element <event> cannot be a direct child of <aggregate>/);
+    });
+
+    it('should throw when a note is a direct child of a root container', () => {
+      const xml = `<eventstorming><aggregate name="Order"><note>orphan</note></aggregate></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Note element must be nested inside a node element/);
+    });
+
+    it('should throw when a note is a direct child of a nested container', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow"><note>orphan</note></container></aggregate></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Note element must be nested inside a node element/);
+    });
+
+    it('should throw when <container> is a child of a node element', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow"><event name="E"><container name="Bad"/></event></container></aggregate></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Element <container> cannot be a child of <event>/);
+    });
+
+    it('should allow valid nested notes inside node elements', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Flow">
+        <event name="OrderPlaced"><note>Valid note</note></event>
         <command name="PlaceOrder"/>
-        <event name="OrderPlaced"/>
-        <note>Valid note</note>
       </container></aggregate></eventstorming>`;
-      expect(() => parseDSL(xml)).not.toThrow();
       const result = parseDSL(xml);
       const noteNodes = result.nodes.filter((n) => n.type === 'note');
       expect(noteNodes).toHaveLength(1);
-      // Verify container and child nodes are also parsed correctly
-      expect(result.containers).toHaveLength(2); // aggregate + container
-      const flowContainer = result.containers.find((c) => c.label === 'Flow');
-      expect(flowContainer?.processes[0]?.stepIds.some((id) => id.includes('PlaceOrder'))).toBe(true);
+      expect(noteNodes[0].parentId).toBe('Flow_OrderPlaced');
     });
 
-    it('should throw on note-only orphaned elements too', () => {
+    it('should include line number in error message for structural violations', () => {
       const xml = `<eventstorming>
-        <note>Isolated note 1</note>
-        <note>Isolated note 2</note>
+        <aggregate name="Order">
+          <event name="OrderPlaced"/>
+        </aggregate>
       </eventstorming>`;
-      expect(() => parseDSL(xml)).toThrow(
-        /Note element\(s\) found outside of a container: Isolated note 1 \(note\), Isolated note 2 \(note\)/,
-      );
+      expect(() => parseDSL(xml)).toThrow(/line 3/);
+    });
+
+    it('should allow valid deeply nested containers', () => {
+      const xml = `<eventstorming><aggregate name="Order">
+        <container name="Level1">
+          <container name="Level2">
+            <container name="Level3">
+              <command name="Deep"/>
+            </container>
+          </container>
+        </container>
+      </aggregate></eventstorming>`;
+      const result = parseDSL(xml);
+      expect(result.containers).toHaveLength(4); // aggregate + 3 containers
+    });
+
+    it('should throw for unknown element type', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow"><foo>unknown</foo></container></aggregate></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Unexpected element <foo>/);
+    });
+
+    it('should throw for unknown element inside a node', () => {
+      const xml = `<eventstorming><aggregate name="Order"><container name="Flow"><event name="E"><foo>bad</foo></event></container></aggregate></eventstorming>`;
+      expect(() => parseDSL(xml)).toThrow(/Unexpected element <foo> inside <event>/);
     });
   });
 
@@ -108,9 +128,10 @@ describe('parseDSL', () => {
 
     it('should parse any <note> child as positioned with default grid offsets', () => {
       const xml = `<eventstorming><aggregate name="User"><container name="User Registration">
-        <event name="UserRegistered"/>
-        <note>Note above</note>
-        <note x="1" y="0">With attributes (ignored)</note>
+        <event name="UserRegistered">
+          <note>Note above</note>
+          <note x="1" y="0">With attributes (ignored)</note>
+        </event>
       </container></aggregate></eventstorming>`;
       const result = parseDSL(xml);
       const noteNodes = result.nodes.filter((n) => n.type === 'note');
@@ -122,21 +143,19 @@ describe('parseDSL', () => {
       expect(noteNodes[1].label).toBe('With attributes (ignored)');
     });
 
-    it('should skip note when no parent node exists yet', () => {
+    it('should throw when note is not nested inside a node element', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Test">
         <note>No parent</note>
         <command name="PlaceOrder"/>
       </container></aggregate></eventstorming>`;
-      const result = parseDSL(xml);
-      const noteNodes = result.nodes.filter((n) => n.type === 'note');
-      // First note has no parent → skipped. Command is a regular node, not a note.
-      expect(noteNodes).toHaveLength(0);
+      expect(() => parseDSL(xml)).toThrow(/Note element must be nested inside a node element/);
     });
 
     it('should read x/y attributes from note for positioning', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Test">
-        <command name="PlaceOrder"/>
-        <note x="99" y="-3">Positioned note</note>
+        <command name="PlaceOrder">
+          <note x="99" y="-3">Positioned note</note>
+        </command>
       </container></aggregate></eventstorming>`;
       const result = parseDSL(xml);
       const noteNodes = result.nodes.filter((n) => n.type === 'note');
@@ -147,8 +166,9 @@ describe('parseDSL', () => {
 
     it('should default to x=0, y=1 when no attributes on note', () => {
       const xml = `<eventstorming><aggregate name="Order"><container name="Test">
-        <command name="PlaceOrder"/>
-        <note>Default position</note>
+        <command name="PlaceOrder">
+          <note>Default position</note>
+        </command>
       </container></aggregate></eventstorming>`;
       const result = parseDSL(xml);
       const noteNodes = result.nodes.filter((n) => n.type === 'note');
@@ -340,7 +360,9 @@ describe('parseDSL', () => {
           </container>
         </aggregate>
         <process name="Inventory Service">
-          <policy name="Has Stock?" id="HS_001" altNext="OutOfStock"/>
+          <container name="Flow">
+            <policy name="Has Stock?" id="HS_001" altNext="OutOfStock"/>
+          </container>
         </process>
       </eventstorming>`;
       const result = parseDSL(xml);
@@ -361,16 +383,18 @@ describe('parseDSL', () => {
           </container>
         </aggregate>
         <process name="Inventory Service">
-          <policy name="Has Stock?" id="HS_001" altNext="OutOfStock"/>
+          <container name="Flow">
+            <policy name="Has Stock?" id="HS_001" altNext="OutOfStock"/>
+          </container>
         </process>
       </eventstorming>`;
       const result = parseDSL(xml);
 
       // Has Stock? should NOT resolve to the "OutOfStock" in Order container by name match.
-      // Instead it should create an implicit error node in Inventory Service container.
+      // Instead it should create an implicit error node in its own Flow container.
       const hasStock = result.nodes.find((n) => n.id === 'custom-HS_001');
       const localImplicit = result.nodes.find(
-        (n) => n.type === 'error' && n.containerId === 'Inventory_Service',
+        (n) => n.type === 'error' && n.containerId === 'Flow',
       );
       expect(hasStock!.altNext).not.toBe('custom-ES_FLOW');
       expect(localImplicit).toBeTruthy();
@@ -547,8 +571,10 @@ describe('parseDSL', () => {
 
     it('should support nodes with custom id in XML', () => {
       const xml = `<eventstorming><process name="Flow">
-        <command name="Customer" id="ext_cust" />
-        <externalSystem name="Gateway" id="ext_gw" />
+        <container name="Flow">
+          <command name="Customer" id="ext_cust" />
+          <externalSystem name="Gateway" id="ext_gw" />
+        </container>
       </process></eventstorming>`;
       const result = parseDSL(xml);
       expect(result.nodes.length).toBe(2);
@@ -678,7 +704,6 @@ describe('parseDSL', () => {
     const crossRootXml = `<eventstorming>
       <aggregate name="Order">
         <container name="Order Lifecycle Container">
-          <note>Top-level group grouping placement and cancellation sub-flows.</note>
           <container name="Place Order">
             <actor name="Customer" />
             <command name="PlaceOrder" />
@@ -881,8 +906,10 @@ describe('parseDSL', () => {
   describe('offset attribute parsing', () => {
     it('parses offset from XML inline process node', () => {
       const xml = `<eventstorming><process name="Test">
-        <command name="A" offset="1" next="B"/>
-        <command name="B"/>
+        <container name="Flow">
+          <command name="A" offset="1" next="B"/>
+          <command name="B"/>
+        </container>
       </process></eventstorming>`;
       const result = parseDSL(xml);
       const nodeA = result.nodes.find(n => n.label === 'A');
