@@ -14,8 +14,6 @@ export interface Position {
 interface NewlineMap {
   /** Sorted array of byte offsets where newlines occur. */
   offsets: number[];
-  /** Total number of lines (newlines + 1, or 0 if text is empty). */
-  lineCount: number;
 }
 
 /** Build a newline map from raw text — one pass, O(n). */
@@ -26,7 +24,7 @@ function buildNewlineMap(text: string): NewlineMap {
       offsets.push(i);
     }
   }
-  return { offsets, lineCount: offsets.length + (text.length > 0 ? 1 : 0) };
+  return { offsets };
 }
 
 /** Binary search: find the largest offset <= target. Returns -1 if none. */
@@ -60,21 +58,24 @@ export class PositionTracker {
 
   /** Convert a character offset in the source text to a 1-based (line, column). */
   offsetToPosition(offset: number): Position {
-    if (offset < 0 || offset > this.map.offsets.at(-1)!) {
-      return { line: 1, column: Math.max(1, offset + 1) };
+    if (offset < 0) {
+      return { line: 1, column: 1 };
+    }
+
+    if (this.map.offsets.length === 0) {
+      // No newlines — single line, column equals offset + 1
+      return { line: 1, column: offset + 1 };
     }
 
     const newlineIndex = findNewlineBefore(this.map, offset);
 
-    // Number of newlines before `offset` = number of lines completed
-    const line = newlineIndex + 2; // +2 because newlineIndex is 0-based and lines are 1-based
-
     if (newlineIndex === -1) {
-      // No newline before offset — column is just the offset + 1
+      // No newline before offset — first line
       return { line: 1, column: offset + 1 };
     }
 
     const lastNewlineOffset = this.map.offsets[newlineIndex];
+    const line = newlineIndex + 2;
     const column = offset - lastNewlineOffset;
 
     return { line, column };

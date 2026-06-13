@@ -22,32 +22,18 @@ import { DSLValidationError, type ValidationError } from './validation-errors.js
  */
 function findElementOffset(text: string, el: Element): number {
   const tagName = el.tagName.toLowerCase();
+  let pattern = '<' + tagName + '(?:\\s|>)';
 
-  // Try to find this specific element by combining tag + key attributes
-  const attrs: string[] = [];
   for (const attr of el.attributes) {
     const value = attr.value.trim();
     if (value && value.length < 100) {
-      attrs.push(`${attr.name}="${value}"`);
+      const escapedAttr = attr.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      pattern += '(?:\\s+' + escapedAttr + '="' + escapedValue + '")?';
     }
   }
 
-  // Build a search pattern: <tagname ...attrs...
-  if (attrs.length > 0) {
-    for (let i = attrs.length; i > 0; i--) {
-      const parts = [`<${tagName}`];
-      for (const a of attrs.slice(0, i)) {
-        parts.push('\\s+' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-      }
-      const pattern = parts.join('');
-      const regex = new RegExp(pattern, 'i');
-      const match = regex.exec(text);
-      if (match) return match.index;
-    }
-  }
-
-  // Fallback: search for <tagName followed by whitespace or >
-  const regex = new RegExp('<' + tagName + '(?:\\s|>)', 'i');
+  const regex = new RegExp(pattern, 'i');
   const match = regex.exec(text);
   return match?.index ?? 0;
 }
@@ -55,6 +41,7 @@ function findElementOffset(text: string, el: Element): number {
 // ─── Error collection ───────────────────────────────────────────────────────
 
 const ALL_VALID_TAGS = [...VALID_CONTAINER_TAGS, 'container', ...Object.keys(XML_NODE_TYPES), 'note'].sort();
+const ALL_VALID_TAGS_DISPLAY = ALL_VALID_TAGS.join(', ');
 
 function addError(errors: ValidationError[], el: Element, message: string, tracker: PositionTracker, text: string): void {
   const offset = findElementOffset(text, el);
@@ -62,6 +49,55 @@ function addError(errors: ValidationError[], el: Element, message: string, track
 }
 
 // ─── Validation rules ───────────────────────────────────────────────────────
+
+/** Strategy for handling a child element by tag name during validation. */
+interface ChildValidationStrategy {
+  /** What to do when encountering a <container> child. Pass null to reject. */
+  onContainer: ((el: Element, errors: ValidationError[], tracker: PositionTracker, text: string) => void) | null;
+  /** What to do when encountering a known node element (event/command/policy/etc.). Pass null to reject. */
+  onNodeElement: ((el: Element, tag: string, errors: ValidationError[], tracker: PositionTracker, text: string) => void) | null;
+  /** Error message when <note> appears in an invalid location. Pass null to allow notes. */
+  noteError: string | null;
+  /** Error message for unknown elements. Pass null to silently accept them. */
+  unknownElementError: ((tag: string) => string) | null;
+}
+
+/**
+ * Validate children of an element using the provided strategy.
+ * Iterates child nodes and dispatches each to the appropriate handler.
+ */
+function validateChildren(
+  el: Element,
+  strategy: ChildValidationStrategy,
+  errors: ValidationError[],
+  tracker: PositionTracker,
+  text: string,
+): void {
+  for (let i = 0; i < el.children.length; i++) {
+    const child = el.children[i];
+    const tag = child.tagName.toLowerCase();
+
+    if (tag === 'container') {
+      if (strategy.onContainer) {
+        strategy.onContainer(child, errors, tracker, text);
+      } else {
+        addError(errors, child, `Element <container> cannot be a child of <${el.tagName.toLowerCase()}>.`, tracker, text);
+      }
+    } else if (XML_NODE_TYPES[tag]) {
+      if (strategy.onNodeElement) {
+        strategy.onNodeElement(child, tag, errors, tracker, text);
+      } else {
+        addError(errors, child, `Element <${tag}> cannot be a direct child of <${el.tagName.toLowerCase()}>. Node elements must be inside a <container> element.`, tracker, text);
+      }
+    } else if (tag === 'note') {
+      if (strategy.noteError) {
+        addError(errors, child, strategy.noteError, tracker, text);
+      }
+    } else if (strategy.unknownElementError) {
+      addError(errors, child, strategy.unknownElementError(tag), tracker, text);
+    }
+  }
+}
 
 /** Check children of <eventstorming> — only root container types allowed. */
 function validateEventStormingChildren(
@@ -90,21 +126,12 @@ function validateRootContainerChildren(
   tracker: PositionTracker,
   text: string,
 ): void {
-  for (const child of Array.from(el.children)) {
-    const tag = child.tagName.toLowerCase();
-
-    if (tag === 'container') {
-      // Container inside root container is OK — validate its children recursively
-      validateNestedContainerChildren(child, errors, tracker, text);
-    } else if (tag === 'note') {
-      addError(errors, child, `Note element must be nested inside a node element (e.g., <event><note>...</note></event>), not placed as a direct child of <${parentTag}>.`, tracker, text);
-    } else if (XML_NODE_TYPES[tag]) {
-      addError(errors, child, `Element <${tag}> cannot be a direct child of <${parentTag}>. Node elements must be inside a <container> element.`, tracker, text);
-    } else if (!ALL_VALID_TAGS.includes(tag)) {
-      // Unknown element entirely
-      addError(errors, child, `Unexpected element <${tag}>. Valid elements are: ${ALL_VALID_TAGS.join(', ')}.`, tracker, text);
-    }
-  }
+  validateChildren(el, {
+    onContainer: (child) => validateNestedContainerChildren(child, errors, tracker, text),
+    onNodeElement: null,
+    noteError: `Note element must be nested inside a node element (e.g., <event><note>...</note></event>), not placed as a direct child of <${parentTag}>.`,
+    unknownElementError: (tag) => `Unexpected element <${tag}>. Valid elements are: ${ALL_VALID_TAGS_DISPLAY}.`,
+  }, errors, tracker, text);
 }
 
 /** Check children of a nested <container> element. */
@@ -114,22 +141,12 @@ function validateNestedContainerChildren(
   tracker: PositionTracker,
   text: string,
 ): void {
-  for (const child of Array.from(el.children)) {
-    const tag = child.tagName.toLowerCase();
-
-    if (tag === 'container') {
-      // Nested container — recurse
-      validateNestedContainerChildren(child, errors, tracker, text);
-    } else if (XML_NODE_TYPES[tag]) {
-      // Node element — OK as direct child of container. Validate its children.
-      validateNodeElementChildren(child, tag, errors, tracker, text);
-    } else if (tag === 'note') {
-      addError(errors, child, `Note element must be nested inside a node element (e.g., <event><note>...</note></event>), not placed as a direct child of <container>.`, tracker, text);
-    } else if (!ALL_VALID_TAGS.includes(tag)) {
-      // Unknown element
-      addError(errors, child, `Unexpected element <${tag}>. Valid elements are: ${ALL_VALID_TAGS.join(', ')}.`, tracker, text);
-    }
-  }
+  validateChildren(el, {
+    onContainer: (child) => validateNestedContainerChildren(child, errors, tracker, text),
+    onNodeElement: (child, tag) => validateNodeElementChildren(child, tag, errors, tracker, text),
+    noteError: `Note element must be nested inside a node element (e.g., <event><note>...</note></event>), not placed as a direct child of <container>.`,
+    unknownElementError: (tag) => `Unexpected element <${tag}>. Valid elements are: ${ALL_VALID_TAGS_DISPLAY}.`,
+  }, errors, tracker, text);
 }
 
 /** Check children of a node element (event/command/policy/etc.). Only <note> allowed. */
@@ -140,19 +157,12 @@ function validateNodeElementChildren(
   tracker: PositionTracker,
   text: string,
 ): void {
-  for (const child of Array.from(el.children)) {
-    const tag = child.tagName.toLowerCase();
-
-    if (tag === 'note') {
-      // OK — notes are the only valid children of node elements
-      continue;
-    } else if (tag === 'container') {
-      addError(errors, child, `Element <container> cannot be a child of <${nodeTag}>. Containers can only be children of aggregate, projector, process, externalSystem, or other containers.`, tracker, text);
-    } else if (!ALL_VALID_TAGS.includes(tag)) {
-      // Unknown element inside a node
-      addError(errors, child, `Unexpected element <${tag}> inside <${nodeTag}>. Node elements can only contain <note> children.`, tracker, text);
-    }
-  }
+  validateChildren(el, {
+    onContainer: null,
+    onNodeElement: null,
+    noteError: null, // notes are allowed — no error
+    unknownElementError: (tag) => `Unexpected element <${tag}> inside <${nodeTag}>. Node elements can only contain <note> children.`,
+  }, errors, tracker, text);
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
