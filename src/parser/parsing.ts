@@ -106,7 +106,6 @@ export function buildContainerTree(
 
   const stepIds: string[] = [];
   const pendingRefs: Array<{ node: DSLNode; rawNext?: string; rawNegativeNext?: string }> = [];
-  let lastRegularNodeId: string | undefined;
   let noteIndex = 0;
 
   for (const child of Array.from(childEl.children)) {
@@ -118,20 +117,12 @@ export function buildContainerTree(
       continue;
     }
 
-    if (tagLower === 'note') {
-      if (lastRegularNodeId) {
-        addPositionedNote(child, childContainer, model, lastRegularNodeId, noteIndex++);
-      }
-      continue;
-    }
-
     const nodeType = XML_NODE_TYPES[tagLower];
     if (!nodeType) continue;
 
     const n = makeXmlNode(child, nodeType, childId, containerPrefix);
     model.nodes.push(n);
     stepIds.push(n.id);
-    lastRegularNodeId = n.id;
 
     // Process <note> children of this regular node (positioned notes attached to the element)
     for (const noteChild of Array.from(child.children)) {

@@ -19,6 +19,38 @@ export function DocumentationPanel() {
         </div>
       </section>
 
+      {/* Grammar Rules */}
+      <section className="mb-4">
+        <h3 className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2">Grammar Rules</h3>
+        <p className="text-xs text-gray-400 mb-2">The parser enforces a strict hierarchy. Violations throw an error with the offending line number.</p>
+
+        <div className="bg-[#252526] rounded p-2 font-mono text-[10px] leading-tight text-green-300 whitespace-pre mb-2">
+&lt;eventstorming&gt;
+  └── ( aggregate | projector | process | externalSystem )+   ← root containers only
+       └── &lt;container&gt;+                                     ← nodes must nest inside containers
+            └── &lt;container&gt;+                                  ← recursive nesting allowed
+                 └── ( event | command | policy | actor | error | query | externalsystem )+  ← leaf nodes
+                      └── &lt;note&gt;+                             ← notes only inside node elements</div>
+
+        <div className="space-y-1.5 text-xs">
+          <div className="bg-[#2d2d2d] rounded p-1.5">
+            <p className="font-semibold text-yellow-300">Note placement</p>
+            <p><span className="text-green-400">&lt;event name="X"&gt;&lt;note&gt;text&lt;/note&gt;&lt;/event&gt;</span> — valid</p>
+            <p><span className="text-red-400">&lt;note&gt;text&lt;/note&gt;</span> at root or inside a container — invalid</p>
+          </div>
+          <div className="bg-[#2d2d2d] rounded p-1.5">
+            <p className="font-semibold text-yellow-300">Root containers → no direct child nodes</p>
+            <p><span className="text-green-400">&lt;aggregate name="A"&gt;&lt;container&gt;&lt;event name="X"/&gt;&lt;/container&gt;&lt;/aggregate&gt;</span> — valid</p>
+            <p><span className="text-red-400">&lt;aggregate name="A"&gt;&lt;event name="X"/&gt;&lt;/aggregate&gt;</span> — invalid</p>
+          </div>
+          <div className="bg-[#2d2d2d] rounded p-1.5">
+            <p className="font-semibold text-yellow-300">&lt;container&gt; nesting</p>
+            <p><span className="text-green-400">&lt;process&gt;&lt;container&gt;&lt;container&gt;&lt;event name="X"/&gt;&lt;/container&gt;&lt;/container&gt;&lt;/process&gt;</span> — valid</p>
+            <p><span className="text-red-400">&lt;container&gt;</span> directly under &lt;eventstorming&gt;, or &lt;event&gt;&lt;container&gt;…&lt;/container&gt;&lt;/event&gt; — invalid</p>
+          </div>
+        </div>
+      </section>
+
       {/* Node Types */}
       <section className="mb-4">
         <h3 className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2">Node Types</h3>

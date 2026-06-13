@@ -110,8 +110,7 @@ Use a ` ```xml ` block. XML is more concise to write by hand. Attach inline meta
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
         <error name="Invalid Email" next="" notes="The email address provided is not valid. Please enter a valid email address and try again." />
-        <event name="UserRegistered" />
-        <note x="1" y="-1"><note>This is a positioned note on the UserRegistered event.</note></note>
+        <event name="UserRegistered"><note x="1" y="-1">This is a positioned note on the UserRegistered event.</note></event>
      </container>
   </aggregate>
   <aggregate name="Morning Routine">
@@ -220,8 +219,7 @@ Rendered:
         <command name="Register" />
         <policy name="Is Email Valid?" altNext="Invalid Email" />
         <error name="Invalid Email" next="" notes="The email address provided is not valid. Please enter a valid email address and try again." />
-        <event name="UserRegistered" />
-        <note x="1" y="-1"><note>This is a positioned note on the UserRegistered event.</note></note>
+        <event name="UserRegistered"><note x="1" y="-1">This is a positioned note on the UserRegistered event.</note></event>
      </container>
   </aggregate>
   <aggregate name="Morning Routine">
@@ -359,6 +357,25 @@ The top-level elements define the diagram layout container:
 - `<externalSystem>` — represents an external system
 - `<projector>` — represents a projector/view
 - `<process>` — represents a business process
+
+### Grammar Rules
+
+The parser enforces a strict hierarchy to prevent structural errors. Violations throw an error with the offending line number:
+
+```text
+<eventstorming>
+  └── ( aggregate | projector | process | externalSystem )+       ← root containers only
+       └── <container>+                                           ← nodes must nest inside containers
+            └── <container>+                                      ← recursive nesting allowed
+                 └── ( event | command | policy | actor | error | query | externalsystem )+  ← leaf nodes
+                      └── <note>+                                 ← notes only inside node elements
+```
+
+| Rule | Valid | Invalid | Error |
+| ---- | ----- | ------- | ----- |
+| `<note>` must be inside a node element | `<event name="X"><note>text</note></event>` | `<note>text</note>` at root or inside a container | `Note element must be nested inside a node element` |
+| Root containers cannot have direct child nodes | `<aggregate name="A"><container><event name="X"/></container></aggregate>` | `<aggregate name="A"><event name="X"/></aggregate>` | `Element <event> cannot be a direct child of <aggregate>. Node elements must be inside a <container> element.` |
+| `<container>` can only be a child of root containers or other `<container>` elements | `<process><container><container><event name="X"/></container></container></process>` | `<container>` directly under `<eventstorming>`, or `<event><container>…</container></event>` | `Unexpected element <container> inside <eventstorming>` / `Element <container> cannot be a child of <event>` |
 
 ### Recursive Containers
 

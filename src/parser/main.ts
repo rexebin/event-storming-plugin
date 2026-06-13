@@ -8,10 +8,11 @@
 import type { DSLModel, DSLContainer } from './models.js';
 import type { PendingRef } from './parsing.js';
 import { normalizeId, XML_NODE_TYPES } from './models.js';
+import { PositionTracker } from './position.js';
+import { validateStructure } from './validator.js';
 import {
 
   buildContainerTree,
-  addPositionedNote,
   makeXmlNode,
   resolveNodeRefs,
   applyImplicitLinking,
@@ -66,11 +67,13 @@ function parseXMLDSL(text: string): DSLModel {
     throw new Error(`Invalid XML: ${msg}`);
   }
 
+  // Structural validation — must pass before any model building
+  const tracker = new PositionTracker(text);
+  validateStructure(root, tracker, text);
+
   for (const diagramEl of Array.from(root.children)) {
     const tagLower = diagramEl.tagName.toLowerCase();
     const cType = XML_CONTAINER_TYPES[tagLower];
-    if (!cType) continue;
-
     const containerName = diagramEl.getAttribute('name') || diagramEl.tagName;
     const containerId = normalizeId(containerName);
     const dslContainer: DSLContainer = {
@@ -89,8 +92,6 @@ function parseXMLDSL(text: string): DSLModel {
     const pendingChildren: Array<{ node: PendingRef['node']; rawNext?: string; rawNegativeNext?: string }> = [];
     const inlineStepIds: string[] = [];
     const allChildContainers: Array<{ el: Element; prefix: string }> = [];
-    let lastRegularNodeId: string | undefined;
-
     for (const childEl of Array.from(diagramEl.children)) {
       const tagLower2 = childEl.tagName.toLowerCase();
       if (tagLower2 === 'container') {
@@ -99,20 +100,11 @@ function parseXMLDSL(text: string): DSLModel {
         continue;
       }
 
-      // Positioned note → create as layout node linked to parent
-      if (tagLower2 === 'note') {
-        if (lastRegularNodeId) {
-          addPositionedNote(childEl, dslContainer, model, lastRegularNodeId, inlineStepIds.length);
-        }
-        continue;
-      }
-
       const nodeType = XML_NODE_TYPES[tagLower2];
       if (!nodeType) continue;
       const n = makeXmlNode(childEl, nodeType, dslContainer.id, containerId + '_');
       model.nodes.push(n);
       inlineStepIds.push(n.id);
-      lastRegularNodeId = n.id;
       pendingChildren.push({ node: n, rawNext: childEl.getAttribute('next') ?? undefined, rawNegativeNext: childEl.getAttribute('altNext') ?? undefined });
     }
 
