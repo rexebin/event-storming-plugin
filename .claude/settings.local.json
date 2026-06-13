@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(bash *)",
+      "Skill(keybindings-help)",
+      "Skill(keybindings-help:*)",
+      "Bash(grep -n '```json\\\\|```eventstorming' /Users/rex/dev/event-storming-plugin/README.md)",
+      "Bash(grep *)",
+      "Bash(npx tsx *)",
+      "Bash(xxd)",
+      "Bash(vp run *)",
+      "mcp__codebase-memory-mcp__search_graph",
+      "mcp__codebase-memory-mcp__search_code",
+      "mcp__serena__replace_content",
+      "Bash(npm test *)",
+      "Read(//Users/rex/.claude/hooks/**)",
+      "mcp__codebase-memory-mcp__list_projects",
+      "Bash(/Users/rex/.local/bin/codebase-memory-mcp --help)",
+      "Bash(/Users/rex/.local/bin/codebase-memory-mcp cli *)",
+      "Bash(codebase-memory-mcp --help)",
+      "Bash(npx codebase-memory-mcp *)",
+      "Bash(codebase-memory-mcp server *)",
+      "Bash(codebase-memory-mcp config *)",
+      "Bash(code *)",
+      "mcp__codebase-memory-mcp__get_code_snippet",
+      "Bash(vp test *)",
+      "Bash(pnpm run *)",
+      "mcp__codebase-memory-mcp__get_architecture",
+      "Bash(npx playwright *)",
+      "Bash(tsc *)",
+      "Bash(npx vp *)",
+      "Bash(vp install *)",
+      "Bash(head -38 /Users/rex/dev/event-storming-plugin/src/layout/index.ts)",
+      "Bash(mv /tmp/index_new.ts /Users/rex/dev/event-storming-plugin/src/layout/index.ts)"
+    ]
+  }
+}
