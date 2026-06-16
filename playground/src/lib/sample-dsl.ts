@@ -5,9 +5,10 @@ export const sampleDSL = `<eventstorming>
       <actor name="Staff" next="CancelOrder"/>
       <event name="PaymentFailed" next="CancelOrder"/>
       <command name="CancelOrder" next="Is Cancellation Allowed?"/>
-      <policy name="Is Cancellation Allowed?" next="OrderCancelled" altNext="CancellationDenied"/>
-      <event name="OrderCancelled"/>
-      <note x="1" y="-2">Order cancellation is only allowed within 1 hour</note>
+      <policy name="Is Cancellation Allowed?" next="OrderCancelled" altNext="CancellationDenied">
+        <note x="0" y="1">Order cancellation is only allowed within 1 hour</note>
+      </policy>
+      <event name="OrderCancelled"/>      
     </container>
   </aggregate>
   <projector name="OrderDetail">
@@ -17,7 +18,7 @@ export const sampleDSL = `<eventstorming>
       <event name="OrderUpdated" next="Order Detail View"/>
       <event name="OrderShipped" next="Order Detail View"/>
       <projector name="Order Detail View" notes="Shows item, status and timeline">
-        <note x="-2" y="-1">Projected from aggregate events</note>
+        <note x="0" y="-1">Projected from aggregate events</note>
       </projector>
     </container>
   </projector>
