@@ -1,5 +1,7 @@
 # Event Storming Diagram Renderer for GitHub and VS Code
 
+🌐 **[Playground](https://rexebin.github.io/event-storming-plugin/)** — try it live in your browser
+
 A **browser extension** (Manifest V3) and **VS Code Markdown preview extension** that render **event storming** diagrams from fenced code blocks.
 
 > ⚠️ **Event storming diagrams should be small and concise.** A complex or sprawling event storming diagram is often a signal — not an achievement — that the underlying domain design or code structure needs simplification. 
