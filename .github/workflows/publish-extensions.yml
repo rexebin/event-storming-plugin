@@ -3,14 +3,18 @@ name: Publish Extensions
 # Triggered by pushing a version tag, e.g. `git tag v1.1.0 && git push origin v1.1.0`.
 # Also runnable manually (workflow_dispatch) for a dry run without a tag.
 #
+# Publishes to Chrome Web Store and Microsoft Edge Add-ons. VS Code Marketplace
+# publishing is handled separately by azure-pipelines.yml (Microsoft Entra ID
+# workload identity federation, not a GitHub Actions secret) — see
+# docs/PUBLISHING.md for why.
+#
 # Each publish job only runs if its marketplace secrets are configured, so this
-# workflow is safe to merge before all three accounts exist — jobs for
-# marketplaces you haven't set up yet are skipped automatically.
+# workflow is safe to merge before both accounts exist — jobs for marketplaces
+# you haven't set up yet are skipped automatically.
 #
 # Required secrets per marketplace — see docs/PUBLISHING.md for how to obtain them:
-#   VS Code Marketplace: VSCE_PAT
-#   Chrome Web Store:    CHROME_EXTENSION_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN
-#   Edge Add-ons:        EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_CLIENT_SECRET, EDGE_ACCESS_TOKEN_URL
+#   Chrome Web Store: CHROME_EXTENSION_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN
+#   Edge Add-ons:     EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_CLIENT_SECRET, EDGE_ACCESS_TOKEN_URL
 
 on:
   push:
@@ -65,19 +69,6 @@ jobs:
             event-storming-plugin.vsix
             event-storming-plugin-chrome.zip
           retention-days: 30
-
-  publish-vscode:
-    needs: [verify-version, build]
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && secrets.VSCE_PAT != '' }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: extension-packages
-      - name: Publish to VS Code Marketplace
-        run: npx @vscode/vsce publish --packagePath event-storming-plugin.vsix --pat "$VSCE_PAT"
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
   publish-chrome:
     needs: [verify-version, build]

@@ -1,0 +1,67 @@
+# Publishes the extension to the VS Code Marketplace using Microsoft Entra ID
+# workload identity federation (no long-lived secrets) — see docs/PUBLISHING.md.
+#
+# Personal Access Tokens for the VS Code Marketplace retire 2026-12-01, so this
+# pipeline uses the replacement `vsce publish --azure-credential` flow instead.
+#
+# This pipeline must be created in Azure DevOps with this GitHub repo as its
+# source, and the <SERVICE_CONNECTION_NAME> placeholder below replaced with the
+# name of the service connection created per docs/PUBLISHING.md.
+
+trigger:
+  tags:
+    include:
+      - 'v*.*.*'
+  branches:
+    exclude:
+      - '*'
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '22.x'
+    displayName: 'Install Node.js'
+
+  - script: npm ci
+    displayName: 'Install dependencies'
+
+  - script: npm run build
+    displayName: 'Build'
+
+  - script: npx vitest run
+    displayName: 'Test'
+
+  - script: |
+      set -euo pipefail
+      PKG_VERSION=$(node -p "require('./package.json').version")
+      MANIFEST_VERSION=$(node -p "require('./manifest.json').version")
+      if [ "$PKG_VERSION" != "$MANIFEST_VERSION" ]; then
+        echo "package.json version ($PKG_VERSION) and manifest.json version ($MANIFEST_VERSION) must match"
+        exit 1
+      fi
+      TAG_VERSION="${BUILD_SOURCEBRANCHNAME#v}"
+      if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+        echo "Tag ${BUILD_SOURCEBRANCHNAME} does not match package.json version ($PKG_VERSION)"
+        exit 1
+      fi
+    displayName: 'Verify version consistency'
+
+  - script: |
+      npm install -g @vscode/vsce
+      vsce package -o event-storming-plugin.vsix
+    displayName: 'Package extension'
+
+  - task: AzureCLI@2
+    displayName: 'Publish to VS Code Marketplace'
+    inputs:
+      azureSubscription: '<SERVICE_CONNECTION_NAME>'
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        vsce publish --azure-credential --packagePath event-storming-plugin.vsix
