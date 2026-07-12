@@ -5,3 +5,6 @@ dist/
 # IDE
 .vscode/
 .idea/
+# packaged extension artifacts (built by CI, see .github/workflows/publish-extensions.yml)
+*.vsix
+*.zip

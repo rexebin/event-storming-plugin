@@ -1,0 +1,199 @@
+name: Publish Extensions
+
+# Triggered by pushing a version tag, e.g. `git tag v1.1.0 && git push origin v1.1.0`.
+# Also runnable manually (workflow_dispatch) for a dry run without a tag.
+#
+# Publishes to Chrome Web Store and Microsoft Edge Add-ons. VS Code Marketplace
+# publishing is handled separately by azure-pipelines.yml (Microsoft Entra ID
+# workload identity federation, not a GitHub Actions secret) — see
+# docs/PUBLISHING.md for why.
+#
+# Each publish job only runs if its marketplace secrets are configured, so this
+# workflow is safe to merge before both accounts exist — jobs for marketplaces
+# you haven't set up yet are skipped automatically.
+#
+# Required secrets per marketplace — see docs/PUBLISHING.md for how to obtain them:
+#   Chrome Web Store: CHROME_EXTENSION_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN
+#   Edge Add-ons:     EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_CLIENT_SECRET, EDGE_ACCESS_TOKEN_URL
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          MANIFEST_VERSION=$(node -p "require('./manifest.json').version")
+          if [ "$PKG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "package.json version ($PKG_VERSION) and manifest.json version ($MANIFEST_VERSION) must match"
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+              echo "Tag ${GITHUB_REF_NAME} does not match package.json version ($PKG_VERSION)"
+              exit 1
+            fi
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx vitest run
+      - name: Package VS Code extension
+        run: npx @vscode/vsce package -o event-storming-plugin.vsix
+      - name: Package browser extension
+        run: cd dist && zip -r ../event-storming-plugin-chrome.zip . -x 'vscode-preview.js'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-packages
+          path: |
+            event-storming-plugin.vsix
+            event-storming-plugin-chrome.zip
+          retention-days: 30
+
+  publish-chrome:
+    needs: [verify-version, build]
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ github.event_name == 'push' && secrets.CHROME_EXTENSION_ID != '' &&
+          secrets.CHROME_CLIENT_ID != '' && secrets.CHROME_CLIENT_SECRET != '' &&
+          secrets.CHROME_REFRESH_TOKEN != '' }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-packages
+      - name: Publish to Chrome Web Store
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          ACCESS_TOKEN=$(curl -sS -X POST https://oauth2.googleapis.com/token \
+            -d "client_id=${CHROME_CLIENT_ID}" \
+            -d "client_secret=${CHROME_CLIENT_SECRET}" \
+            -d "refresh_token=${CHROME_REFRESH_TOKEN}" \
+            -d "grant_type=refresh_token" | node -p "JSON.parse(require('fs').readFileSync(0)).access_token")
+
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "undefined" ]; then
+            echo "Failed to obtain Chrome Web Store access token"
+            exit 1
+          fi
+
+          echo "Uploading package..."
+          UPLOAD_RESPONSE=$(curl -sS -X PUT \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -T event-storming-plugin-chrome.zip \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}")
+          echo "$UPLOAD_RESPONSE"
+          echo "$UPLOAD_RESPONSE" | node -e "
+            const r = JSON.parse(require('fs').readFileSync(0));
+            if (r.uploadState !== 'SUCCESS') { console.error('Upload failed'); process.exit(1); }
+          "
+
+          echo "Publishing..."
+          PUBLISH_RESPONSE=$(curl -sS -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}/publish")
+          echo "$PUBLISH_RESPONSE"
+          echo "$PUBLISH_RESPONSE" | node -e "
+            const r = JSON.parse(require('fs').readFileSync(0));
+            const ok = Array.isArray(r.status) && (r.status.includes('OK') || r.status.includes('ITEM_PENDING_REVIEW'));
+            if (!ok) { console.error('Publish failed'); process.exit(1); }
+          "
+
+  publish-edge:
+    needs: [verify-version, build]
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ github.event_name == 'push' && secrets.EDGE_PRODUCT_ID != '' &&
+          secrets.EDGE_CLIENT_ID != '' && secrets.EDGE_CLIENT_SECRET != '' &&
+          secrets.EDGE_ACCESS_TOKEN_URL != '' }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-packages
+      - name: Publish to Microsoft Edge Add-ons
+        env:
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_CLIENT_SECRET: ${{ secrets.EDGE_CLIENT_SECRET }}
+          EDGE_ACCESS_TOKEN_URL: ${{ secrets.EDGE_ACCESS_TOKEN_URL }}
+        run: |
+          set -euo pipefail
+
+          ACCESS_TOKEN=$(curl -sS -X POST "${EDGE_ACCESS_TOKEN_URL}" \
+            -d "client_id=${EDGE_CLIENT_ID}" \
+            -d "client_secret=${EDGE_CLIENT_SECRET}" \
+            -d "grant_type=client_credentials" \
+            -d "scope=https://api.addons.microsoftedge.microsoft.com/.default" \
+            | node -p "JSON.parse(require('fs').readFileSync(0)).access_token")
+
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "undefined" ]; then
+            echo "Failed to obtain Edge Add-ons access token"
+            exit 1
+          fi
+
+          echo "Uploading package..."
+          UPLOAD_HEADERS=$(curl -sS -D - -o /dev/null -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@event-storming-plugin-chrome.zip" \
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/${EDGE_PRODUCT_ID}/submissions/draft/package")
+
+          OPERATION_ID=$(echo "$UPLOAD_HEADERS" | grep -i '^Location:' | sed -E 's/.*operations\/([^ \r\n]+).*/\1/')
+          if [ -z "$OPERATION_ID" ]; then
+            echo "Failed to start upload operation"
+            echo "$UPLOAD_HEADERS"
+            exit 1
+          fi
+
+          echo "Waiting for upload to process (operation ${OPERATION_ID})..."
+          for i in $(seq 1 20); do
+            STATUS_RESPONSE=$(curl -sS -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              "https://api.addons.microsoftedge.microsoft.com/v1/products/${EDGE_PRODUCT_ID}/submissions/draft/package/operations/${OPERATION_ID}")
+            STATUS=$(echo "$STATUS_RESPONSE" | node -p "JSON.parse(require('fs').readFileSync(0)).status")
+            echo "  status: $STATUS"
+            if [ "$STATUS" = "Succeeded" ]; then
+              break
+            fi
+            if [ "$STATUS" = "Failed" ]; then
+              echo "$STATUS_RESPONSE"
+              exit 1
+            fi
+            sleep 15
+          done
+          if [ "$STATUS" != "Succeeded" ]; then
+            echo "Upload did not complete in time"
+            exit 1
+          fi
+
+          echo "Publishing..."
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Length: 0" \
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/${EDGE_PRODUCT_ID}/submissions"
