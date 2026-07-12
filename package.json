@@ -31,6 +31,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package:vscode": "npm run build && npx @vscode/vsce package",
+    "package:chrome": "npm run build && cd dist && zip -r ../event-storming-plugin-chrome.zip . -x 'vscode-preview.js'",
     "playground": "cd playground && vp dev"
   },
   "contributes": {
