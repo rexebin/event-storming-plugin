@@ -331,6 +331,52 @@ export function computeLayout(model: DSLModel): LayoutResult {
       expandGroupBoundsForNotes(group, groupNotes);
     });
 
+    // A note can pull its owning group's top edge upward (to fit above its parent node),
+    // which may push it into the group positioned right before it. Cascade a downward
+    // shift through that group — and every group after it — so groups never overlap.
+    let cascadeShift = 0;
+    let prevGroupBottom: number | null = null;
+    container.processes.forEach((process, processIndex) => {
+      const group = allGroups.find((g) => g.id === `${container.id}_group_${processIndex}`);
+      if (!group) return;
+
+      const unshiftedTop = group.y + cascadeShift;
+      const overlap = prevGroupBottom !== null ? Math.max(0, prevGroupBottom + GROUP_GAP_Y - unshiftedTop) : 0;
+      const shiftAmount = cascadeShift + overlap;
+
+      if (shiftAmount > 0) {
+        const idsToShift = new Set(process.stepIds);
+        for (const n of allNodes) {
+          if (n.type === 'note' && n.parentId && idsToShift.has(n.parentId)) idsToShift.add(n.id);
+        }
+        for (const n of allNodes) { if (idsToShift.has(n.id)) n.y += shiftAmount; }
+        group.y += shiftAmount;
+        for (const sg of allSubGroups) {
+          if (sg.id.startsWith(`${container.id}_subgroup_${processIndex}_`)) sg.y += shiftAmount;
+        }
+      }
+
+      cascadeShift = shiftAmount;
+      prevGroupBottom = group.y + group.height;
+    });
+
+    // Re-derive the outer bounds now that note expansion/cascading may have grown or moved content.
+    for (const n of allNodes.slice(nodesBefore)) {
+      if (!treeIds.has(n.containerId!)) continue;
+      maxRight = Math.max(maxRight, n.x + NODE_W);
+      maxBottom = Math.max(maxBottom, n.y + NODE_H);
+    }
+    for (const g of allGroups.slice(groupsBefore)) {
+      if (g.containerId !== container.id) continue;
+      maxRight = Math.max(maxRight, g.x + g.width);
+      maxBottom = Math.max(maxBottom, g.y + g.height);
+    }
+    for (const sg of allSubGroups.slice(subGroupsBefore)) {
+      if (sg.containerId !== container.id) continue;
+      maxRight = Math.max(maxRight, sg.x + sg.width);
+      maxBottom = Math.max(maxBottom, sg.y + sg.height);
+    }
+
     const width  = maxRight  + CONTAINER_PADDING;
     const height = maxBottom + CONTAINER_PADDING + CONTAINER_BOTTOM_EXTRA;
 
