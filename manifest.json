@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Event Storming Diagram Renderer",
-  "version": "1.0.0",
+  "name": "Event Storming Renderer",
+  "version": "1.0.2",
   "description": "Render event storming diagrams on GitHub from fenced code blocks.",
   "icons": {
     "16": "icon.png",
