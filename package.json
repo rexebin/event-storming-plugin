@@ -1,8 +1,8 @@
 {
-  "name": "event-storming-plugin",
-  "displayName": "Event Storming Diagram Renderer",
+  "name": "event-storming-renderer",
+  "displayName": "Event Storming Renderer",
   "publisher": "rexebin",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Render event storming diagrams on GitHub and in VS Code Markdown preview.",
   "icon": "icon.png",
   "license": "GPL-3.0-only",
